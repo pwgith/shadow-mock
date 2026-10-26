@@ -51,7 +51,7 @@ Rules without an automated check are marked **(review)** and enforced in code re
 
 ## 4. Naming
 
-* **Packages:** short, lower case, a single word, no underscores or plurals, and not `util`, `utils`, `common`, `helpers`, `misc` or `base` (`revive` var-naming, plus the package-name check in `scripts/lint.sh`). Name for what the package provides: `detect`, `scenario`, `blob`.
+* **Packages:** short, lower case, a single word, no underscores or plurals, and not `util`, `utils`, `common`, `helpers`, `misc` or `base` (`revive` var-naming, plus the package-name check in `scripts/lint.sh`). Name for what the package provides: `detect`, `counter`, `blob`.
 * **No stutter:** `session.Session` is fine, but `session.SessionStore` is not; use `session.Store`.
 * **MixedCaps:** never underscores in Go identifiers, except in tests (`TestResolve_layerBeatsPriority`) and generated code.
 * **Initialisms** keep a consistent case: `ID`, `URL`, `HTTP`, `JSON`, `XML`, `JWT`, `JWKS`, `IP`, `TTL`, `API`, `SQL`, `UUID`, `TLS`, `CIDR`, `SSRF`. For example `urlMockID`, `ParseJWT`, `clientIP`, `HTTPClient`. Enforced by `staticcheck` ST1003 with the project initialisms list.
@@ -165,7 +165,7 @@ Other structure rules:
 * Test helpers call `t.Helper()` (`thelper`). Use `t.Parallel()` where the test has no shared state (`tparallel` checks consistency). Use `t.Context()` for test contexts.
 * Fixtures live in `testdata/`. Golden files update with `-update`.
 * Fuzz tests (`FuzzXxx`) for every parser: mapping JSON, body scanner, template parser, CIDR input.
-* Coverage targets are at least 85 % for `engine`, `match`, `detect` and `scenario`, and at least 70 % overall (`scripts/lint.sh` reports, and CI enforces).
+* Coverage targets are at least 85 % for `engine`, `match`, `detect` and `counter`, and at least 70 % overall (`scripts/lint.sh` reports, and CI enforces).
 * **Acceptance specs:** the Gherkin features in `features/` run with godog. Step definitions live in `test/acceptance/steps_*.go` and reuse the vocabulary in `features/README.md`. A behaviour change updates the relevant `.feature` file in the same pull request.
 
 ## 17. Dependencies

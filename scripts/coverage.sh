@@ -8,7 +8,7 @@ PROFILE="${1:-coverage.out}"
 MODULE="github.com/pwgith/shadow-mock"
 OVERALL_MIN=70
 CORE_MIN=85
-CORE_PACKAGES=(internal/engine internal/match internal/detect internal/scenario)
+CORE_PACKAGES=(internal/engine internal/match internal/detect internal/counter)
 
 failed=0
 

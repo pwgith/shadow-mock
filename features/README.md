@@ -12,7 +12,6 @@ features/
 │   ├── mappings/              loading, admin CRUD, priority
 │   ├── request_matching/      URL, method, headers/query/cookies, value matchers, bodies, auth, custom
 │   ├── responses/             definitions, templating, delays, faults, proxying, gzip, unmatched
-│   ├── stateful/              scenarios
 │   ├── journal/               request journal, verification, near misses
 │   ├── record_playback/       recording and snapshots
 │   ├── webhooks/              serve-event listeners
@@ -31,7 +30,8 @@ features/
 │   ├── plans_and_limits/      entitlements, rate and session limits, metering
 │   └── operations/            health, shutdown, SSRF
 ├── 05_management_app/         SaaS management app (Next.js) behaviour that the engine depends on
-└── 06_non_functional/         performance, security, compatibility
+├── 06_non_functional/         performance, security, compatibility
+└── 07_stateful_responses/     call-count responses (replace WireMock scenarios); scenario rejection
 ```
 
 ## Modes and tags
@@ -126,7 +126,7 @@ And I remember the response JSON at "$.id" as "ID"         # use later as ${ID}
 | Double | Used by |
 |---|---|
 | **Fake Clerk issuer** (JWKS endpoint, mints user and M2M JWTs with arbitrary claims) | `04_saas/auth`, `05_management_app` |
-| **Test clock** (injected `clock.Clock`) | TTLs, retention, scenario expiry, templating `now` |
+| **Test clock** (injected `clock.Clock`) | TTLs, retention, counter expiry, templating `now` |
 | **Upstream stub server** (records requests, configurable responses) | Proxying, recording |
 | **Webhook receiver** | Webhooks |
 | **In-memory S3** (or MinIO) | Object storage |

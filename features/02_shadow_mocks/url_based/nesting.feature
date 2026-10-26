@@ -38,13 +38,18 @@ Feature: Key-based shadow mocks nested inside a URL-based shadow mock
     When I send a "GET" request to "/a" with header "X-Shadow-Mock-Key" set to "${K1.key}"
     Then the response body is "global"
 
-  Scenario: The nested session forks scenario state from its parent
-    Given the URL-based shadow mock "U1" has scenario "s" in state "Advanced"
+  Scenario: The nested session starts its call counters at zero
+    Given the global mapping:
+      """json
+      { "request": { "urlPath": "/n" }, "response": { "status": 200 }, "callResponses": [ { "calls": "1", "response": { "status": 201 } } ] }
+      """
+    And I send a "GET" request to "/n" via "U1"
     And a key-based shadow mock "K2" with:
       """json
       { "parentId": "${U1.id}" }
       """
-    Then the scenario "s" in "K2" is in state "Advanced"
+    When I send a "GET" request to "/n" via "U1" with header "X-Shadow-Mock-Key" set to "${K2.key}"
+    Then the response status is 201
 
   Scenario: Deleting the parent deletes its nested sessions
     When I call admin "DELETE" "/sessions/${U1.id}"

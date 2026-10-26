@@ -1,7 +1,7 @@
 @saas @P5 @FR-9.4 @FR-9.7 @security
 Feature: Tenant isolation
   No org can read, change or influence another org's mappings, sessions,
-  journals, scenario state, files or stats.
+  journals, call counters, files or stats.
 
   Background:
     Given Shadow Mock is running in SaaS mode
@@ -31,10 +31,11 @@ Feature: Tenant isolation
     When I call admin "GET" "https://shadowmock.test/acme/__admin/requests"
     Then no journal entry mentions "/secret"
 
-  Scenario: Scenario state is per org
-    Given org "globex" advanced global scenario "flow" to "Done"
-    And org "acme" has the same global scenario "flow"
-    Then the scenario "flow" for org "acme" is in state "Started"
+  Scenario: Call counters are per org
+    Given orgs "acme" and "globex" each have a global mapping with id "ffffffff-0000-0000-0000-000000000009" for "/n" that returns 201 on call 1
+    And org "globex" has called "/n" 5 times
+    When I send a "GET" request to "https://shadowmock.test/acme/n"
+    Then the response status is 201
 
   Scenario: Shared journal body objects are unreachable except through the owner's rows
     Given org "globex" has a journal entry with a 10 KB body stored in a shared body object

@@ -54,11 +54,11 @@ shadowmock/
 │   │   ├── fs/                # WireMock file layout (mappings/, __files/), fsnotify
 │   │   ├── memory/
 │   │   ├── postgres/          # SaaS: configuration, journal rows, LISTEN/NOTIFY
-│   │   └── redis/             # SaaS: scenario state, session registry, hot journal, fan-out, rate limits
+│   │   └── redis/             # SaaS: call counters, session registry, hot journal, fan-out, rate limits
 │   ├── session/               # Session, Registry, key generation, TTL reaper
 │   ├── detect/                # Detector, Aho-Corasick automaton, staged pipeline
 │   ├── engine/                # Layer, Snapshot, Stack, Resolve
-│   ├── scenario/              # per-layer scenario state, forked from the parent at session creation
+│   ├── counter/               # call counters per stub and request scope (call-count responses)
 │   ├── respond/               # rendering, templating, delays, faults, proxy
 │   │   └── template/          # Handlebars (raymond) + WireMock helpers
 │   ├── journal/               # hot journal (ring buffer | Redis), batch writer, verification
@@ -148,9 +148,7 @@ type StubMapping struct {
     Request               RequestPattern     `json:"request"`
     Response              ResponseDefinition `json:"response"`
     Persistent            bool               `json:"persistent,omitempty"`
-    ScenarioName          string             `json:"scenarioName,omitempty"`
-    RequiredScenarioState string             `json:"requiredScenarioState,omitempty"`
-    NewScenarioState      string             `json:"newScenarioState,omitempty"`
+    CallResponses         []CallResponse     `json:"callResponses,omitempty"` // Shadow Mock extension (FR-4.1)
     Metadata              map[string]any     `json:"metadata,omitempty"`
     PostServeActions      json.RawMessage    `json:"postServeActions,omitempty"`
     ServeEventListeners   json.RawMessage    `json:"serveEventListeners,omitempty"`
@@ -159,6 +157,8 @@ type StubMapping struct {
     InsertionIndex int64             `json:"-"`
 }
 ```
+
+`CallResponse` is `{calls string | every int, response ResponseDefinition}`; `calls` accepts `"3"`, `"1-2"` and `"100+"`, and is parsed into a `CallRule` at compile time (§6.3). The decoder rejects WireMock's scenario fields rather than keeping them in `Extra` (FR-4.4).
 
 `RequestPattern` and `ResponseDefinition` mirror the WireMock schema. Matchers are a tagged union (`StringValuePattern`) decoded by inspecting the single operator key (`equalTo`, `matches`, and so on), which is how WireMock serialises them.
 
@@ -235,11 +235,7 @@ type SessionRepository interface {
     Watch(ctx context.Context) (<-chan ChangeEvent, error)
 }
 
-type ScenarioRepository interface { // memory in standalone; Redis in SaaS
-    Get(ctx context.Context, s Scope, scenario string) (state string, ok bool, err error)
-    Set(ctx context.Context, s Scope, scenario, state string) error
-    Reset(ctx context.Context, s Scope) error
-}
+// Call counters use counter.Counters (§6.3): memory in standalone, Redis in SaaS.
 
 type JournalRepository interface {
     Append(ctx context.Context, e journal.Entry) error
@@ -275,7 +271,7 @@ type Provider interface {
     Mappings() MappingRepository
     Files() FileRepository
     Sessions() SessionRepository
-    Scenarios() ScenarioRepository
+    Counters() counter.Counters
     Journal() JournalRepository
     Blobs() BlobStore
     Close() error
@@ -291,7 +287,7 @@ func Open(cfg config.Storage) (Provider, error) // registry: store.Register("fs"
 | `fs` | `<root>/mappings`, `<root>/__files` (WireMock layout) | Memory by default, so sessions stay ephemeral. Optional `<root>/sessions/<id>/mappings` for persistence | `fsnotify`, debounced 200 ms |
 | `memory` | in memory | in memory | in-process channel |
 | `postgres` | `mappings(org_id, session_id NULL, id, body JSONB, …)` (SAAS.md §6.1) | same table, `session_id` set | `LISTEN/NOTIFY` via one leader, fanned out over Redis (SAAS.md §6.2) |
-| `redis` | – | Scenario state, session registry with TTL, hot journal | Pub/sub channel `sm:changes` |
+| `redis` | Global call counters | Call counters, session registry with TTL, hot journal | Pub/sub channel `sm:changes` |
 | `s3` (`BlobStore`) | `files/<org>/…`, shared `journal/…` objects | same | – (metadata rows carry the change events) |
 
 A **composite provider** lets standalone use `fs` for global data and `memory` for sessions and journal, which is the default.
@@ -341,7 +337,6 @@ type Layer struct {
     Scope     store.Scope
     Kind      session.Kind
     snap      atomic.Pointer[Snapshot]
-    Scenarios *scenario.State // per-layer; forked from the parent at session creation (§6.3)
 }
 
 func (l *Layer) Snapshot() *Snapshot { return l.snap.Load() }
@@ -370,9 +365,6 @@ func (e *Engine) Resolve(ctx context.Context, req *Request, stack Stack) Result 
             if hidden.has(cs.ID) || hidden.matchesPattern(req) {
                 continue
             }
-            if !cs.ScenarioOK(stack.ScenarioView(layer)) {
-                continue
-            }
             if cs.Match(req).Matched {
                 return Result{Stub: cs, Layer: layer}
             }
@@ -389,37 +381,59 @@ Key rules:
 * **The layer beats priority** (FR-7.5): the outer loop is the layer, and priority ordering applies only within a snapshot.
 * **Override by ID**: a key-based or URL-based shadow mock stub with ID X hides global stub X even if that copy does not match this request. That is what "replace this mapping" means.
 * `Request` is a parsed view (method, URL parts, headers, cookies, query, body bytes, lazily parsed JSON and XML) built **once** and shared across layers.
+* **Matching never depends on state.** Resolution is a pure function of the request and the snapshots. Call counts only choose **which response** the selected stub returns (§6.3), so they are read after matching, never during it.
 
-### 6.3 Scenario isolation (FR-7.6)
+### 6.3 Call-count responses (FR-4.1 to FR-4.4, FR-7.6)
 
-Each session owns a full, independent copy of scenario state, **snapshotted from its parent when the session is created**. Global and session state never share data afterwards.
+WireMock scenarios are not supported. In their place, a stub can pick its response by call number.
 
 ```go
-type State struct {
-    mu     sync.RWMutex
-    states map[string]string // scenario name → current state
+package counter
+
+// Key identifies one counter: who is calling (the request's most specific scope) and
+// which stub is serving (the stub's own scope and id). Including the stub's scope keeps
+// a session override and the global stub it hides on separate counters.
+type Key struct {
+    RequestScope store.Scope // the session the request was attributed to, or global
+    StubScope    store.Scope // the layer the serving stub belongs to
+    StubID       string
 }
 
-// Fork is called once, at session creation, under the parent's read lock.
-func (s *State) Fork() *State {
-    s.mu.RLock(); defer s.mu.RUnlock()
-    return &State{states: maps.Clone(s.states)}
+type Counters interface {
+    Next(ctx context.Context, k Key) (int64, error)            // atomic increment, returns 1, 2, 3, …
+    List(ctx context.Context, s store.Scope) ([]Entry, error)   // counters whose RequestScope is s
+    Set(ctx context.Context, k Key, n int64) error
+    Reset(ctx context.Context, s store.Scope, stubID string) error // stubID "" = all in scope
 }
-
-func (s *State) Get(name string) string {
-    s.mu.RLock(); defer s.mu.RUnlock()
-    if v, ok := s.states[name]; ok { return v }
-    return scenario.Started // scenario added to global after the fork
-}
-
-func (s *State) Set(name, state string) { s.mu.Lock(); s.states[name] = state; s.mu.Unlock() }
-func (s *State) Reset()                 { s.mu.Lock(); clear(s.states); s.mu.Unlock() } // all → Started
 ```
 
-* For any request with a session, **every** scenario read and transition uses the most specific layer's `State`, whichever layer the serving stub came from. The global state changes only for requests without a session.
-* A key-based shadow mock nested in a URL-based shadow mock forks from the URL-based shadow mock's state.
-* The snapshot is a single map clone, so it costs O(number of scenarios). That is negligible for realistic counts.
-* In SaaS, with scenario state in Redis, the fork is a server-side copy of the parent hash (Lua `HGETALL` + `HSET`) inside the session-create path.
+```go
+// CompiledStub keeps its call rules pre-parsed.
+type CallRule struct {
+    From, To int64             // inclusive; To = 0 means open-ended ("100+")
+    Every    int64             // > 0 for "every n"
+    Response *CompiledResponse
+}
+
+// ResponseFor returns the response for call n: first matching rule, else the default.
+func (cs *CompiledStub) ResponseFor(n int64) *CompiledResponse {
+    for _, r := range cs.CallRules {
+        if r.Every > 0 && n%r.Every == 0 { return r.Response }
+        if r.Every == 0 && n >= r.From && (r.To == 0 || n <= r.To) { return r.Response }
+    }
+    return cs.Response
+}
+```
+
+* **The counter is only touched when needed.** After `Resolve` selects a stub, the engine calls `Counters.Next` only if the stub has `callResponses` or its templates use `request.callNumber`. Most stubs never touch a counter.
+* **Scope:** `RequestScope` is the most specific layer in the request's stack:
+  * The session, for key-based and URL-based traffic. A key-based shadow mock nested in a URL-based one has its own counters.
+  * Global, for plain traffic.
+
+  A new session therefore starts at zero, with nothing copied (FR-7.6).
+* **Lifetime:** counters for a session are deleted with the session. Replacing or deleting a stub resets its counters. In standalone, an in-memory `map[Key]*atomic.Int64` is used. In SaaS, a Redis `INCR` on `cnt:{org}:{requestScope}:{stubScope}:{stubID}` gives atomic, gap-free numbers across instances, with the session's TTL applied to its keys.
+* **Rejected scenario fields:** the mapping decoder rejects `scenarioName`, `requiredScenarioState` and `newScenarioState` with `scenarios_not_supported`. They are deliberately **not** kept in `Extra`, so they can never be silently ignored (FR-4.4).
+* **Recording:** `repeatsAsCallResponses` folds identical requests that got different responses into one stub, with `calls` rules in recorded order.
 
 ## 7. Session detection
 
@@ -506,8 +520,9 @@ The body is read once into a pooled buffer, capped at `maxBodyBytes` (hard limit
 4. stack := build:  [key-based?] + [url-based?] + [global(tenant)]
 5. res := Engine.Resolve(req, stack)
 6. if res.Stub == nil → 404 with near-miss body (WireMock format)
-   else → respond.Render(res.Stub, req, templateCtx{layer, session})   // gzip if accepted
-          scenario transition on the most specific layer's state
+   else → if the stub has callResponses or uses request.callNumber:
+              n = Counters.Next(Key{requestScope, stubScope, stubID}); resp = res.Stub.ResponseFor(n)
+          respond.Render(resp, req, templateCtx{layer, session, callNumber: n})   // gzip if accepted
 7. journal.Append(Entry{tenant, sessionID, layerKind, stubID, req, resp, timings, detectHit})
 8. webhooks fire asynchronously
 ```
@@ -593,14 +608,16 @@ Because WireMock handlers are written once against a `Scope`, every WireMock end
 | `POST /__admin/sessions/{id}/keepalive` | Extend the TTL by its original duration |
 | `* /__admin/sessions/{id}/mappings…` | WireMock mappings API, session-scoped |
 | `* /__admin/sessions/{id}/requests…` | Journal and verification, session-scoped |
-| `* /__admin/sessions/{id}/scenarios…` | Scenario state, session-scoped |
+| `GET /__admin/sessions/{id}/counters`, `POST …/counters/reset`, `PUT/DELETE …/counters/{stubMappingId}` | Call counters, session-scoped (FR-4.3) |
 | `* /__admin/sessions/{id}/near-misses…` | Near misses, session-scoped |
 | `POST /__admin/sessions/{id}/recordings/start` | Record into the session |
 
-Shadow Mock extensions, used mainly by the management app:
+Shadow Mock extensions:
 
 | Method and path | Purpose |
 |---|---|
+| `GET /__admin/counters`, `POST /__admin/counters/reset`, `PUT/DELETE /__admin/counters/{stubMappingId}` | Global call counters: list, reset all, set or reset one (FR-4.3) |
+| `GET /__admin/scenarios…` | Always `404 not_supported` (FR-4.4) |
 | `POST /__admin/mappings/validate` | Validate a mapping against the engine's own parser and matchers |
 | `POST /__admin/mappings/dry-run` | Resolve a sample request against a scope and return what would be served |
 | `GET /__admin/stats/live` | Live counters for the org |
@@ -651,7 +668,7 @@ storage:
     hot:  { driver: memory, maxEntries: 10000, maxBodyBytes: 65536 }  # SaaS: redis, maxEntries 1000 per scope (plan-dependent)
     warm: { driver: none }   # SaaS: postgres, rowBatchMs: 250, rowBatchSize: 500, inlineMaxBytes: 4096,
                              #       bodyObjectFlushMs: 5000, bodyObjectMaxBytes: 8388608
-  scenarios: { driver: memory }   # SaaS: redis
+  counters: { driver: memory }    # SaaS: redis
   blobs:
     driver: fs                    # fs | memory | s3
     dir: ./blobs
@@ -710,7 +727,7 @@ templating: { global: false }
 |---|---|---|
 | Layer snapshots | `atomic.Pointer` load, no locks | Rebuild off-path, then an atomic store |
 | Detector index | `atomic.Pointer` load per tenant | Debounced rebuild, then an atomic store |
-| Scenario state | Standalone: `RWMutex` per layer (contention is per session only). SaaS: Redis hash per scope | `Lock` on transition / atomic Lua transition |
+| Call counters | Standalone: `atomic.Int64` per key in a `sync.Map`. SaaS: Redis key per counter | Atomic increment (`Add` / `INCR`) |
 | Journal | Standalone: ring buffer. SaaS: Redis hot list per scope | Append / pipelined `LPUSH`+`LTRIM`; warm tier batched off-path |
 | Session registry | `sync.Map` id → session | Repository write, then a change event |
 
@@ -727,7 +744,7 @@ The full SaaS platform context (Next.js and Clerk on Vercel, the separate manage
 | Network | optional `local.ipAllowlist` | Per-org IP allowlist from the management app |
 | Storage | `fs` + `memory` | `postgres` shared with the management app; bodies and `__files` in S3-compatible object storage (R2) |
 | Change events | fsnotify, in-process | Postgres triggers → `pg_notify` → one listener → Redis pub/sub → all instances, plus 30 s reconciliation |
-| Scenario state, hot session registry | memory | Redis-compatible shared cache (atomic transitions with Lua) |
+| Call counters, hot session registry | memory | Redis-compatible shared cache (atomic `INCR`, TTL per session) |
 | Journal and stats | ring buffer | Hot: Redis per session and org (verification). Warm: batched lean Postgres rows plus shared body objects. Counters in memory → Redis every second, rolled up per minute |
 | Quotas and metering | none | Plan limits from `orgs.limits` (rps, sessions, hot journal, retention, CI keys) via middleware and `Authorizer`; meters to `usage_daily` |
 | Hosting | binary or Docker | Render web service (autoscaled, min 2), Render Key Value on the private network, Supabase Postgres, R2. The same Docker image runs anywhere (Fly.io as the fallback for true TCP faults) |
@@ -736,9 +753,9 @@ None of these changes touch `engine`, `match`, `detect` or `admin` handler code.
 
 ## 14. Testing strategy
 
-* **Unit tests:** each matcher, the template helpers, the detector stages and ambiguity policies, scenario forking at session creation, and the stack resolution rules (layer beats priority, override by ID, masks).
+* **Unit tests:** each matcher, the template helpers, the detector stages and ambiguity policies, call-rule parsing and selection (`ResponseFor`), rejection of scenario fields, and the stack resolution rules (layer beats priority, override by ID, masks).
 * **Conformance suite** (`test/conformance`): WireMock's documented mapping examples, each run as request → expected response. Optionally a differential mode that runs the same corpus against a real WireMock container.
-* **Concurrency tests:** many parallel key-based shadow mocks mutating the same scenario. Assert isolation under `-race`.
+* **Concurrency tests:** many parallel key-based shadow mocks calling the same stub with `callResponses`. Assert each session sees gap-free call numbers starting at 1, under `-race`.
 * **Benchmarks:** `Resolve` with 5k mappings, and `Detect` with 1 KiB, 100 KiB and 1 MiB bodies against 10, 1k and 10k active sessions (checks NFR-2.1 and NFR-2.2).
 * **Fuzzing:** `go test -fuzz` on mapping JSON decoding, the body scanner and template parsing.
 
@@ -747,7 +764,7 @@ None of these changes touch `engine`, `match`, `detect` or `admin` handler code.
 | Phase | Scope |
 |---|---|
 | **P0 – Core** | Model and JSON compatibility, `fs` and `memory` stores, URL, header, query and body matchers (equalTo, contains, regex, equalToJson, jsonPath), basic responses, admin mappings, requests and reset, auth interfaces with Noop, single global layer through the stack engine |
-| **P1 – Shadow** | Session registry and TTL, detection stages 1 to 3, then the Aho-Corasick metadata and body scans, session-scoped admin, scenario forking, override and mask |
+| **P1 – Shadow** | Session registry and TTL, detection stages 1 to 3, then the Aho-Corasick metadata and body scans, session-scoped admin, call-count responses with counters per session, scenario-field rejection, override and mask |
 | **P2 – URL-based shadow mocks** | `/d/<id>` path-prefix routing, nested key-based shadow mock inside a URL-based shadow mock |
 | **P3 – Parity** | Templating, delays and faults, gzip responses, proxy, record and playback, XML and XPath, JSON schema, multipart, webhooks, near misses, conformance suite |
 | **P4 – Central server** | Separate admin listener, metrics and tracing, Docker, hardening, quotas |
@@ -757,7 +774,7 @@ None of these changes touch `engine`, `match`, `detect` or `admin` handler code.
 
 1. **Layer beats priority.** It is predictable for test authors: "my session's mapping wins if it matches".
 2. **Override by ID hides even if not matching.** It gives "replace" semantics consistent with `PUT /mappings/{id}`.
-3. **Each session snapshots scenario state at creation and uses only its copy.** Reads and writes both go to the most specific layer, so global traffic can never change a running test's state, and the reverse is also true.
+3. **Call-count responses instead of scenarios.** Matching never depends on state. A counter per stub per request scope only selects the response, so sessions start at zero, nothing is forked, and a single atomic increment is the only per-request state operation.
 4. **Detection stops at the first stage with a hit.** Explicit signals (headers) outrank incidental ones (body text).
 5. **Per-tenant Aho-Corasick automaton, rebuilt copy-on-write.** Lookup cost is independent of session count, with no locks on reads.
 6. **Store is never read on the hot path.** It keeps a database-backed SaaS fast and makes the store swappable.

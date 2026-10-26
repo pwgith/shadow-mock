@@ -77,7 +77,7 @@ Feature: Key-based shadow mock lifecycle
     Then the response status is 200
     And admin "GET" "/sessions/${S1.id}" returns status 404
 
-  Scenario: Expiry discards the session's mappings, journal and scenario state
+  Scenario: Expiry discards the session's mappings, journal and call counters
     Given a key-based shadow mock "S1" with:
       """json
       { "ttlSeconds": 60 }
@@ -88,7 +88,7 @@ Feature: Key-based shadow mock lifecycle
       """
     And I send a "GET" request to "/x" with header "X-Shadow-Mock-Key" set to "${S1.key}"
     When the test clock advances by "2m"
-    Then the store holds no mappings, journal entries or scenario state for "S1"
+    Then the store holds no mappings, journal entries or call counters for "S1"
 
   Scenario: List active sessions with a kind filter
     Given a key-based shadow mock "S1"

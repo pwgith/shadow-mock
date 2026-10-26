@@ -73,8 +73,8 @@ tags:
     description: Count and find requests (FR-5.2).
   - name: Near misses
     description: Closest mappings for unmatched requests (FR-5.3).
-  - name: Scenarios
-    description: Stateful scenarios (FR-4.1, FR-7.6).
+  - name: Counters
+    description: Call counters for call-count responses (FR-4.1 to FR-4.4, FR-7.6). WireMock scenarios are not supported.
   - name: Recordings
     description: Record and snapshot (FR-6.1).
   - name: Settings
@@ -289,7 +289,7 @@ paths:
       tags: [Runtime]
       operationId: dryRunRequest
       summary: Resolve a sample request without recording it
-      description: Shows which layer and mapping would serve the request, and the rendered response. It never changes scenario state or the journal.
+      description: Shows which layer and mapping would serve the request, and the rendered response. It never advances call counters or writes to the journal. The result uses the call number the next real call would get.
       requestBody:
         required: true
         content:
@@ -528,49 +528,75 @@ paths:
               schema: { $ref: '#/components/schemas/NearMissList' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
-  # ───────────────────────────── Scenarios ─────────────────────────────
-  /__admin/scenarios:
+  # ───────────────────────────── Call counters ─────────────────────────────
+  /__admin/counters:
     get:
-      tags: [Scenarios]
-      operationId: listScenarios
-      summary: List scenarios and their current state
+      tags: [Counters]
+      operationId: listCounters
+      summary: List call counters in scope
+      description: Counters exist only for stubs with `callResponses` or that use `request.callNumber`, and only after their first call.
       parameters:
         - $ref: '#/components/parameters/ScopeKey'
       responses:
         '200':
-          description: Scenarios.
+          description: Counters.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ScenarioList' }
+              schema: { $ref: '#/components/schemas/CounterList' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
-  /__admin/scenarios/reset:
+  /__admin/counters/reset:
     post:
-      tags: [Scenarios]
-      operationId: resetScenarios
-      summary: Reset every scenario to Started
+      tags: [Counters]
+      operationId: resetCounters
+      summary: Reset every call counter in scope to zero
       parameters:
         - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200': { description: Reset. The next call to each stub is call 1. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/counters/{stubMappingId}:
+    parameters:
+      - $ref: '#/components/parameters/StubMappingId'
+      - $ref: '#/components/parameters/ScopeKey'
+    put:
+      tags: [Counters]
+      operationId: setCounter
+      summary: Set a stub's call counter
+      description: Sets how many calls have happened. The next call gets `count + 1`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CounterUpdate' }
+      responses:
+        '200':
+          description: Updated counter.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Counter' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Counters]
+      operationId: resetCounter
+      summary: Reset a stub's call counter to zero
       responses:
         '200': { description: Reset. }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
-  /__admin/scenarios/{scenarioName}/state:
-    put:
-      tags: [Scenarios]
-      operationId: setScenarioState
-      summary: Set one scenario's state, or reset it with an empty body
-      parameters:
-        - $ref: '#/components/parameters/ScenarioName'
-        - $ref: '#/components/parameters/ScopeKey'
-      requestBody:
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ScenarioStateUpdate' }
+  /__admin/scenarios:
+    get:
+      tags: [Counters]
+      operationId: scenariosNotSupported
+      summary: WireMock scenarios are not supported
+      description: |
+        Always returns `404 not_supported`, as do all `/__admin/scenarios/…` paths and their
+        session-scoped equivalents (FR-4.4). Use `callResponses` on the mapping instead.
       responses:
-        '200': { description: Updated. }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ───────────────────────────── Recordings ─────────────────────────────
@@ -670,7 +696,7 @@ paths:
     post:
       tags: [System]
       operationId: resetAll
-      summary: Reset API mappings, the journal and scenarios
+      summary: Reset API mappings, the journal and call counters
       x-saas: global-write-rejected
       responses:
         '200': { description: Reset. }
@@ -830,7 +856,7 @@ paths:
       tags: [Sessions]
       operationId: deleteSession
       summary: Delete a session and everything it owns
-      description: Deletes the session's mappings, files, journal and scenario state, and any nested key-based shadow mocks.
+      description: Deletes the session's mappings, files, journal and call counters, and any nested key-based shadow mocks.
       responses:
         '200': { description: Deleted. }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1159,28 +1185,28 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
-  /__admin/sessions/{sessionId}/scenarios:
+  /__admin/sessions/{sessionId}/counters:
     get:
       tags: [Session scope]
-      operationId: listSessionScenarios
-      summary: The session's scenario states
-      description: The session's own copy, forked from its parent at creation (FR-7.6).
+      operationId: listSessionCounters
+      summary: The session's call counters
+      description: The session's own counters, which start at zero when it is created (FR-7.6). They include global stubs that served the session's requests.
       parameters:
         - $ref: '#/components/parameters/SessionId'
       responses:
         '200':
-          description: Scenarios.
+          description: Counters.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ScenarioList' }
+              schema: { $ref: '#/components/schemas/CounterList' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
-  /__admin/sessions/{sessionId}/scenarios/reset:
+  /__admin/sessions/{sessionId}/counters/reset:
     post:
       tags: [Session scope]
-      operationId: resetSessionScenarios
-      summary: Reset the session's scenarios to Started
+      operationId: resetSessionCounters
+      summary: Reset all of the session's call counters to zero
       parameters:
         - $ref: '#/components/parameters/SessionId'
       responses:
@@ -1188,20 +1214,34 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
-  /__admin/sessions/{sessionId}/scenarios/{scenarioName}/state:
+  /__admin/sessions/{sessionId}/counters/{stubMappingId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - $ref: '#/components/parameters/StubMappingId'
     put:
       tags: [Session scope]
-      operationId: setSessionScenarioState
-      summary: Set or reset one scenario in the session
-      parameters:
-        - $ref: '#/components/parameters/SessionId'
-        - $ref: '#/components/parameters/ScenarioName'
+      operationId: setSessionCounter
+      summary: Set one stub's call counter in the session
       requestBody:
+        required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ScenarioStateUpdate' }
+            schema: { $ref: '#/components/schemas/CounterUpdate' }
       responses:
-        '200': { description: Updated. }
+        '200':
+          description: Updated counter.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Counter' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Session scope]
+      operationId: resetSessionCounter
+      summary: Reset one stub's call counter in the session
+      responses:
+        '200': { description: Reset. }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -1384,11 +1424,6 @@ components:
       required: true
       description: File name, which may include sub-folders (URL-encoded).
       schema: { type: string }
-    ScenarioName:
-      name: scenarioName
-      in: path
-      required: true
-      schema: { type: string }
     Limit:
       name: limit
       in: query
@@ -1495,6 +1530,7 @@ components:
         - global_writes_via_management_app
         # not found (404)
         - not_found
+        - not_supported
         - unknown_org
         - unknown_url_based_mock
         - not_available_in_saas
@@ -1506,6 +1542,7 @@ components:
         - token_too_short
         - token_in_use
         - recording_in_progress
+        - scenarios_not_supported
         - parent_not_found
         # limits (413, 429)
         - body_too_large
@@ -1549,9 +1586,18 @@ components:
     # ── Stub mappings (WireMock wire model) ──
     StubMapping:
       type: object
-      description: WireMock StubMapping. Unknown fields are preserved and returned unchanged (FR-1.4).
+      description: |
+        WireMock StubMapping, plus the Shadow Mock extension `callResponses`. Unknown fields are
+        preserved and returned unchanged (FR-1.4). The WireMock scenario fields `scenarioName`,
+        `requiredScenarioState` and `newScenarioState` are **rejected** with
+        `422 scenarios_not_supported` (FR-4.4).
       required: [request, response]
       additionalProperties: true
+      not:
+        anyOf:
+          - required: [scenarioName]
+          - required: [requiredScenarioState]
+          - required: [newScenarioState]
       properties:
         id: { type: string, format: uuid }
         uuid: { type: string, format: uuid }
@@ -1559,10 +1605,17 @@ components:
         priority: { type: integer, minimum: 1, description: Lower wins within a layer. The default is 5. }
         persistent: { type: boolean }
         request: { $ref: '#/components/schemas/RequestPattern' }
-        response: { $ref: '#/components/schemas/ResponseDefinition' }
-        scenarioName: { type: string }
-        requiredScenarioState: { type: string }
-        newScenarioState: { type: string }
+        response:
+          $ref: '#/components/schemas/ResponseDefinition'
+          description: The default response, used when no `callResponses` rule matches the call number.
+        callResponses:
+          type: array
+          description: Rules that pick a response by call number. The first match wins (FR-4.1).
+          items: { $ref: '#/components/schemas/CallResponse' }
+          examples:
+            - - { calls: '1-2', response: { status: 503 } }
+              - { every: 3, response: { status: 500 } }
+              - { calls: '100+', response: { status: 429, headers: { Retry-After: '1' } } }
         metadata: { type: object, additionalProperties: true }
         postServeActions:
           type: array
@@ -1862,6 +1915,7 @@ components:
             scanTruncated: { type: boolean }
             ambiguousSessionIds: { type: array, items: { type: string } }
         bodyTruncated: { type: boolean, description: True when the hot copy truncated a body over 64 KiB. }
+        callNumber: { type: integer, minimum: 1, description: "The stub's call number in this scope, when it has callResponses or uses request.callNumber." }
     ServeEventList:
       type: object
       properties:
@@ -1913,25 +1967,48 @@ components:
           type: array
           items: { $ref: '#/components/schemas/NearMiss' }
 
-    # ── Scenarios ──
-    Scenario:
+    # ── Call-count responses ──
+    CallResponse:
+      type: object
+      description: |
+        One rule. Set exactly one selector, `calls` or `every`.
+        `calls`: `"3"` (the 3rd call), `"1-2"` (calls 1 to 2) or `"100+"` (call 100 onwards).
+        `every`: every nth call (n, 2n, 3n, …). Call numbers start at 1.
+      required: [response]
+      oneOf:
+        - required: [calls]
+        - required: [every]
+      properties:
+        calls:
+          type: string
+          pattern: '^([1-9][0-9]*)(-[1-9][0-9]*|\+)?$'
+          examples: ['3', '1-2', '100+']
+        every: { type: integer, minimum: 2 }
+        response: { $ref: '#/components/schemas/ResponseDefinition' }
+    Counter:
+      type: object
+      required: [stubMappingId, count]
+      properties:
+        stubMappingId: { type: string, format: uuid }
+        stubLayer:
+          $ref: '#/components/schemas/Layer'
+          description: The layer the stub belongs to. A session override and the global stub it hides have separate counters.
+        count: { type: integer, minimum: 0, description: Calls so far. The next call is `count + 1`. }
+        lastCalledAt: { type: string, format: date-time }
+    CounterList:
       type: object
       properties:
-        id: { type: string }
-        name: { type: string }
-        state: { type: string, examples: [Started] }
-        possibleStates: { type: array, items: { type: string } }
-    ScenarioList:
-      type: object
-      properties:
-        scenarios:
+        counters:
           type: array
-          items: { $ref: '#/components/schemas/Scenario' }
-    ScenarioStateUpdate:
+          items: { $ref: '#/components/schemas/Counter' }
+    CounterUpdate:
       type: object
-      description: An empty object resets the scenario to Started.
+      required: [count]
       properties:
-        state: { type: string }
+        count: { type: integer, minimum: 0 }
+        stubLayer:
+          $ref: '#/components/schemas/Layer'
+          description: Which stub's counter to set when a session override and a global stub share the id. Defaults to the stub in effect for this scope.
 
     # ── Recordings ──
     RecordSpec:
@@ -1963,7 +2040,7 @@ components:
             textSizeThreshold: { type: string, examples: [2kb] }
             binarySizeThreshold: { type: string, examples: [10kb] }
         persist: { type: boolean }
-        repeatsAsScenarios: { type: boolean }
+        repeatsAsCallResponses: { type: boolean, description: "Identical requests that got different responses become one mapping with callResponses (replaces WireMock repeatsAsScenarios)." }
         transformers: { type: array, items: { type: string } }
         transformerParameters: { type: object, additionalProperties: true }
     SnapshotSpec:

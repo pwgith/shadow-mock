@@ -1,7 +1,7 @@
-@saas @management-app @P5 @FR-6.4
+@saas @management-app @P5 @FR-6.4 @FR-4.3 @FR-4.4
 Feature: Sessions and runtime operations from the management app
-  The app manages sessions and calls the engine's runtime API for scenario
-  state, dry-runs, validation, recordings and live stats.
+  The app manages sessions and calls the engine's runtime API for call
+  counters, dry-runs, validation, recordings and live stats.
 
   Background:
     Given the org "acme" with handle "acme" on plan "Team"
@@ -22,12 +22,19 @@ Feature: Sessions and runtime operations from the management app
     When I dry-run "POST /payments" with body '{"amount":10}' against "S1"
     Then I see which layer and mapping would serve it, and the rendered response
 
-  Scenario: View and reset scenario state
-    Given a key-based shadow mock "S1" whose scenario "order" is in state "Placed"
-    When I open the scenarios tab of "S1"
-    Then I see scenario "order" in state "Placed"
-    When I reset scenario "order"
-    Then the engine reports scenario "order" in state "Started" for "S1"
+  Scenario: View, set and reset call counters
+    Given a key-based shadow mock "S1" whose stub for "POST /payments" has been called 2 times
+    When I open the counters tab of "S1"
+    Then I see the stub for "POST /payments" with count 2
+    When I set its count to 9
+    Then the engine reports count 9 for that stub in "S1"
+    When I reset the counters of "S1"
+    Then the engine reports count 0 for that stub in "S1"
+
+  Scenario: Building a mapping with call-count responses
+    When I add a rule "calls 1-2 → 503" and a rule "every 3 → 500" to a mapping in the editor
+    Then the saved mapping contains the matching "callResponses" rules in that order
+    And mappings containing WireMock scenario fields cannot be saved, with a hint to use call-count responses
 
   Scenario: Start and stop a recording into a session
     Given a URL-based shadow mock "U1"
