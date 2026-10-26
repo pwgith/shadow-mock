@@ -15,7 +15,8 @@ formatters:
     - goimports
   settings:
     gofumpt:
-      extra-rules: true
+      extra:
+        group-params: true
       module-path: github.com/pwgith/shadow-mock
     goimports:
       local-prefixes:
@@ -363,8 +364,10 @@ linters:
           - gosec
           - containedctx
           - forbidigo
-      - path: test/acceptance/
+      # Test-support packages hold case tables and a parsed-once spec as package data.
+      - path: test/(acceptance|contract)/
         linters:
+          - goconst
           - funlen
           - dupl
           - gochecknoglobals
