@@ -222,6 +222,7 @@ paths:
       x-saas: unavailable
       responses:
         '200': { description: Saved. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /__admin/mappings/unmatched:
@@ -274,8 +275,15 @@ paths:
       tags: [Runtime]
       operationId: validateMapping
       summary: Validate a mapping without saving it
-      description: Used by the management app before writing a global mapping to the database. It runs the engine's own parser and matcher compilation.
-      requestBody: { $ref: '#/components/requestBodies/StubMapping' }
+      description: |
+        Used by the management app before writing a global mapping to the database. It runs the
+        engine's own parser and matcher compilation. It accepts **any JSON object**, valid or not,
+        because reporting what is wrong with an invalid mapping is the point of the endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: A candidate StubMapping. The contract does not validate it. }
       responses:
         '200':
           description: The validation result. Invalid mappings also return 200, with `valid` set to false.
@@ -597,6 +605,7 @@ paths:
         Always returns `404 not_supported`, as do all `/__admin/scenarios/…` paths and their
         session-scoped equivalents (FR-4.4). Use `callResponses` on the mapping instead.
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ───────────────────────────── Recordings ─────────────────────────────
@@ -711,6 +720,7 @@ paths:
       x-saas: unavailable
       responses:
         '200': { description: Shutting down. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /__admin/health:
@@ -740,6 +750,7 @@ paths:
                 type: object
                 properties:
                   version: { type: string, examples: ['0.1.0'] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   # ───────────────────────────── Sessions ─────────────────────────────
   /__admin/sessions:
@@ -1328,6 +1339,11 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Usage' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: Standalone and central-server mode have no plans or usage (`not_supported`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   # ───────────────────────────── Platform (outside the org prefix) ─────────────────────────────
   /__health:
@@ -1382,6 +1398,11 @@ paths:
           content:
             text/plain:
               schema: { type: string }
+        '404':
+          description: Not exposed publicly in SaaS.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
 components:
   securitySchemes:
