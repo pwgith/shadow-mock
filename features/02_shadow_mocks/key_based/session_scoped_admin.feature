@@ -1,6 +1,6 @@
 @key-based @P1 @FR-7.3 @NFR-1.2
 Feature: Session-scoped admin API
-  Every WireMock admin endpoint for mappings, journal, scenarios and near
+  Every WireMock admin endpoint for mappings, journal, counters and near
   misses is also available per session, in the same shape. Existing WireMock
   clients can be scoped by base URL or by a header.
 
@@ -23,8 +23,8 @@ Feature: Session-scoped admin API
       | POST   | /requests/find               |  with JSON '{"method":"ANY"}'                                                            | 200    |
       | GET    | /requests/unmatched          |                                                                                          | 200    |
       | DELETE | /requests                    |                                                                                          | 200    |
-      | GET    | /scenarios                   |                                                                                          | 200    |
-      | POST   | /scenarios/reset             |                                                                                          | 200    |
+      | GET    | /counters                    |                                                                                          | 200    |
+      | POST   | /counters/reset              |                                                                                          | 200    |
       | POST   | /near-misses/request         |  with JSON '{"method":"GET","url":"/x"}'                                                 | 200    |
       | GET    | /requests/unmatched/near-misses |                                                                                       | 200    |
 

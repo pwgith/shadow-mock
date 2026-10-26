@@ -27,7 +27,8 @@ It runs in two deployment modes:
 | URL-based shadow mock | A session selected by a **URL insert** (`/<org-handle>/d/<id>/…`; `/d/<id>/…` in standalone). Kind `url-based`. |
 | Session | The umbrella term in the API and code for a key-based shadow mock or a URL-based shadow mock (`/__admin/sessions/...`). |
 | Mapping / stub | A request pattern plus a response definition (WireMock `StubMapping`). |
-| Layer | An ordered set of mappings, scenario state and a request journal. The global session, URL-based shadow mocks and key-based shadow mocks are each a layer. |
+| Call count | How many times a mapping has served a request within one layer scope. Drives call-count responses (FR-4.1). |
+| Layer | An ordered set of mappings, call counters and a request journal. The global session, URL-based shadow mocks and key-based shadow mocks are each a layer. |
 | Session key | Opaque, unguessable token that identifies a key-based shadow mock in traffic. |
 | Match token | An extra string registered on a key-based shadow mock (for example a test customer ID) that also selects that session when found in a request. |
 | Tenant | An organisation (`org`) in SaaS. Standalone has one implicit tenant, `local`. |
@@ -42,7 +43,7 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 
 * **FR-1.1** Load mappings from `<root>/mappings/**/*.json`. Each file holds either one mapping or `{"mappings": [...]}`.
 * **FR-1.2** Load response bodies referenced by `bodyFileName` from `<root>/__files/`.
-* **FR-1.3** Accept the WireMock JSON schema unchanged: `id`, `uuid`, `name`, `priority`, `request`, `response`, `persistent`, `scenarioName`, `requiredScenarioState`, `newScenarioState`, `metadata`, `postServeActions`, `serveEventListeners`.
+* **FR-1.3** Accept the WireMock JSON schema unchanged: `id`, `uuid`, `name`, `priority`, `request`, `response`, `persistent`, `metadata`, `postServeActions`, `serveEventListeners`, plus the Shadow Mock extension `callResponses`. The scenario fields (`scenarioName`, `requiredScenarioState`, `newScenarioState`) are not supported and are rejected (FR-4.4).
 * **FR-1.4** Unknown fields are kept and round-tripped, not dropped.
 * **FR-1.5** Hot reload: file changes are picked up without a restart (optional flag, on by default in standalone).
 
@@ -61,15 +62,30 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 * **FR-3.1** `status`, `statusMessage`, `headers`, `body`, `jsonBody`, `base64Body`, `bodyFileName`.
 * **FR-3.2** Delays: `fixedDelayMilliseconds`, `delayDistribution` (`lognormal`, `uniform`), `chunkedDribbleDelay`. Global delay settings.
 * **FR-3.3** Faults: `CONNECTION_RESET_BY_PEER`, `EMPTY_RESPONSE`, `MALFORMED_RESPONSE_CHUNK`, `RANDOM_DATA_THEN_CLOSE`. In SaaS behind Render's proxy, connection-level faults reach the client as proxy errors (typically 502), not raw resets (SAAS.md §9.1).
-* **FR-3.4** Response templating (`transformers: ["response-template"]`, or global templating): Handlebars syntax with the WireMock helper set (`request.*`, `jsonPath`, `xPath`, `randomValue`, `now`, `date`, `regexExtract`, `math`, `base64`, `parseJson`, and the rest of the set).
+* **FR-3.4** Response templating (`transformers: ["response-template"]`, or global templating): Handlebars syntax with the WireMock helper set (`request.*`, `jsonPath`, `xPath`, `randomValue`, `now`, `date`, `regexExtract`, `math`, `base64`, `parseJson`, and the rest of the set), plus the Shadow Mock addition `request.callNumber` (FR-4.3).
 * **FR-3.5** Proxying: `proxyBaseUrl`, `additionalProxyRequestHeaders`, `removeProxyRequestHeaders`, `proxyUrlPrefixToRemove`. Global browser-proxy mode is optional and lower priority.
 * **FR-3.5a** Gzip response compression when the client accepts it, on by default as in WireMock. It can be disabled per mapping (`gzipDisabled`) and per org.
 * **FR-3.6** Default response when nothing matches: 404 with a near-miss diagnostic body, the same as WireMock.
 
-### 3.4 Stateful behaviour
+### 3.4 Stateful behaviour: call-count responses
 
-* **FR-4.1** Scenarios: named state machines (`Started` is the initial state). Each scenario can be reset on its own or all together.
-* **FR-4.2** Scenario state is **scoped to its layer** (see FR-7.6).
+Shadow Mock replaces WireMock's scenarios with **call-count responses**: a mapping can return a different response depending on how many times it has been called. This covers retries, polling, flaky dependencies and rate limits, with a much simpler model. Shadow mocks cover the other common use of scenarios, isolating tests from one another.
+
+* **FR-4.1 Call-count responses.** A mapping may define `callResponses`, an ordered list of rules. Each rule has one selector and a `response`:
+  * `"calls": "3"`: the 3rd call only.
+  * `"calls": "1-2"`: calls 1 to 2.
+  * `"calls": "100+"`: call 100 onwards.
+  * `"every": 3`: every 3rd call (3, 6, 9, …).
+
+  The first rule that matches the current call number wins. If none match, the mapping's `response` is used. Call numbers start at 1. Rule responses support everything a normal response does (templating, delays, faults, proxying, files).
+* **FR-4.2 Counter scope.** A call is a request that the mapping matched and served. Counters are kept **per mapping, per layer scope**:
+  * Each key-based or URL-based shadow mock has its own counters, including for global mappings that serve its requests.
+  * Plain global traffic shares one counter per mapping.
+  * A session's counters start at zero when it is created, and are discarded with it.
+
+  Increments are atomic across engine instances, so concurrent calls get distinct, gap-free numbers. Replacing a mapping (same id) resets its counters.
+* **FR-4.3 Counter admin.** The admin API lists counters, sets a mapping's counter to a value, and resets one or all counters, in the global scope or a session scope. Templates can read the call number as `{{request.callNumber}}`.
+* **FR-4.4 Scenarios are not supported.** A mapping containing `scenarioName`, `requiredScenarioState` or `newScenarioState` is rejected with `422 scenarios_not_supported`, and the message suggests `callResponses`. When loading from files, such mappings are reported and skipped, never loaded with the fields ignored. The `/__admin/scenarios` endpoints return `404 not_supported`.
 
 ### 3.5 Journal, verification and diagnostics
 
@@ -82,7 +98,7 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 
 ### 3.6 Record and playback
 
-* **FR-6.1** Recording via `/__admin/recordings/start|stop|snapshot`, producing mappings. Recording into a key-based or URL-based shadow mock must also be supported.
+* **FR-6.1** Recording via `/__admin/recordings/start|stop|snapshot`, producing mappings. Recording into a key-based or URL-based shadow mock must also be supported. Where WireMock offers `repeatsAsScenarios`, Shadow Mock offers `repeatsAsCallResponses`: repeated identical requests with different responses become one mapping with `callResponses`.
 
 ### 3.7 Webhooks
 
@@ -90,7 +106,7 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 
 ### 3.8 Admin API
 
-* **FR-6.3** WireMock-compatible `/__admin` REST API: mappings CRUD, `import`, `reset`, `save`, `files`, `requests`, `near-misses`, `scenarios`, `recordings`, `settings`, `health`, `shutdown`.
+* **FR-6.3** WireMock-compatible `/__admin` REST API: mappings CRUD, `import`, `reset`, `save`, `files`, `requests`, `near-misses`, `recordings`, `settings`, `health`, `shutdown` (but not `scenarios`, FR-4.4), plus `counters` (FR-4.3).
 * **FR-6.4** Admin path prefix is configurable. Shadow Mock-specific endpoints live under `/__admin/sessions/...`, plus `/__admin/mappings/validate`, `/__admin/mappings/dry-run`, `/__admin/stats/live` and `/__admin/usage`, so they never collide with WireMock's.
 * **FR-6.5 SaaS restrictions.** In SaaS, `shutdown` and `save` are disabled. Global-scope writes (`mappings`, `files`, `import`, `settings`, global `reset`) are rejected with 403 because they are made through the management app (FR-9.5a). Session-scoped equivalents are allowed.
 
@@ -101,8 +117,8 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
   * Key-based: default 1 h, maximum 24 h.
   * URL-based: default 24 h, maximum 30 days (7 days on the Free tier), because CI configuration points at a stable base URL.
 
-  Both are configurable, and can be extended (`keepalive`) or deleted explicitly. When a session expires, its mappings, journal and scenario state are discarded. An active session of either kind counts towards concurrent sessions for billing (SAAS.md §10.2).
-* **FR-7.3 Session-scoped admin.** All mapping, journal, scenario and near-miss endpoints are also available under `/__admin/sessions/{id}/...`, in the same shape as the global endpoints. Calling a global endpoint with header `X-Shadow-Mock-Key: <key>` scopes it the same way. This lets existing WireMock clients be used per session with only a base-URL change.
+  Both are configurable, and can be extended (`keepalive`) or deleted explicitly. When a session expires, its mappings, journal and call counters are discarded. An active session of either kind counts towards concurrent sessions for billing (SAAS.md §10.2).
+* **FR-7.3 Session-scoped admin.** All mapping, file, journal, counter, recording and near-miss endpoints are also available under `/__admin/sessions/{id}/...`, in the same shape as the global endpoints. Calling a global endpoint with header `X-Shadow-Mock-Key: <key>` scopes it the same way. This lets existing WireMock clients be used per session with only a base-URL change.
 * **FR-7.4 Detection.** For each inbound mock request, the server looks for an active session key or match token, in this order:
   1. Designated header (default `X-Shadow-Mock-Key`, configurable list) – exact lookup
   2. Designated query parameter (default `shadow_mock_key`) – exact lookup
@@ -112,7 +128,7 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 
   The first stage that finds a hit wins, and later stages are skipped.
 * **FR-7.5 Resolution.** If a session is detected, its mappings are evaluated first. If any key-based shadow mock mapping matches, it serves the response. Otherwise the request falls through to the next layer (the URL-based shadow mock, if present, then global). **The layer always takes precedence over priority**: a priority-10 key-based shadow mock mapping beats a priority-1 global mapping. Priority applies only within a layer.
-* **FR-7.6 Scenario isolation.** When a session is created, it takes its **own copy of every global scenario's state at that moment**. From then on, all reads and writes, including those made by global mappings serving the session's requests, use the session's copy. Later changes to global state are not visible to the session. One test advancing a scenario must never affect another session or the global session, and global traffic must never affect a running test. Resetting scenarios within a session sets them to `Started`, matching WireMock's reset behaviour.
+* **FR-7.6 Call-count isolation.** Every session has its own call counters, starting at zero when the session is created. Requests attributed to the session advance only the session's counters, even when a global mapping serves them. One test's calls never change the call numbers another session or the global session sees, and global traffic never changes a running test's call numbers (FR-4.2).
 * **FR-7.7 Override by ID.** A key-based shadow mock mapping with the same `id` as a global mapping hides that global mapping for this session.
 * **FR-7.8 Suppression.** A key-based shadow mock can mask a global mapping, by ID or by pattern, without replacing it. The request then continues down the stack as if that mapping did not exist.
 * **FR-7.9 Match tokens.** On create or update, a session can register extra strings (for example `"tokens": ["CUST-99812", "order-7731"]`). These are useful when the SUT does not forward the session header but does forward test data. Tokens must be unique among the tenant's active sessions; a conflict returns 409. The minimum token length is configurable (default 6) to avoid false positives.
@@ -124,7 +140,7 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 
 * **FR-8.1 Create.** `POST /__admin/sessions/url-based` returns `{id, baseUrl, expiresAt}`.
 * **FR-8.2 Routing.** Path insert only: `http(s)://<host>/<org-handle>/d/<id>/...`, for example `https://shadowmock.kaizentis.xyz/my-org/d/abc12345/claims/...`. The prefix is stripped before matching, so mappings are written exactly as they would be for the real dependency. There is no host-based routing. In standalone mode the org segment is optional (`/d/<id>/...`).
-* **FR-8.3 Resolution.** URL-based shadow mock mappings are evaluated first, then global. The same precedence, override, suppression and scenario-isolation rules apply as for key-based shadow mocks (FR-7.5 to FR-7.8).
+* **FR-8.3 Resolution.** URL-based shadow mock mappings are evaluated first, then global. The same precedence, override, suppression and call-count isolation rules apply as for key-based shadow mocks (FR-7.5 to FR-7.8).
 * **FR-8.4 Session-scoped admin.** The same as FR-7.3, under `/__admin/sessions/{id}/...`.
 * **FR-8.5 Nesting (phase 2).** Key-based shadow mocks can be created *inside* a URL-based shadow mock, giving the stack **key-based → URL-based → global**.
 * **FR-8.6 Unknown ID.** A request to a non-existent or expired URL-based mock ID returns 404 with a clear message. It never falls back to global silently.
@@ -165,17 +181,17 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 * **NFR-2.5** Target throughput: at least 10k req/s per instance for simple stubs.
 
 ### 7.3 Storage abstraction
-* **NFR-3.1** All persistence is behind repository interfaces: mappings, files, sessions, journal, scenarios, settings, and a `BlobStore` for bulky bytes (local directory in standalone, S3-compatible object storage in SaaS, R2 recommended).
+* **NFR-3.1** All persistence is behind repository interfaces: mappings, files, sessions, journal, call counters, settings, and a `BlobStore` for bulky bytes (local directory in standalone, S3-compatible object storage in SaaS, R2 recommended).
 * **NFR-3.2** Implementations: `fs` (WireMock layout, standalone default), `memory` (tests and ephemeral sessions), and for SaaS:
   * `postgres`: configuration and journal rows.
-  * `redis`: scenario state, session registry, hot journal and change fan-out.
+  * `redis`: call counters, session registry, hot journal and change fan-out.
   * `s3`: the `BlobStore`.
 
   Changing the backend is a config change only.
 * **NFR-3.3** The request hot path never queries the store. It works from an in-memory compiled snapshot that is refreshed by change events from the store.
 
 ### 7.4 Scalability (central server and SaaS)
-* **NFR-4.1** Stateless request handling apart from caches. In SaaS, the session registry, scenario state and hot journal live in a shared Redis-compatible store, so instances scale out horizontally.
+* **NFR-4.1** Stateless request handling apart from caches. In SaaS, the session registry, call counters and hot journal live in a shared Redis-compatible store, so instances scale out horizontally.
 * **NFR-4.2** Quotas per tenant, set by plan: request rate, included and maximum concurrent sessions, mappings per session, hot journal size, retention and CI keys (SAAS.md §12.3).
 * **NFR-4.3 Billing meters.** Per org, per day: mock requests (sum), concurrent sessions (95th percentile of 5-minute samples), plus visibility meters. They are reported idempotently to the platform billing service. Plan limits come from platform entitlements mirrored into the app database (SAAS.md §10, §12).
 * **NFR-4.4 Bounded hot journal.** Entry caps per session and per org are set by plan: Free 200, Starter and Team 1,000, Business 5,000, with 1,000 as the default. Bodies over 64 KiB are truncated in the hot copy, so Redis memory stays proportional to plan limits.
@@ -199,12 +215,13 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 * "Underlay" session mappings that apply only when no global mapping matches. Session mappings are overrides only.
 * Scanning **response** bodies of proxied calls for session keys
 * WebSocket and SSE mocking
+* WireMock scenarios (stateful named state machines). Replaced by call-count responses (FR-4.1 to FR-4.4)
 
 ## 9. Decisions log
 | # | Question | Decision (2026-10-26) |
 |---|---|---|
 | 1 | Underlay mappings in key-based shadow mocks? | No |
-| 2 | Scenario state a session sees on fall-through to global | The session's own copy, snapshotted at session creation, for reads and writes (FR-7.6) |
+| 2 | Scenario state a session sees on fall-through to global | **Superseded by #16** (2026-10-27): scenarios are not supported. Sessions have their own call counters, starting at zero (FR-7.6) |
 | 3 | Body-scan proxied response bodies? | No |
 | 4 | WebSocket/SSE mocking? | No |
 | 5 | SaaS addressing for mock traffic | One host, `shadowmock.kaizentis.xyz`, org handle as the first path segment, URL-based shadow mocks at `/<org-handle>/d/<id>`. No per-tenant DNS |
@@ -218,6 +235,7 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 | 13 | Cost-driven design | (A) shared per-instance journal body objects; (B) bounded hot journal; (C) gzip by default; (D) Clerk per-org fees are a platform cost, charged once per org. See SAAS.md §11 |
 | 14 | Pricing structure | Platform org fee (Free, Team $19, Business $79, Enterprise) plus per-app tiers. Shadow Mock: Free, Starter $29, Team $99, Business $399, Enterprise, with overage on requests and p95 concurrent sessions. Proposal; see SAAS.md §12 |
 | 15 | Session TTLs | Key-based: default 1 h, max 24 h. URL-based: default 24 h, max 30 days. Both renewable, and both count as concurrent sessions while active (FR-7.2) |
+| 16 | Stateful behaviour (2026-10-27) | WireMock scenarios are **not supported**; mappings using them are rejected with a clear error. Replaced by **call-count responses** (`callResponses`), with counters per mapping per layer scope. Shadow mocks cover test isolation, and call counts cover retries, polling, flaky dependencies and rate limits. Cross-endpoint state is not covered; revisit if users need it |
 
 ## 10. Open questions
 Pricing levels in SAAS.md §12 are a proposal to validate with early customers. Items to verify before launch are listed in SAAS.md §13.

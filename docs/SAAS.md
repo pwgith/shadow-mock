@@ -16,7 +16,7 @@ Kaizentis (`kaizentis.xyz`) is a multi-application SaaS platform, and Shadow Moc
 | **Shadow Mock management app** | Next.js + Clerk | Vercel | UI for mappings, sessions, journals, stats and settings. Writes configuration **directly to the shared database**. Hosts the CI token exchange |
 | **Shadow Mock engine** (this Go app) | Go, no UI | **Render** web service, autoscaled, ≥ 2 instances (§9.1) | Serves mock traffic and the runtime and admin API |
 | **Database** | PostgreSQL | **Supabase** (§9.3) | Source of truth for orgs, mappings, sessions, file metadata, journal rows, stats and usage |
-| **Shared cache** | Valkey (Redis-compatible) | **Render Key Value**, private network (§9.2) | Scenario state, session registry, hot journal, change fan-out, rate limits, live counters |
+| **Shared cache** | Valkey (Redis-compatible) | **Render Key Value**, private network (§9.2) | Call counters, session registry, hot journal, change fan-out, rate limits, live counters |
 | **Object storage** | S3 API | **Cloudflare R2** (§8) | Journal bodies, `__files` bodies, recordings and exports |
 | **Ops observability** | Prometheus metrics, OTel traces, logs | Grafana Cloud, Better Stack or Axiom (free or low tier) | Running the platform. **Not** the customer journal |
 
@@ -125,7 +125,7 @@ A token with no active organisation (a personal account) is rejected with `403 n
 | Everything else: mock traffic, any HTTP method | **None** | IP allowlist (§4), quotas (§10.3) |
 
 * The JWT is the source of truth for identity, and the path must agree with it. This stops a user in several Clerk orgs from silently writing to whichever org is active, and means a routing or lookup bug cannot cause cross-tenant access. Handle aliases resolve to the same `org_id`, so they pass.
-* Mock traffic can change scenario state, but only within the layer it is attributed to. That is by design.
+* Mock traffic advances call counters (FR-4.2), but only within the scope it is attributed to. That is by design.
 * The SUT's own `Authorization` header is never interpreted on mock traffic, because it belongs to the real dependency.
 
 ### 3.4 Teams (platform)
@@ -143,7 +143,7 @@ Teams are a **platform** concept owned by the platform shell and reused by every
 | Action | Where | Who |
 |---|---|---|
 | Call mocks | Engine | Anyone, subject to the IP allowlist and quotas |
-| Create, change and delete key-based and URL-based shadow mocks and their mappings; verify; read journals; scenario state; recordings | Engine admin API (CI, tests, scripts) or the management app | **Any member of the org** with the `editor` role: every Clerk `org:member` and `org:admin`, and CI tokens. An optional custom `org:viewer` role is read-only |
+| Create, change and delete key-based and URL-based shadow mocks and their mappings; verify; read journals; call counters; recordings | Engine admin API (CI, tests, scripts) or the management app | **Any member of the org** with the `editor` role: every Clerk `org:member` and `org:admin`, and CI tokens. An optional custom `org:viewer` role is read-only |
 | Change the org's **global session** mappings, files and settings | **Management app only**, writing to the database | Org admins, plus teams granted `global:write` |
 | Org settings: handle, IP allowlist, journal settings | Management app | Org admins |
 | CI keys | Management app | Org admins, plus teams granted `ci-keys:manage` |
@@ -227,7 +227,7 @@ All of its queries run as the signed-in user under Supabase row-level security k
 
 These operations work on runtime state or need engine logic:
 
-* Scenario state: view and reset (it lives in Redis).
+* Call counters: view, set and reset (they live in Redis).
 * Near-miss analysis for a journal entry.
 * "Test this mapping" dry-run (`POST /__admin/mappings/dry-run`) and validation before saving (`POST /__admin/mappings/validate`, the same code as the engine).
 * Starting and stopping recordings.
@@ -366,7 +366,7 @@ end $$ language plpgsql;
 |---|---|---|
 | Orgs, handles, allowlists, mappings, sessions, tokens, masks, settings | Postgres | Compiled in-memory snapshots per org and layer, refreshed on change events. **Never read per request** |
 | `__files` bodies | Object storage, metadata in `files` | Read-through LRU cache per instance |
-| Scenario state | Redis (`scn:{org}:{scope}`) | Read and transition per request. Forked at session creation (DESIGN §6.3) |
+| Call counters | Redis (`cnt:{org}:{requestScope}:{stubScope}:{stubId}`) | Atomic `INCR` only for stubs with `callResponses` or `request.callNumber`. Session keys carry the session TTL (DESIGN §6.3) |
 | Session registry | Postgres (durable) + Redis (hot, with TTL) | A reaper deletes expired sessions from Postgres |
 | Journal (hot and warm) | Redis; Postgres + object storage | §7 |
 | Live counters | In memory per instance → Redis every second | Rolled up into `stats_minute` and `usage_daily` |
@@ -458,8 +458,8 @@ Hot caps apply per session and per org, and are set by plan (§12.3): Free 200, 
 ### 9.2 Render Key Value
 
 * Connected over Render's **private network**, and not exposed to the internet. The management app never connects to it; it uses the engine API for live data (§5.2).
-* Hot-path Redis use is kept small. Per request it handles only scenario state (for stubs that use scenarios), the hot journal append and batched rate-limit tokens. Stats counters are added up in memory and flushed every second.
-* Eviction policy is `noeviction`, so scenario and session state are never dropped silently. Memory is sized from hot journal caps.
+* Hot-path Redis use is kept small. Per request it handles only a call-counter `INCR` (for stubs with `callResponses`), the hot journal append and batched rate-limit tokens. Stats counters are added up in memory and flushed every second.
+* Eviction policy is `noeviction`, so call counters and session state are never dropped silently. Memory is sized from hot journal caps.
 
 ### 9.3 Supabase Postgres
 
@@ -696,10 +696,11 @@ Free orgs inactive for 90 days are archived, because Clerk charges per retained 
 
 What the SaaS setup means for the Go engine (detail in DESIGN.md):
 
-* **Storage providers:** `postgres` for configuration and journal rows, `redis` for scenario state, session registry, hot journal and change fan-out, and `s3` for `BlobStore`.
+* **Storage providers:** `postgres` for configuration and journal rows, `redis` for call counters, session registry, hot journal and change fan-out, and `s3` for `BlobStore`.
 * **Auth:** JWT only, with a list of trusted Clerk issuers. No `jti` denylist by default.
 * **Tenancy:** the org always comes from `/<org-handle>` via an in-memory org directory with aliases, and admin calls must have a matching JWT org.
 * **Request path:** the per-org IP allowlist runs before the body is read, and detection uses the org's own index.
+* **Stateful responses:** WireMock scenarios are not supported. Call-count responses use one Redis `INCR` per call, only for stubs that need it.
 * **Journal:** a Redis hot tier for verification, plus a warm tier of batched rows and shared body objects.
 * **Response compression:** gzip by default.
 * **Metering:** meters go to `usage_daily`, and limits come from `orgs.limits`.

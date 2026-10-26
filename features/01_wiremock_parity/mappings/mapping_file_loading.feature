@@ -53,12 +53,12 @@ Feature: Load mappings and response files from the WireMock file layout
     When I send a "GET" request to "/claims/1"
     Then the response JSON at "$.status" is "OPEN"
 
-  Scenario: Every WireMock StubMapping field is accepted
+  Scenario: Every supported StubMapping field is accepted
     Given the global mappings file "mappings/full.json":
       """json
       { "id": "8c5db8b0-2db4-4ad7-a99f-38c9b00da3f7", "uuid": "8c5db8b0-2db4-4ad7-a99f-38c9b00da3f7",
         "name": "full", "priority": 3, "persistent": true,
-        "scenarioName": "s", "requiredScenarioState": "Started", "newScenarioState": "Next",
+        "callResponses": [ { "calls": "1", "response": { "status": 201 } } ],
         "metadata": { "team": "claims" },
         "request": { "url": "/full" }, "response": { "status": 200 },
         "postServeActions": [], "serveEventListeners": [] }

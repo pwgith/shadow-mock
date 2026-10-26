@@ -6,7 +6,7 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 |---|---|
 | FR-1.1 | `01_wiremock_parity/mappings/mapping_file_loading.feature` |
 | FR-1.2 | `01_wiremock_parity/mappings/mapping_file_loading.feature`, `02_shadow_mocks/common/session_files.feature` |
-| FR-1.3 | `01_wiremock_parity/mappings/mapping_file_loading.feature` |
+| FR-1.3 | `01_wiremock_parity/mappings/mapping_file_loading.feature`, `07_stateful_responses/scenarios_not_supported.feature` |
 | FR-1.4 | `01_wiremock_parity/mappings/mapping_file_loading.feature` |
 | FR-1.5 | `01_wiremock_parity/mappings/mapping_file_loading.feature` |
 | FR-2.1 | `01_wiremock_parity/request_matching/url_matching.feature` |
@@ -19,12 +19,14 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-3.1 | `01_wiremock_parity/responses/response_definition.feature` |
 | FR-3.2 | `01_wiremock_parity/responses/delays.feature` |
 | FR-3.3 | `01_wiremock_parity/responses/faults.feature` |
-| FR-3.4 | `01_wiremock_parity/responses/response_templating.feature` |
+| FR-3.4 | `01_wiremock_parity/responses/response_templating.feature`, `07_stateful_responses/call_count_responses.feature` |
 | FR-3.5 | `01_wiremock_parity/responses/proxying.feature` |
 | FR-3.5a | `01_wiremock_parity/responses/gzip.feature` |
 | FR-3.6 | `01_wiremock_parity/responses/unmatched_requests.feature` |
-| FR-4.1 | `01_wiremock_parity/stateful/scenarios.feature` |
-| FR-4.2 | `01_wiremock_parity/stateful/scenarios.feature`, `02_shadow_mocks/key_based/scenario_isolation.feature` |
+| FR-4.1 | `07_stateful_responses/call_count_responses.feature` |
+| FR-4.2 | `02_shadow_mocks/key_based/call_count_isolation.feature`, `07_stateful_responses/call_count_responses.feature` |
+| FR-4.3 | `05_management_app/sessions_and_runtime.feature`, `07_stateful_responses/call_count_responses.feature` |
+| FR-4.4 | `05_management_app/sessions_and_runtime.feature`, `07_stateful_responses/scenarios_not_supported.feature` |
 | FR-5.1 | `01_wiremock_parity/journal/request_journal.feature` |
 | FR-5.2 | `01_wiremock_parity/journal/verification.feature` |
 | FR-5.3 | `01_wiremock_parity/journal/near_misses.feature`, `05_management_app/journal_browsing.feature` |
@@ -41,7 +43,7 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-7.3 | `02_shadow_mocks/key_based/session_scoped_admin.feature` |
 | FR-7.4 | `02_shadow_mocks/key_based/detection_designated_fields.feature`, `02_shadow_mocks/key_based/detection_scanning.feature` |
 | FR-7.5 | `02_shadow_mocks/key_based/layered_resolution.feature` |
-| FR-7.6 | `02_shadow_mocks/key_based/scenario_isolation.feature` |
+| FR-7.6 | `02_shadow_mocks/key_based/call_count_isolation.feature`, `02_shadow_mocks/url_based/resolution.feature` |
 | FR-7.7 | `02_shadow_mocks/key_based/override_and_mask.feature` |
 | FR-7.8 | `02_shadow_mocks/key_based/override_and_mask.feature` |
 | FR-7.9 | `02_shadow_mocks/key_based/match_tokens.feature` |

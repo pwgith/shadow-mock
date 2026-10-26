@@ -41,11 +41,13 @@ Feature: Record and playback into the global session
     When I call admin "POST" "/recordings/stop"
     Then the response JSON at "$.mappings" has 1 items
 
-  Scenario: Repeated identical requests become a scenario when requested
+  Scenario: Repeated identical requests become call-count responses when requested
+    Given the upstream stub server "claims" returns 202 then 200 for "GET /claims/1"
     When I call admin "POST" "/recordings/start" with:
       """json
-      { "targetBaseUrl": "${upstream.claims}", "repeatsAsScenarios": true }
+      { "targetBaseUrl": "${upstream.claims}", "repeatsAsCallResponses": true }
       """
     And I send 2 "GET" requests to "/claims/1"
     When I call admin "POST" "/recordings/stop"
-    Then the response JSON at "$.mappings[0].scenarioName" is not null
+    Then the response JSON at "$.mappings" has 1 items
+    And the response JSON at "$.mappings[0].callResponses" is present
