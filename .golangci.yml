@@ -1,0 +1,395 @@
+# golangci-lint v2 configuration for Shadow Mock.
+# Enforces docs/CODING_STANDARDS.md. Section references are to that document.
+# Check this file with: golangci-lint config verify
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+# §3 Formatting
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra-rules: true
+      module-path: github.com/pwgith/shadow-mock
+    goimports:
+      local-prefixes:
+        - github.com/pwgith/shadow-mock
+  exclusions:
+    generated: lax
+
+linters:
+  default: none
+  enable:
+    # Correctness
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck          # includes gosimple and stylecheck in v2
+    - unused
+    - wastedassign
+    - nilerr
+    - nilnil
+    - exhaustive
+    - copyloopvar
+    - predeclared
+    # Errors (§7)
+    - errorlint
+    - errname
+    # Context and HTTP (§8, §12)
+    - containedctx
+    - contextcheck
+    - noctx
+    - bodyclose
+    # Data access (§13)
+    - sqlclosecheck
+    - rowserrcheck
+    # Architecture, time, randomness, logging (§5, §10, §11)
+    - depguard
+    - forbidigo
+    - sloglint
+    - gochecknoinits
+    - gochecknoglobals
+    # Style and docs (§4, §6)
+    - revive
+    - godot
+    - misspell
+    - nakedret
+    - unconvert
+    - usestdlibvars
+    - intrange
+    - gocritic
+    # JSON (§14)
+    - musttag
+    - tagliatelle
+    # Complexity and duplication
+    - gocognit
+    - nestif
+    - funlen
+    - dupl
+    - goconst
+    - unparam
+    # Performance (§15)
+    - prealloc
+    - perfsprint
+    # Security
+    - gosec
+    # Tests (§16)
+    - thelper
+    - tparallel
+    # Suppressions (§18)
+    - nolintlint
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (net/http.ResponseWriter).Write
+        - (*bytes.Buffer).Write
+        - (*bytes.Buffer).WriteString
+        - (*strings.Builder).WriteString
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment   # readability over byte-packing; hot structs are tuned by benchmark
+      settings:
+        shadow:
+          strict: false
+
+    staticcheck:
+      checks:
+        - all
+        - -ST1000          # package comments are checked by revive
+      initialisms:
+        - ACL
+        - API
+        - CIDR
+        - CPU
+        - CSV
+        - DNS
+        - EOF
+        - GUID
+        - HTML
+        - HTTP
+        - HTTPS
+        - ID
+        - IP
+        - JSON
+        - JWKS
+        - JWT
+        - SQL
+        - SSRF
+        - TCP
+        - TLS
+        - TTL
+        - UDP
+        - UI
+        - URI
+        - URL
+        - UTF8
+        - UUID
+        - XML
+
+    exhaustive:
+      default-signifies-exhaustive: true
+
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+
+    # §5 Architecture rules
+    depguard:
+      rules:
+        banned-libraries:
+          files:
+            - $all
+          deny:
+            - pkg: github.com/pkg/errors
+              desc: "use the standard library errors package and fmt.Errorf with %w (§7)"
+            - pkg: io/ioutil
+              desc: "deprecated; use io and os"
+            - pkg: github.com/sirupsen/logrus
+              desc: "use log/slog (§11)"
+            - pkg: go.uber.org/zap
+              desc: "use log/slog (§11)"
+            - pkg: github.com/rs/zerolog
+              desc: "use log/slog (§11)"
+            - pkg: github.com/stretchr/testify
+              desc: "use the testing package with github.com/google/go-cmp/cmp (§16)"
+            - pkg: github.com/pwgith/shadow-mock/cmd
+              desc: "nothing imports cmd; wiring lives only in cmd/shadowmock (§5)"
+        crypto-randomness:
+          files:
+            - $all
+            - "!**/internal/respond/**"
+          deny:
+            - pkg: math/rand
+              desc: "identifiers and secrets must use crypto/rand via internal/ids (§10, NFR-5.1)"
+        hot-path-no-storage:
+          files:
+            - "**/internal/engine/**"
+            - "**/internal/match/**"
+            - "**/internal/detect/**"
+            - "**/internal/respond/**"
+          deny:
+            - pkg: github.com/pwgith/shadow-mock/internal/store/postgres
+              desc: "the request hot path works only from in-memory snapshots (NFR-3.3)"
+            - pkg: github.com/pwgith/shadow-mock/internal/store/redis
+              desc: "the request hot path works only from in-memory snapshots (NFR-3.3)"
+            - pkg: database/sql
+              desc: "the request hot path works only from in-memory snapshots (NFR-3.3)"
+        storage-drivers-behind-interfaces:
+          files:
+            - $all
+            - "!**/internal/store/**"
+            - "!**/internal/blob/**"
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: "Postgres access belongs in internal/store/postgres (NFR-3.2)"
+            - pkg: github.com/redis/go-redis
+              desc: "Redis access belongs in internal/store/redis (NFR-3.2)"
+            - pkg: github.com/aws/aws-sdk-go-v2
+              desc: "object storage access belongs in internal/blob (NFR-3.2)"
+        public-extension-api:
+          files:
+            - "**/pkg/extension/**"
+          deny:
+            - pkg: github.com/pwgith/shadow-mock/internal
+              desc: "pkg/extension is the public API and must not depend on internal packages (§5)"
+
+    # §10, §11, §12 forbidden identifiers
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^time\.(Now|Since|Until|After|AfterFunc|Tick|NewTimer|NewTicker|Sleep)$
+          pkg: ^time$
+          msg: "use the injected internal/clock.Clock so the test clock controls time (§10)"
+        - pattern: ^(fmt\.Print(f|ln)?|print|println)$
+          msg: "use log/slog (§11)"
+        - pattern: ^log\.
+          pkg: ^log$
+          msg: "use log/slog (§11)"
+        - pattern: ^http\.(Get|Post|Head|PostForm)$
+          pkg: ^net/http$
+          msg: "use the shared egress.Client with timeouts and SSRF policy (§12)"
+        - pattern: ^http\.DefaultClient$
+          pkg: ^net/http$
+          msg: "use the shared egress.Client with timeouts and SSRF policy (§12)"
+        - pattern: ^panic$
+          msg: "no panics in library code; return an error, or use a Must* helper in must.go (§7)"
+        - pattern: ^os\.Exit$
+          pkg: ^os$
+          msg: "only cmd/shadowmock may exit the process (§5)"
+
+    sloglint:
+      kv-only: true
+      no-global: default
+      context: scope
+      static-msg: true
+      key-naming-case: snake
+      forbidden-keys:
+        - time
+        - level
+        - msg
+        - source
+
+    revive:
+      enable-all-rules: false
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: early-return
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - sayRepetitiveInsteadOfStutters
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: unused-parameter
+        - name: use-any
+        - name: var-declaration
+        - name: var-naming
+        - name: import-shadowing
+        - name: defer
+        - name: struct-tag
+        - name: unnecessary-stmt
+        - name: deep-exit
+
+    godot:
+      scope: declarations
+      capital: true
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - hugeParam        # request and mapping structs are passed by value deliberately in tests
+        - paramTypeCombine
+        - unnamedResult
+        - whyNoLint        # nolintlint covers this
+
+    tagliatelle:
+      case:
+        use-field-name: false
+        rules:
+          json: camel      # WireMock wire model and admin API (§14)
+          yaml: camel      # engine configuration keys (DESIGN.md §11)
+
+    gocognit:
+      min-complexity: 20
+    nestif:
+      min-complexity: 5
+    funlen:
+      lines: 80
+      statements: 50
+      ignore-comments: true
+    dupl:
+      threshold: 150
+    goconst:
+      min-len: 3
+      min-occurrences: 4
+      ignore-calls: true
+    nakedret:
+      max-func-lines: 0
+
+    gosec:
+      excludes:
+        - G104             # unhandled errors are reported by errcheck
+      config:
+        global:
+          audit: false
+
+    thelper:
+      test:
+        first: true
+        name: true
+        begin: true
+      benchmark:
+        first: true
+        name: true
+        begin: true
+
+    usestdlibvars:
+      http-method: true
+      http-status-code: true
+      time-weekday: true
+      constant-kind: true
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+
+  exclusions:
+    generated: lax
+    presets:
+      - std-error-handling   # deferred Close/Flush and print helpers, as is standard practice
+    rules:
+      # Tests may use fixtures, panics, long table-driven functions and real time in benchmarks.
+      - path: _test\.go
+        linters:
+          - dupl
+          - funlen
+          - gochecknoglobals
+          - goconst
+          - gosec
+          - containedctx
+          - forbidigo
+      - path: test/acceptance/
+        linters:
+          - funlen
+          - dupl
+          - gochecknoglobals
+          - forbidigo
+      # The clock package is the one place allowed to read real time.
+      - path: internal/clock/
+        linters:
+          - forbidigo
+        text: internal/clock
+      # Must* helpers may panic during start-up.
+      - path: (^|/)must\.go$
+        linters:
+          - forbidigo
+        text: no panics in library code
+      # The binary's entry point may exit and use the default logger before configuration.
+      - path: ^cmd/
+        linters:
+          - forbidigo
+          - sloglint
+        text: (only cmd/shadowmock may exit|global logger)
+      # External formats (JWT claims, OAuth) use snake_case JSON.
+      - path: internal/auth/claims\.go
+        linters:
+          - tagliatelle
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

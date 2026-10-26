@@ -1,0 +1,11 @@
+# Normalise text files to LF in the repository and working tree (matches .editorconfig).
+* text=auto eol=lf
+
+*.sh     text eol=lf
+Makefile text eol=lf
+*.go     text eol=lf
+
+# Binary fixtures
+*.png    binary
+*.gz     binary
+*.zst    binary
