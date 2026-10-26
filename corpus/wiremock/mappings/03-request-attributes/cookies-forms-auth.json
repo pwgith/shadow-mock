@@ -1,0 +1,44 @@
+{
+  "mappings": [
+    {
+      "id": "c0030003-0003-4000-8000-000000000001",
+      "name": "Cookie matching",
+      "metadata": { "corpus": "request-attributes", "feature": "cookies" },
+      "request": { "method": "GET", "urlPath": "/wm/cookies/session", "cookies": { "session": { "matches": "s-[a-z0-9]+" }, "locale": { "equalTo": "en-AU" } } },
+      "response": { "status": 200, "body": "session {{request.cookies.session}}", "transformers": ["response-template"] }
+    },
+    {
+      "id": "c0030003-0003-4000-8000-000000000002",
+      "name": "Form parameters (application/x-www-form-urlencoded)",
+      "metadata": { "corpus": "request-attributes", "feature": "formParameters" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/forms/token",
+        "formParameters": {
+          "grant_type": { "equalTo": "client_credentials" },
+          "scope": { "contains": "mocks:write" }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "access_token": "fake-token", "token_type": "Bearer", "expires_in": 3600 }
+      }
+    },
+    {
+      "id": "c0030003-0003-4000-8000-000000000003",
+      "name": "Basic auth credentials",
+      "metadata": { "corpus": "request-attributes", "feature": "basicAuthCredentials" },
+      "request": { "method": "GET", "urlPath": "/wm/auth/basic", "basicAuthCredentials": { "username": "svc-claims", "password": "s3cret" } },
+      "response": { "status": 200, "body": "basic auth accepted" }
+    },
+    {
+      "id": "c0030003-0003-4000-8000-000000000004",
+      "name": "Basic auth fallback: wrong or missing credentials",
+      "metadata": { "corpus": "request-attributes", "feature": "basicAuthCredentials" },
+      "priority": 10,
+      "request": { "method": "GET", "urlPath": "/wm/auth/basic" },
+      "response": { "status": 401, "headers": { "WWW-Authenticate": "Basic realm=\"corpus\"" } }
+    }
+  ]
+}

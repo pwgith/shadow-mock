@@ -1,0 +1,8 @@
+{
+  "name": "masks-hide-global-fx",
+  "ttlSeconds": 600,
+  "masks": [
+    { "id": "5d030001-5003-4000-8000-000000000004" },
+    { "request": { "method": "GET", "urlPathPattern": "/sm/customers/.*" } }
+  ]
+}

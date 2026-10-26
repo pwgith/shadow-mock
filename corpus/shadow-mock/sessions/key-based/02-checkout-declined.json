@@ -1,0 +1,20 @@
+{
+  "name": "checkout-declined-card",
+  "ttlSeconds": 600,
+  "tokens": ["CUST-99812", "order-7731"],
+  "metadata": { "test": "CheckoutTest.declinedCard", "pipeline": "system-test" },
+  "mappings": [
+    {
+      "id": "5d040001-5004-4000-8000-000000000001",
+      "name": "Session: card declined",
+      "request": { "method": "POST", "urlPath": "/sm/payments" },
+      "response": { "status": 402, "jsonBody": { "error": "card_declined", "source": "session" } }
+    },
+    {
+      "id": "5d040001-5004-4000-8000-000000000002",
+      "name": "Session: credit check declines this customer",
+      "request": { "method": "POST", "urlPath": "/sm/credit-check" },
+      "response": { "status": 200, "jsonBody": { "decision": "DECLINE", "source": "session" } }
+    }
+  ]
+}

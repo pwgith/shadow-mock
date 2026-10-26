@@ -1,0 +1,5 @@
+{
+  "filters": { "urlPathPattern": "/wm/proxy/payments/.*" },
+  "requestBodyPattern": { "matcher": "auto" },
+  "persist": false
+}

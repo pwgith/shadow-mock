@@ -1,0 +1,63 @@
+{
+  "mappings": [
+    {
+      "id": "c0140001-0014-4000-8000-000000000001",
+      "name": "Webhook with a templated JSON body",
+      "metadata": { "corpus": "webhooks", "receiver": "http://localhost:8090" },
+      "request": { "method": "POST", "urlPath": "/wm/webhooks/payments" },
+      "response": { "status": 202, "jsonBody": { "status": "ACCEPTED" } },
+      "serveEventListeners": [
+        {
+          "name": "webhook",
+          "parameters": {
+            "method": "POST",
+            "url": "http://localhost:8090/callbacks/payments",
+            "headers": { "Content-Type": "application/json", "X-Signature": "corpus-signature" },
+            "body": "{ \"paymentRef\": \"{{jsonPath originalRequest.body '$.ref'}}\", \"status\": \"SETTLED\", \"at\": \"{{now}}\" }"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c0140001-0014-4000-8000-000000000002",
+      "name": "Webhook after a fixed delay",
+      "metadata": { "corpus": "webhooks" },
+      "request": { "method": "POST", "urlPath": "/wm/webhooks/delayed" },
+      "response": { "status": 202 },
+      "serveEventListeners": [
+        { "name": "webhook", "parameters": { "method": "GET", "url": "http://localhost:8090/callbacks/delayed", "delay": { "type": "fixed", "milliseconds": 1000 } } }
+      ]
+    },
+    {
+      "id": "c0140001-0014-4000-8000-000000000003",
+      "name": "Webhook after a random delay",
+      "metadata": { "corpus": "webhooks" },
+      "request": { "method": "POST", "urlPath": "/wm/webhooks/random-delay" },
+      "response": { "status": 202 },
+      "serveEventListeners": [
+        { "name": "webhook", "parameters": { "method": "POST", "url": "http://localhost:8090/callbacks/random", "delay": { "type": "uniform", "lower": 500, "upper": 1500 } } }
+      ]
+    },
+    {
+      "id": "c0140001-0014-4000-8000-000000000004",
+      "name": "Two webhooks from one request, URL templated from the request",
+      "metadata": { "corpus": "webhooks" },
+      "request": { "method": "POST", "urlPathTemplate": "/wm/webhooks/orders/{orderId}" },
+      "response": { "status": 202 },
+      "serveEventListeners": [
+        { "name": "webhook", "parameters": { "method": "POST", "url": "http://localhost:8090/callbacks/orders/{{originalRequest.path.orderId}}/packed", "body": "packed" } },
+        { "name": "webhook", "parameters": { "method": "POST", "url": "http://localhost:8090/callbacks/orders/{{originalRequest.path.orderId}}/shipped", "body": "shipped", "delay": { "type": "fixed", "milliseconds": 2000 } } }
+      ]
+    },
+    {
+      "id": "c0140001-0014-4000-8000-000000000005",
+      "name": "Legacy postServeActions webhook",
+      "metadata": { "corpus": "webhooks" },
+      "request": { "method": "POST", "urlPath": "/wm/webhooks/legacy" },
+      "response": { "status": 200 },
+      "postServeActions": [
+        { "name": "webhook", "parameters": { "method": "POST", "url": "http://localhost:8090/callbacks/legacy", "base64Body": "bGVnYWN5" } }
+      ]
+    }
+  ]
+}

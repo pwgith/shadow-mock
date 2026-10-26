@@ -1,0 +1,23 @@
+{
+  "mappings": [
+    {
+      "id": "5d060001-5006-4000-8000-000000000001",
+      "name": "Mapping set 'declined-payments': card declined",
+      "request": { "method": "POST", "urlPath": "/sm/payments" },
+      "response": { "status": 402, "jsonBody": { "error": "card_declined", "source": "mapping set" } }
+    },
+    {
+      "id": "5d060001-5006-4000-8000-000000000002",
+      "name": "Mapping set 'declined-payments': refund also fails",
+      "request": { "method": "POST", "urlPathPattern": "/sm/payments/[^/]+/refunds" },
+      "response": { "status": 409, "jsonBody": { "error": "nothing_to_refund", "source": "mapping set" } }
+    },
+    {
+      "id": "5d060001-5006-4000-8000-000000000003",
+      "name": "Mapping set 'declined-payments': 3-D Secure challenge on the first attempt",
+      "request": { "method": "POST", "urlPath": "/sm/payments/authorise" },
+      "response": { "status": 200, "jsonBody": { "status": "AUTHORISED" } },
+      "callResponses": [ { "calls": "1", "response": { "status": 202, "jsonBody": { "status": "CHALLENGE_REQUIRED" } } } ]
+    }
+  ]
+}

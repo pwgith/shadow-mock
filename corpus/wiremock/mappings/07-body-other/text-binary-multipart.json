@@ -1,0 +1,56 @@
+{
+  "mappings": [
+    { "id": "c0070001-0007-4000-8000-000000000001", "name": "Text body equalTo", "metadata": { "corpus": "body-other" },
+      "request": { "method": "POST", "urlPath": "/wm/text/equal", "bodyPatterns": [ { "equalTo": "hello world" } ] }, "response": { "status": 200, "body": "text equal" } },
+    { "id": "c0070001-0007-4000-8000-000000000002", "name": "Text body equalTo, case-insensitive", "metadata": { "corpus": "body-other" },
+      "request": { "method": "POST", "urlPath": "/wm/text/equal-ci", "bodyPatterns": [ { "equalTo": "HELLO WORLD", "caseInsensitive": true } ] }, "response": { "status": 200, "body": "text equal, any case" } },
+    { "id": "c0070001-0007-4000-8000-000000000003", "name": "Text body contains", "metadata": { "corpus": "body-other" },
+      "request": { "method": "POST", "urlPath": "/wm/text/contains", "bodyPatterns": [ { "contains": "urgent" } ] }, "response": { "status": 200, "body": "urgent" } },
+    { "id": "c0070001-0007-4000-8000-000000000004", "name": "Text body matches", "metadata": { "corpus": "body-other" },
+      "request": { "method": "POST", "urlPath": "/wm/text/matches", "bodyPatterns": [ { "matches": "(?s)^BEGIN.*END$" } ] }, "response": { "status": 200, "body": "framed message" } },
+    { "id": "c0070001-0007-4000-8000-000000000005", "name": "Body must be empty", "metadata": { "corpus": "body-other" },
+      "request": { "method": "POST", "urlPath": "/wm/text/empty", "bodyPatterns": [ { "absent": true } ] }, "response": { "status": 200, "body": "no body sent" } },
+    { "id": "c0070001-0007-4000-8000-000000000006", "name": "binaryEqualTo (bytes 01 02 03)", "metadata": { "corpus": "body-other" },
+      "request": { "method": "POST", "urlPath": "/wm/binary/equal", "bodyPatterns": [ { "binaryEqualTo": "AQID" } ] }, "response": { "status": 200, "body": "binary match" } },
+    {
+      "id": "c0070001-0007-4000-8000-000000000007",
+      "name": "Multipart: ANY part matches",
+      "metadata": { "corpus": "body-other", "feature": "multipart" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/multipart/any",
+        "multipartPatterns": [ {
+          "matchingType": "ANY",
+          "headers": { "Content-Disposition": { "contains": "name=\"document\"" }, "Content-Type": { "equalTo": "application/pdf" } },
+          "bodyPatterns": [ { "contains": "%PDF" } ]
+        } ]
+      },
+      "response": { "status": 201, "body": "document uploaded" }
+    },
+    {
+      "id": "c0070001-0007-4000-8000-000000000008",
+      "name": "Multipart: ALL parts match",
+      "metadata": { "corpus": "body-other", "feature": "multipart" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/multipart/all",
+        "multipartPatterns": [ { "matchingType": "ALL", "headers": { "Content-Disposition": { "contains": "form-data" } } } ]
+      },
+      "response": { "status": 201, "body": "every part is form-data" }
+    },
+    {
+      "id": "c0070001-0007-4000-8000-000000000009",
+      "name": "Multipart: two named parts, each with its own pattern",
+      "metadata": { "corpus": "body-other", "feature": "multipart" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/multipart/claim",
+        "multipartPatterns": [
+          { "name": "metadata", "matchingType": "ANY", "bodyPatterns": [ { "matchesJsonPath": "$.claimId" } ] },
+          { "name": "photo", "matchingType": "ANY", "headers": { "Content-Type": { "matches": "image/(jpeg|png)" } } }
+        ]
+      },
+      "response": { "status": 201, "body": "claim with photo" }
+    }
+  ]
+}

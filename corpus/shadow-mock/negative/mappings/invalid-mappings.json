@@ -1,0 +1,12 @@
+{
+  "_expect": { "status": 422, "note": "WireMock-format validation errors ({\"errors\": [...]}). Each mapping must be rejected." },
+  "cases": [
+    { "why": "only one URL matcher allowed", "mapping": { "request": { "url": "/sm/neg/m1", "urlPath": "/sm/neg/m1" }, "response": { "status": 200 } } },
+    { "why": "status out of range", "mapping": { "request": { "urlPath": "/sm/neg/m2" }, "response": { "status": 99 } } },
+    { "why": "unknown body matcher", "mapping": { "request": { "urlPath": "/sm/neg/m3", "bodyPatterns": [ { "noSuchMatcher": "x" } ] }, "response": { "status": 200 } } },
+    { "why": "invalid regex", "mapping": { "request": { "urlPathPattern": "/sm/neg/[unclosed" }, "response": { "status": 200 } } },
+    { "why": "unknown fault", "mapping": { "request": { "urlPath": "/sm/neg/m5" }, "response": { "fault": "DISK_ON_FIRE" } } },
+    { "why": "request is required", "mapping": { "response": { "status": 200 } } },
+    { "why": "unknown custom matcher", "mapping": { "request": { "urlPath": "/sm/neg/m7", "customMatcher": { "name": "nope" } }, "response": { "status": 200 } } }
+  ]
+}

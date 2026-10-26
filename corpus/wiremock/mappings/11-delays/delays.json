@@ -1,0 +1,46 @@
+{
+  "mappings": [
+    {
+      "id": "c0110001-0011-4000-8000-000000000001",
+      "name": "Fixed delay of 500 ms",
+      "metadata": { "corpus": "delays" },
+      "request": { "method": "GET", "urlPath": "/wm/delay/fixed" },
+      "response": { "status": 200, "body": "after 500 ms", "fixedDelayMilliseconds": 500 }
+    },
+    {
+      "id": "c0110001-0011-4000-8000-000000000002",
+      "name": "Uniform random delay between 100 and 300 ms",
+      "metadata": { "corpus": "delays" },
+      "request": { "method": "GET", "urlPath": "/wm/delay/uniform" },
+      "response": { "status": 200, "body": "uniform delay", "delayDistribution": { "type": "uniform", "lower": 100, "upper": 300 } }
+    },
+    {
+      "id": "c0110001-0011-4000-8000-000000000003",
+      "name": "Log-normal random delay (median 80 ms)",
+      "metadata": { "corpus": "delays" },
+      "request": { "method": "GET", "urlPath": "/wm/delay/lognormal" },
+      "response": { "status": 200, "body": "lognormal delay", "delayDistribution": { "type": "lognormal", "median": 80, "sigma": 0.4 } }
+    },
+    {
+      "id": "c0110001-0011-4000-8000-000000000004",
+      "name": "Log-normal delay capped at 500 ms",
+      "metadata": { "corpus": "delays" },
+      "request": { "method": "GET", "urlPath": "/wm/delay/lognormal-capped" },
+      "response": { "status": 200, "body": "capped lognormal", "delayDistribution": { "type": "lognormal", "median": 120, "sigma": 0.8, "maxValue": 500 } }
+    },
+    {
+      "id": "c0110001-0011-4000-8000-000000000005",
+      "name": "Chunked dribble: body in 5 chunks over 1 s",
+      "metadata": { "corpus": "delays" },
+      "request": { "method": "GET", "urlPath": "/wm/delay/dribble" },
+      "response": { "status": 200, "body": "0123456789ABCDEFGHIJ", "chunkedDribbleDelay": { "numberOfChunks": 5, "totalDuration": 1000 } }
+    },
+    {
+      "id": "c0110001-0011-4000-8000-000000000006",
+      "name": "Slow dependency for timeout tests (10 s)",
+      "metadata": { "corpus": "delays" },
+      "request": { "method": "GET", "urlPath": "/wm/delay/timeout" },
+      "response": { "status": 200, "body": "too late", "fixedDelayMilliseconds": 10000 }
+    }
+  ]
+}

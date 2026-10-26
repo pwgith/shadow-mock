@@ -1,0 +1,20 @@
+{
+  "name": "claims-api-ci",
+  "ttlSeconds": 2592000,
+  "metadata": { "service": "claims-api", "pipeline": "github-actions" },
+  "mappings": [
+    {
+      "id": "5d050001-5005-4000-8000-000000000001",
+      "name": "URL-based: policy 9 is lapsed for this API's CI",
+      "request": { "method": "GET", "urlPath": "/sm/policies/9" },
+      "response": { "status": 200, "jsonBody": { "policyId": "9", "active": false, "source": "url-based" } }
+    },
+    {
+      "id": "5d050001-5005-4000-8000-000000000002",
+      "name": "URL-based: fraud service times out on the first call",
+      "request": { "method": "POST", "urlPath": "/sm/fraud/score" },
+      "response": { "status": 200, "jsonBody": { "score": 12, "source": "url-based" } },
+      "callResponses": [ { "calls": "1", "response": { "status": 504, "fixedDelayMilliseconds": 2000 } } ]
+    }
+  ]
+}

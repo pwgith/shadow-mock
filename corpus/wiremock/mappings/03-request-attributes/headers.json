@@ -1,0 +1,51 @@
+{
+  "mappings": [
+    {
+      "id": "c0030001-0003-4000-8000-000000000001",
+      "name": "Header equalTo (header name is case-insensitive)",
+      "metadata": { "corpus": "request-attributes", "feature": "headers" },
+      "request": { "method": "GET", "urlPath": "/wm/headers/tenant", "headers": { "X-Tenant": { "equalTo": "acme" } } },
+      "response": { "status": 200, "body": "tenant acme" }
+    },
+    {
+      "id": "c0030001-0003-4000-8000-000000000002",
+      "name": "Several headers must all match",
+      "metadata": { "corpus": "request-attributes", "feature": "headers" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/headers/all",
+        "headers": {
+          "Content-Type": { "matches": "application/(.+\\+)?json(;.*)?" },
+          "Accept": { "contains": "json" },
+          "X-Request-Id": { "matches": "[0-9a-f-]{36}" }
+        }
+      },
+      "response": { "status": 202, "body": "all headers matched" }
+    },
+    {
+      "id": "c0030001-0003-4000-8000-000000000003",
+      "name": "Header must be absent",
+      "metadata": { "corpus": "request-attributes", "feature": "headers" },
+      "request": { "method": "GET", "urlPath": "/wm/headers/anonymous", "headers": { "Authorization": { "absent": true } } },
+      "response": { "status": 200, "body": "anonymous" }
+    },
+    {
+      "id": "c0030001-0003-4000-8000-000000000004",
+      "name": "Header present with any value",
+      "metadata": { "corpus": "request-attributes", "feature": "headers" },
+      "request": { "method": "GET", "urlPath": "/wm/headers/authenticated", "headers": { "Authorization": { "matches": "Bearer .+" } } },
+      "response": { "status": 200, "body": "authenticated" }
+    },
+    {
+      "id": "c0030001-0003-4000-8000-000000000005",
+      "name": "Multi-value header with hasExactly",
+      "metadata": { "corpus": "request-attributes", "feature": "multi-value" },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/headers/multi",
+        "headers": { "X-Role": { "hasExactly": [ { "equalTo": "reader" }, { "equalTo": "writer" } ] } }
+      },
+      "response": { "status": 200, "body": "exactly reader and writer" }
+    }
+  ]
+}

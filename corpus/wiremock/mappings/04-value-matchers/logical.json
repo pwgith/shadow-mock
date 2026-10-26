@@ -1,0 +1,42 @@
+{
+  "mappings": [
+    {
+      "id": "c0040002-0004-4000-8000-000000000001",
+      "name": "and: every pattern must match",
+      "metadata": { "corpus": "value-matchers", "feature": "and" },
+      "request": { "urlPath": "/wm/logic/and", "headers": { "X-Value": { "and": [ { "matches": "[a-z]+" }, { "contains": "mock" }, { "doesNotContain": "wire" } ] } } },
+      "response": { "status": 200, "body": "and" }
+    },
+    {
+      "id": "c0040002-0004-4000-8000-000000000002",
+      "name": "or: any pattern may match",
+      "metadata": { "corpus": "value-matchers", "feature": "or" },
+      "request": { "urlPath": "/wm/logic/or", "queryParameters": { "region": { "or": [ { "equalTo": "AU" }, { "equalTo": "NZ" }, { "absent": true } ] } } },
+      "response": { "status": 200, "body": "or" }
+    },
+    {
+      "id": "c0040002-0004-4000-8000-000000000003",
+      "name": "not: negates a pattern",
+      "metadata": { "corpus": "value-matchers", "feature": "not" },
+      "request": { "urlPath": "/wm/logic/not", "headers": { "X-Env": { "not": { "equalTo": "production" } } } },
+      "response": { "status": 200, "body": "not production" }
+    },
+    {
+      "id": "c0040002-0004-4000-8000-000000000004",
+      "name": "Nested logic: (A or B) and not C",
+      "metadata": { "corpus": "value-matchers", "feature": "nested" },
+      "request": {
+        "urlPath": "/wm/logic/nested",
+        "headers": {
+          "X-Value": {
+            "and": [
+              { "or": [ { "contains": "gold" }, { "contains": "platinum" } ] },
+              { "not": { "contains": "suspended" } }
+            ]
+          }
+        }
+      },
+      "response": { "status": 200, "body": "premium and active" }
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "mappings": [
+    {
+      "id": "c0100002-0010-4000-8000-000000000001",
+      "name": "Date helpers",
+      "metadata": { "corpus": "templating", "feature": "dates" },
+      "request": { "method": "GET", "urlPath": "/wm/template/dates" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": "{\n  \"today\": \"{{now format='yyyy-MM-dd'}}\",\n  \"inThreeDays\": \"{{now offset='3 days' format='yyyy-MM-dd'}}\",\n  \"lastHour\": \"{{now offset='-1 hours'}}\",\n  \"sydney\": \"{{now timezone='Australia/Sydney' format='yyyy-MM-dd HH:mm:ssZ'}}\",\n  \"epochMillis\": {{now format='epoch'}},\n  \"unixSeconds\": {{now format='unix'}},\n  \"parsedHeader\": \"{{date (parseDate request.headers.X-Date format='dd/MM/yyyy') format='yyyy-MM-dd'}}\",\n  \"startOfMonth\": \"{{date (truncateDate (parseDate request.headers.X-Date format='dd/MM/yyyy') 'first day of month') format='yyyy-MM-dd'}}\"\n}",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100002-0010-4000-8000-000000000002",
+      "name": "Random value helpers",
+      "metadata": { "corpus": "templating", "feature": "random" },
+      "request": { "method": "GET", "urlPath": "/wm/template/random" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": "{\n  \"alphanumeric\": \"{{randomValue length=12 type='ALPHANUMERIC' uppercase=true}}\",\n  \"alphabetic\": \"{{randomValue length=6 type='ALPHABETIC'}}\",\n  \"numeric\": \"{{randomValue length=8 type='NUMERIC'}}\",\n  \"symbols\": \"{{randomValue length=10 type='ALPHANUMERIC_AND_SYMBOLS'}}\",\n  \"hex\": \"{{randomValue length=16 type='HEXADECIMAL'}}\",\n  \"uuid\": \"{{randomValue type='UUID'}}\",\n  \"int\": {{randomInt lower=5 upper=9}},\n  \"decimal\": {{randomDecimal lower=-10.1 upper=12.5}},\n  \"picked\": \"{{pickRandom 'red' 'green' 'blue'}}\"\n}",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100002-0010-4000-8000-000000000003",
+      "name": "Math, encoding and string helpers",
+      "metadata": { "corpus": "templating", "feature": "strings" },
+      "request": { "method": "GET", "urlPath": "/wm/template/strings" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": "{\n  \"sum\": {{math 1 '+' 2}},\n  \"product\": {{math request.query.qty '*' 25}},\n  \"modulo\": {{math 10 '%' 3}},\n  \"encoded\": \"{{base64 'hello'}}\",\n  \"decoded\": \"{{base64 'aGVsbG8=' decode=true}}\",\n  \"urlEncoded\": \"{{urlEncode 'a b&c'}}\",\n  \"trimmed\": \"{{trim request.headers.X-Padded}}\",\n  \"capitalised\": \"{{capitalize request.query.name}}\",\n  \"upper\": \"{{upper request.query.name}}\",\n  \"size\": {{size 'abcde'}},\n  \"orderNo\": \"{{regexExtract request.query.ref '[0-9]+'}}\",\n  \"fallback\": \"{{regexExtract 'abc' '[0-9]+' default='none'}}\"\n}",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100002-0010-4000-8000-000000000004",
+      "name": "Regex capture groups",
+      "metadata": { "corpus": "templating", "feature": "strings" },
+      "request": { "method": "POST", "urlPath": "/wm/template/regex-groups" },
+      "response": {
+        "status": 200,
+        "body": "{{regexExtract request.body '([A-Z]{3})-([0-9]+)' 'parts'}}prefix={{parts.0}} number={{parts.1}}",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100002-0010-4000-8000-000000000005",
+      "name": "Conditionals, arrays, values and iteration",
+      "metadata": { "corpus": "templating", "feature": "logic" },
+      "request": { "method": "GET", "urlPath": "/wm/template/logic" },
+      "response": {
+        "status": 200,
+        "body": "{{#if (contains request.query.plan 'gold')}}GOLD{{else}}STANDARD{{/if}} | {{#matches request.query.code '[0-9]+'}}numeric{{else}}not numeric{{/matches}} | {{#eq request.query.plan 'gold'}}eq-gold{{/eq}} | {{val request.query.missing or='default-value'}} | {{arrayJoin ',' (arrayAdd (array 'b' 'c') 'a' position='start')}} | {{#each (range 1 4) as |i|}}[{{i}}]{{/each}}",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100002-0010-4000-8000-000000000006",
+      "name": "Form data helper",
+      "metadata": { "corpus": "templating", "feature": "formData" },
+      "request": { "method": "POST", "urlPath": "/wm/template/form" },
+      "response": {
+        "status": 200,
+        "body": "{{formData request.body 'form' urlDecode=true}}Hello {{form.firstName}} {{form.lastName}}",
+        "transformers": ["response-template"]
+      }
+    }
+  ]
+}

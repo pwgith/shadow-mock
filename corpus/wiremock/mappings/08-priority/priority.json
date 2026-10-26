@@ -1,0 +1,43 @@
+{
+  "mappings": [
+    {
+      "id": "c0080001-0008-4000-8000-000000000001",
+      "name": "Catch-all for /wm/priority (low priority)",
+      "metadata": { "corpus": "priority" },
+      "priority": 10,
+      "request": { "method": "ANY", "urlPathPattern": "/wm/priority/.*" },
+      "response": { "status": 404, "jsonBody": { "error": "not found (catch-all)" } }
+    },
+    {
+      "id": "c0080001-0008-4000-8000-000000000002",
+      "name": "Specific claim wins over the catch-all",
+      "metadata": { "corpus": "priority" },
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/wm/priority/claims/42" },
+      "response": { "status": 200, "body": "specific claim 42" }
+    },
+    {
+      "id": "c0080001-0008-4000-8000-000000000003",
+      "name": "Default priority (5) claims list",
+      "metadata": { "corpus": "priority" },
+      "request": { "method": "GET", "urlPathPattern": "/wm/priority/claims/[0-9]+" },
+      "response": { "status": 200, "body": "generic claim (default priority 5)" }
+    },
+    {
+      "id": "c0080001-0008-4000-8000-000000000004",
+      "name": "Priority 4 beats the default 5",
+      "metadata": { "corpus": "priority" },
+      "priority": 4,
+      "request": { "method": "GET", "urlPath": "/wm/priority/claims/7" },
+      "response": { "status": 200, "body": "priority 4 claim 7" }
+    },
+    {
+      "id": "c0080001-0008-4000-8000-000000000005",
+      "name": "Priority 6 loses to the default 5",
+      "metadata": { "corpus": "priority" },
+      "priority": 6,
+      "request": { "method": "GET", "urlPath": "/wm/priority/claims/8" },
+      "response": { "status": 200, "body": "never served (priority 6)" }
+    }
+  ]
+}

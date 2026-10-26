@@ -1,0 +1,9 @@
+{
+  "targetBaseUrl": "http://localhost:8089",
+  "filters": { "urlPathPattern": "/wm/record/.*", "method": "ANY" },
+  "captureHeaders": { "Accept": {}, "Content-Type": { "caseInsensitive": true } },
+  "requestBodyPattern": { "matcher": "equalToJson", "ignoreArrayOrder": true, "ignoreExtraElements": false },
+  "extractBodyCriteria": { "textSizeThreshold": "2kb", "binarySizeThreshold": "10kb" },
+  "persist": false,
+  "transformers": ["response-template"]
+}

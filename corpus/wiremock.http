@@ -1,0 +1,251 @@
+# Requests for corpus/wiremock (VS Code REST Client: humao.rest-client).
+# Start the mock with: shadowmock --root corpus/wiremock   (or real WireMock, see README.md)
+@base = http://localhost:8080
+
+### 01 url: exact path and query → 200 "url exact match"
+GET {{base}}/wm/url/exact?status=OPEN&page=1
+
+### 01 url: same path, different query → 404 with near-miss body
+GET {{base}}/wm/url/exact?status=CLOSED&page=1
+
+### 01 urlPath ignores the query → 200
+GET {{base}}/wm/url/path?anything=goes
+
+### 01 urlPattern over path and query → 200
+GET {{base}}/wm/url/pattern/42?page=3
+
+### 01 urlPathPattern → 200
+GET {{base}}/wm/url/path-pattern/motor-claims
+
+### 01 urlPathTemplate → 200 {"claimId": 42, "noteId": "n-7"}
+GET {{base}}/wm/url/claims/42/notes/n-7
+
+### 01 urlPathTemplate with a draft note id → 404 (doesNotMatch)
+GET {{base}}/wm/url/claims/42/notes/draft-1
+
+### 01 case-sensitive → 404
+GET {{base}}/wm/url/casesensitive
+
+### 02 ANY method echoes the method → "DELETE"
+DELETE {{base}}/wm/methods/any
+
+### 02 GET-only path with POST → 404
+POST {{base}}/wm/methods/get
+
+### 03 header name is case-insensitive → 200
+GET {{base}}/wm/headers/tenant
+x-tenant: acme
+
+### 03 several headers → 202
+POST {{base}}/wm/headers/all
+Content-Type: application/json; charset=utf-8
+Accept: application/json
+X-Request-Id: 3f2b8c1e-1d2a-4b9e-9a77-0c3d2e1f4a5b
+
+{}
+
+### 03 query: hasExactly → 200
+GET {{base}}/wm/query/exactly?id=1&id=2
+
+### 03 query: includes, extra values allowed → 200 "...last id 3"
+GET {{base}}/wm/query/includes?id=1&id=95&id=3
+
+### 03 cookies → 200 "session s-abc"
+GET {{base}}/wm/cookies/session
+Cookie: session=s-abc; locale=en-AU
+
+### 03 form parameters → 200 token
+POST {{base}}/wm/forms/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&scope=claims:read%20mocks:write
+
+### 03 basic auth correct → 200
+GET {{base}}/wm/auth/basic
+Authorization: Basic c3ZjLWNsYWltczpzM2NyZXQ=
+
+### 03 basic auth wrong → 401 (fallback mapping)
+GET {{base}}/wm/auth/basic
+Authorization: Basic d3Jvbmc6d3Jvbmc=
+
+### 03 host matching → 200 "payments host"
+GET {{base}}/wm/host/info
+Host: payments.internal
+
+### 04 and/or/not: nested logic → 200
+GET {{base}}/wm/logic/nested
+X-Value: gold-member-active
+
+### 04 relative date → 200 when X-Date is within the last 7 days (edit the date)
+GET {{base}}/wm/dates/recent
+X-Date: 2026-10-26T09:00:00Z
+
+### 04 actualFormat → 200
+GET {{base}}/wm/dates/formatted
+X-Date: 31/12/2025
+
+### 04 numbers: 5.00 equals 5 → 200
+GET {{base}}/wm/numbers/equal?qty=5.00
+
+### 04 numbers: range → 200
+GET {{base}}/wm/numbers/band?score=60
+
+### 05 equalToJson strict, different key order → 200
+POST {{base}}/wm/json/strict
+Content-Type: application/json
+
+{ "tags": ["a", "b"], "id": 1 }
+
+### 05 json-unit placeholders → 200
+POST {{base}}/wm/json/placeholders
+Content-Type: application/json
+
+{ "id": 7, "name": "Ada", "active": true, "ref": "ABC-123", "note": null }
+
+### 05 jsonPath filter → 200
+POST {{base}}/wm/jsonpath/filter
+Content-Type: application/json
+
+{ "items": [ { "sku": "A1", "qty": 2 }, { "sku": "B1", "qty": 9 } ] }
+
+### 05 jsonPath numeric sub-matcher → 200
+POST {{base}}/wm/jsonpath/amount
+Content-Type: application/json
+
+{ "amount": 1500.75 }
+
+### 05 JSON schema valid → 201; change amount to -1 → 404
+POST {{base}}/wm/jsonschema/claim
+Content-Type: application/json
+
+{ "id": 3, "amount": 120.5, "currency": "AUD" }
+
+### 06 equalToXml ignores whitespace and attribute order → 200
+POST {{base}}/wm/xml/equal
+Content-Type: application/xml
+
+<claim type="motor" id="1">
+  <status>OPEN</status>
+</claim>
+
+### 06 SOAP with namespaces → 200 SOAP body from __files
+POST {{base}}/wm/soap/claims
+Content-Type: text/xml; charset=utf-8
+SOAPAction: urn:claims/GetClaim
+
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><c:GetClaim xmlns:c="urn:claims"><c:ClaimId>42</c:ClaimId></c:GetClaim></soap:Body></soap:Envelope>
+
+### 07 multipart ANY → 201
+POST {{base}}/wm/multipart/any
+Content-Type: multipart/form-data; boundary=corpus
+
+--corpus
+Content-Disposition: form-data; name="document"; filename="a.pdf"
+Content-Type: application/pdf
+
+%PDF-1.7 fake
+--corpus
+Content-Disposition: form-data; name="note"
+
+hello
+--corpus--
+
+### 08 priority: specific beats catch-all → 200 "specific claim 42"
+GET {{base}}/wm/priority/claims/42
+
+### 08 priority 6 loses to default 5 → "generic claim (default priority 5)"
+GET {{base}}/wm/priority/claims/8
+
+### 09 status message and headers → 418
+GET {{base}}/wm/responses/teapot
+
+### 09 multi-value Set-Cookie → two Set-Cookie headers
+GET {{base}}/wm/responses/cookies
+
+### 09 missing body file → 500 naming does-not-exist.json
+GET {{base}}/wm/files/missing
+
+### 10 request model echo
+POST {{base}}/wm/template/echo/a/b?status=OPEN&tag=x&tag=y
+X-Correlation-Id: corr-123
+Cookie: session=s-1
+
+hello
+
+### 10 templated bodyFileName → claims/claim-42.json
+GET {{base}}/wm/template/claims/42
+
+### 10 templated file contents → order confirmation
+POST {{base}}/wm/template/orders
+Content-Type: application/json
+
+{ "customer": "Ada", "items": [ { "sku": "A1", "qty": 1 } ] }
+
+### 10 helpers: strings and math
+GET {{base}}/wm/template/strings?qty=4&name=ada&ref=ORD-778
+X-Padded:    padded value
+
+### 10 helpers: dates
+GET {{base}}/wm/template/dates
+X-Date: 15/03/2026
+
+### 10 helpers: JSON iteration
+POST {{base}}/wm/template/order-lines
+Content-Type: application/json
+
+{ "items": [ { "sku": "A1", "qty": 2, "price": 10 }, { "sku": "B2", "qty": 1, "price": 5.5 } ] }
+
+### 11 fixed delay → about 500 ms
+GET {{base}}/wm/delay/fixed
+
+### 11 chunked dribble → body arrives over 1 s
+GET {{base}}/wm/delay/dribble
+
+### 12 fault: connection reset (standalone); 502 behind the SaaS proxy
+GET {{base}}/wm/fault/reset
+
+### 13 partial mocking: stubbed decline → 402 (no upstream needed)
+POST {{base}}/wm/proxy/payments/declined
+
+### 13 proxied → needs the upstream on :8089
+GET {{base}}/wm/proxy/payments/123
+
+### 14 webhook → 202 now; receiver on :8090 gets POST /callbacks/payments
+POST {{base}}/wm/webhooks/payments
+Content-Type: application/json
+
+{ "ref": "P-77" }
+
+### 15 near-miss target, nearly matched → 404 listing what differs
+POST {{base}}/wm/near-miss/claims?dryRun=true
+X-Tenant: globex
+Content-Type: application/json
+
+{ "type": "home" }
+
+### Admin: find by metadata (team = claims)
+POST {{base}}/__admin/mappings/find-by-metadata
+Content-Type: application/json
+
+< ./wiremock/admin/mappings/find-by-metadata.json
+
+### Admin: count POSTs with an OPEN claim body
+POST {{base}}/__admin/requests/count
+Content-Type: application/json
+
+< ./wiremock/admin/verification/count-posts-with-body.json
+
+### Admin: near misses for a request
+POST {{base}}/__admin/near-misses/request
+Content-Type: application/json
+
+< ./wiremock/admin/near-misses/request.json
+
+### Admin: import
+POST {{base}}/__admin/mappings/import
+Content-Type: application/json
+
+< ./wiremock/admin/mappings/import.json
+
+### Admin: scenarios are not supported → 404 not_supported (Shadow Mock)
+GET {{base}}/__admin/scenarios

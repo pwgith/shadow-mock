@@ -1,0 +1,8 @@
+{
+  "orderId": "{{randomValue type='UUID'}}",
+  "customer": "{{jsonPath request.body '$.customer'}}",
+  "items": {{jsonPath request.body '$.items'}},
+  "placedAt": "{{now}}",
+  "estimatedDelivery": "{{now offset='5 days' format='yyyy-MM-dd'}}",
+  "status": "CONFIRMED"
+}

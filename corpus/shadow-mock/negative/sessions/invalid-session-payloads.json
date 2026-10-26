@@ -1,0 +1,12 @@
+{
+  "_expect": { "note": "Each payload is POSTed to the endpoint shown and must fail with the given status and error." },
+  "cases": [
+    { "endpoint": "/__admin/sessions/key-based", "payload": { "ttlSeconds": 86401 }, "status": 422, "error": "ttl_exceeds_maximum" },
+    { "endpoint": "/__admin/sessions/key-based", "payload": { "ttlSeconds": 0 }, "status": 422, "error": "ttl_must_be_positive" },
+    { "endpoint": "/__admin/sessions/url-based", "payload": { "ttlSeconds": 2592001 }, "status": 422, "error": "ttl_exceeds_maximum" },
+    { "endpoint": "/__admin/sessions/key-based", "payload": { "tokens": ["AB12"] }, "status": 422, "error": "token_too_short" },
+    { "endpoint": "/__admin/sessions/key-based", "payload": { "tokens": ["CUST-99812"] }, "status": 409, "error": "token_in_use", "precondition": "Create sessions/key-based/02-checkout-declined.json first." },
+    { "endpoint": "/__admin/sessions/key-based", "payload": { "parentId": "zzzzzzzzzzzzzzzz" }, "status": 404, "error": "parent_not_found" },
+    { "endpoint": "/__admin/sessions/key-based", "payload": { "mappings": [ { "scenarioName": "s", "request": { "urlPath": "/x" }, "response": { "status": 200 } } ] }, "status": 422, "error": "scenarios_not_supported" }
+  ]
+}

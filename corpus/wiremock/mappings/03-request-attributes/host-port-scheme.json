@@ -1,0 +1,25 @@
+{
+  "mappings": [
+    {
+      "id": "c0030004-0003-4000-8000-000000000001",
+      "name": "Host matching (virtual hosts on one mock)",
+      "metadata": { "corpus": "request-attributes", "feature": "host" },
+      "request": { "method": "GET", "urlPath": "/wm/host/info", "host": { "equalTo": "payments.internal" } },
+      "response": { "status": 200, "body": "payments host" }
+    },
+    {
+      "id": "c0030004-0003-4000-8000-000000000002",
+      "name": "Host matching with a regex",
+      "metadata": { "corpus": "request-attributes", "feature": "host" },
+      "request": { "method": "GET", "urlPath": "/wm/host/info", "host": { "matches": ".*\\.claims\\.internal" } },
+      "response": { "status": 200, "body": "claims host {{request.host}}", "transformers": ["response-template"] }
+    },
+    {
+      "id": "c0030004-0003-4000-8000-000000000003",
+      "name": "Scheme and port matching (standalone with an HTTPS listener on 8443)",
+      "metadata": { "corpus": "request-attributes", "feature": "scheme-port" },
+      "request": { "method": "GET", "urlPath": "/wm/scheme/secure-only", "scheme": "https", "port": 8443 },
+      "response": { "status": 200, "body": "served over https on 8443" }
+    }
+  ]
+}

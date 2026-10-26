@@ -1,0 +1,24 @@
+{
+  "mappings": [
+    { "id": "c0020001-0002-4000-8000-000000000001", "name": "GET only", "metadata": { "corpus": "methods" },
+      "request": { "method": "GET", "urlPath": "/wm/methods/get" }, "response": { "status": 200, "body": "GET" } },
+    { "id": "c0020001-0002-4000-8000-000000000002", "name": "POST only", "metadata": { "corpus": "methods" },
+      "request": { "method": "POST", "urlPath": "/wm/methods/post" }, "response": { "status": 201, "body": "POST" } },
+    { "id": "c0020001-0002-4000-8000-000000000003", "name": "PUT only", "metadata": { "corpus": "methods" },
+      "request": { "method": "PUT", "urlPath": "/wm/methods/put" }, "response": { "status": 200, "body": "PUT" } },
+    { "id": "c0020001-0002-4000-8000-000000000004", "name": "PATCH only", "metadata": { "corpus": "methods" },
+      "request": { "method": "PATCH", "urlPath": "/wm/methods/patch" }, "response": { "status": 200, "body": "PATCH" } },
+    { "id": "c0020001-0002-4000-8000-000000000005", "name": "DELETE only", "metadata": { "corpus": "methods" },
+      "request": { "method": "DELETE", "urlPath": "/wm/methods/delete" }, "response": { "status": 204 } },
+    { "id": "c0020001-0002-4000-8000-000000000006", "name": "HEAD only", "metadata": { "corpus": "methods" },
+      "request": { "method": "HEAD", "urlPath": "/wm/methods/head" }, "response": { "status": 200, "headers": { "X-Exists": "true" } } },
+    { "id": "c0020001-0002-4000-8000-000000000007", "name": "OPTIONS (CORS pre-flight)", "metadata": { "corpus": "methods" },
+      "request": { "method": "OPTIONS", "urlPath": "/wm/methods/options" },
+      "response": { "status": 204, "headers": { "Allow": "GET, POST, OPTIONS", "Access-Control-Allow-Origin": "*" } } },
+    { "id": "c0020001-0002-4000-8000-000000000008", "name": "ANY method", "metadata": { "corpus": "methods" },
+      "request": { "method": "ANY", "urlPath": "/wm/methods/any" },
+      "response": { "status": 200, "body": "{{request.method}}", "transformers": ["response-template"] } },
+    { "id": "c0020001-0002-4000-8000-000000000009", "name": "No method given matches any method", "metadata": { "corpus": "methods" },
+      "request": { "urlPath": "/wm/methods/unspecified" }, "response": { "status": 200, "body": "no method constraint" } }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "seeded-from-declined-payments",
+  "ttlSeconds": 1800,
+  "seedFrom": { "mappingSet": "declined-payments" }
+}

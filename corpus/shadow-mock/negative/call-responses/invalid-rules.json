@@ -1,0 +1,12 @@
+{
+  "_expect": { "status": 422, "error": "validation_failed", "note": "Each entry is a separate mapping to POST; every one must be rejected." },
+  "cases": [
+    { "why": "call numbers start at 1", "mapping": { "request": { "urlPath": "/sm/neg/c1" }, "response": { "status": 200 }, "callResponses": [ { "calls": "0", "response": { "status": 500 } } ] } },
+    { "why": "range runs backwards", "mapping": { "request": { "urlPath": "/sm/neg/c2" }, "response": { "status": 200 }, "callResponses": [ { "calls": "4-2", "response": { "status": 500 } } ] } },
+    { "why": "not a number", "mapping": { "request": { "urlPath": "/sm/neg/c3" }, "response": { "status": 200 }, "callResponses": [ { "calls": "x", "response": { "status": 500 } } ] } },
+    { "why": "every must be at least 2", "mapping": { "request": { "urlPath": "/sm/neg/c4" }, "response": { "status": 200 }, "callResponses": [ { "every": 1, "response": { "status": 500 } } ] } },
+    { "why": "only one selector per rule", "mapping": { "request": { "urlPath": "/sm/neg/c5" }, "response": { "status": 200 }, "callResponses": [ { "calls": "3", "every": 2, "response": { "status": 500 } } ] } },
+    { "why": "a rule needs a response", "mapping": { "request": { "urlPath": "/sm/neg/c6" }, "response": { "status": 200 }, "callResponses": [ { "calls": "3" } ] } },
+    { "why": "a rule needs a selector", "mapping": { "request": { "urlPath": "/sm/neg/c7" }, "response": { "status": 200 }, "callResponses": [ { "response": { "status": 500 } } ] } }
+  ]
+}

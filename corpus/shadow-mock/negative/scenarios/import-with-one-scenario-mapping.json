@@ -1,0 +1,9 @@
+{
+  "_expect": { "status": 422, "error": "scenarios_not_supported", "note": "Nothing from the import is applied." },
+  "import": {
+    "mappings": [
+      { "request": { "method": "GET", "urlPath": "/sm/neg/import/ok" }, "response": { "status": 200 } },
+      { "newScenarioState": "Done", "request": { "method": "GET", "urlPath": "/sm/neg/import/bad" }, "response": { "status": 200 } }
+    ]
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "mappings": [
+    {
+      "id": "c0060001-0006-4000-8000-000000000001",
+      "name": "equalToXml (whitespace and attribute order ignored)",
+      "metadata": { "corpus": "body-xml", "feature": "equalToXml" },
+      "request": { "method": "POST", "urlPath": "/wm/xml/equal", "bodyPatterns": [ { "equalToXml": "<claim id=\"1\" type=\"motor\"><status>OPEN</status></claim>" } ] },
+      "response": { "status": 200, "headers": { "Content-Type": "application/xml" }, "body": "<result>equal</result>" }
+    },
+    {
+      "id": "c0060001-0006-4000-8000-000000000002",
+      "name": "equalToXml with xmlunit placeholders",
+      "metadata": { "corpus": "body-xml", "feature": "equalToXml" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/xml/placeholders",
+        "bodyPatterns": [ {
+          "equalToXml": "<claim><id>${xmlunit.ignore}</id><lodged>${xmlunit.isDateTime}</lodged><amount>${xmlunit.isNumber}</amount></claim>",
+          "enablePlaceholders": true
+        } ]
+      },
+      "response": { "status": 200, "body": "placeholders matched" }
+    },
+    {
+      "id": "c0060001-0006-4000-8000-000000000003",
+      "name": "equalToXml with custom placeholder delimiters",
+      "metadata": { "corpus": "body-xml", "feature": "equalToXml" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/xml/custom-delimiters",
+        "bodyPatterns": [ {
+          "equalToXml": "<claim><id>[[xmlunit.ignore]]</id></claim>",
+          "enablePlaceholders": true,
+          "placeholderOpeningDelimiterRegex": "\\[\\[",
+          "placeholderClosingDelimiterRegex": "]]"
+        } ]
+      },
+      "response": { "status": 200, "body": "custom delimiters matched" }
+    },
+    {
+      "id": "c0060001-0006-4000-8000-000000000004",
+      "name": "equalToXml with exempted comparisons",
+      "metadata": { "corpus": "body-xml", "feature": "equalToXml" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/xml/exempted",
+        "bodyPatterns": [ { "equalToXml": "<a:claim xmlns:a=\"urn:claims\"><a:id>1</a:id></a:claim>", "exemptedComparisons": ["NAMESPACE_PREFIX"] } ]
+      },
+      "response": { "status": 200, "body": "namespace prefix ignored" }
+    },
+    {
+      "id": "c0060001-0006-4000-8000-000000000005",
+      "name": "matchesXPath: presence and attribute predicate",
+      "metadata": { "corpus": "body-xml", "feature": "matchesXPath" },
+      "request": { "method": "POST", "urlPath": "/wm/xpath/item", "bodyPatterns": [ { "matchesXPath": "//items/item[@sku='A1' and @qty > 1]" } ] },
+      "response": { "status": 200, "body": "A1 with qty > 1" }
+    },
+    {
+      "id": "c0060001-0006-4000-8000-000000000006",
+      "name": "matchesXPath with equalTo sub-matcher",
+      "metadata": { "corpus": "body-xml", "feature": "matchesXPath" },
+      "request": { "method": "POST", "urlPath": "/wm/xpath/value", "bodyPatterns": [ { "matchesXPath": { "expression": "/claim/status/text()", "equalTo": "OPEN" } } ] },
+      "response": { "status": 200, "body": "open claim (xml)" }
+    },
+    {
+      "id": "c0060001-0006-4000-8000-000000000007",
+      "name": "matchesXPath with namespaces (SOAP)",
+      "metadata": { "corpus": "body-xml", "feature": "matchesXPath" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/soap/claims",
+        "headers": { "SOAPAction": { "equalTo": "urn:claims/GetClaim" } },
+        "bodyPatterns": [ {
+          "matchesXPath": "/soap:Envelope/soap:Body/c:GetClaim/c:ClaimId[.='42']",
+          "xPathNamespaces": { "soap": "http://schemas.xmlsoap.org/soap/envelope/", "c": "urn:claims" }
+        } ]
+      },
+      "response": { "status": 200, "headers": { "Content-Type": "text/xml; charset=utf-8" }, "bodyFileName": "soap/get-claim-response.xml" }
+    }
+  ]
+}

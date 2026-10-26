@@ -1,0 +1,68 @@
+{
+  "mappings": [
+    {
+      "id": "c0100003-0010-4000-8000-000000000001",
+      "name": "jsonPath helper with a default",
+      "metadata": { "corpus": "templating", "feature": "json" },
+      "request": { "method": "POST", "urlPath": "/wm/template/json-path" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "customer": "{{jsonPath request.body '$.customer.name'}}",
+          "itemCount": "{{size (jsonPath request.body '$.items')}}",
+          "currency": "{{jsonPath request.body '$.currency' default='AUD'}}"
+        },
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100003-0010-4000-8000-000000000002",
+      "name": "parseJson and iterate over items",
+      "metadata": { "corpus": "templating", "feature": "json" },
+      "request": { "method": "POST", "urlPath": "/wm/template/order-lines" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": "{{parseJson request.body 'order'}}{ \"lines\": [{{#each order.items as |item|}}{ \"sku\": \"{{item.sku}}\", \"lineTotal\": {{math item.qty '*' item.price}} }{{#unless @last}},{{/unless}}{{/each}}] }",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100003-0010-4000-8000-000000000003",
+      "name": "toJson, formatJson, jsonMerge, jsonRemove, jsonArrayAdd",
+      "metadata": { "corpus": "templating", "feature": "json" },
+      "request": { "method": "POST", "urlPath": "/wm/template/json-transform" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": "{{parseJson request.body 'input'}}{\n  \"headers\": {{toJson request.headers}},\n  \"merged\": {{jsonMerge input.base input.patch removeNulls=true}},\n  \"withoutId123\": {{jsonRemove input.items '$.[?(@.id == 123)]'}},\n  \"capped\": {{jsonArrayAdd input.items input.newItem maxItems=3}},\n  \"compact\": {{formatJson input.base format='compact'}}\n}",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100003-0010-4000-8000-000000000004",
+      "name": "xPath helper",
+      "metadata": { "corpus": "templating", "feature": "xml" },
+      "request": { "method": "POST", "urlPath": "/wm/template/xpath" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/xml" },
+        "body": "<ack><claimId>{{xPath request.body '/claim/id/text()'}}</claimId><status>RECEIVED</status></ack>",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100003-0010-4000-8000-000000000005",
+      "name": "soapXPath helper",
+      "metadata": { "corpus": "templating", "feature": "xml" },
+      "request": { "method": "POST", "urlPath": "/wm/template/soap" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/xml; charset=utf-8" },
+        "body": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><GetClaimResponse><ClaimId>{{soapXPath request.body '/GetClaim/ClaimId/text()'}}</ClaimId></GetClaimResponse></soap:Body></soap:Envelope>",
+        "transformers": ["response-template"]
+      }
+    }
+  ]
+}

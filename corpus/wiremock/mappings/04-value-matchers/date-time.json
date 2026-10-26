@@ -1,0 +1,17 @@
+{
+  "mappings": [
+    { "id": "c0040003-0004-4000-8000-000000000001", "name": "before an absolute date-time", "metadata": { "corpus": "value-matchers", "feature": "date-time" },
+      "request": { "urlPath": "/wm/dates/before", "headers": { "X-Date": { "before": "2026-01-01T00:00:00Z" } } }, "response": { "status": 200, "body": "before 2026" } },
+    { "id": "c0040003-0004-4000-8000-000000000002", "name": "after a relative date-time", "metadata": { "corpus": "value-matchers", "feature": "date-time" },
+      "request": { "urlPath": "/wm/dates/recent", "headers": { "X-Date": { "after": "now -7 days" } } }, "response": { "status": 200, "body": "within the last week" } },
+    { "id": "c0040003-0004-4000-8000-000000000003", "name": "before a relative future date-time", "metadata": { "corpus": "value-matchers", "feature": "date-time" },
+      "request": { "urlPath": "/wm/dates/booking", "queryParameters": { "date": { "before": "now +3 days" } } }, "response": { "status": 200, "body": "bookable" } },
+    { "id": "c0040003-0004-4000-8000-000000000004", "name": "equalToDateTime", "metadata": { "corpus": "value-matchers", "feature": "date-time" },
+      "request": { "urlPath": "/wm/dates/exact", "headers": { "X-Date": { "equalToDateTime": "2026-06-24T00:00:00Z" } } }, "response": { "status": 200, "body": "exact date-time" } },
+    { "id": "c0040003-0004-4000-8000-000000000005", "name": "actualFormat for non-ISO input", "metadata": { "corpus": "value-matchers", "feature": "date-time" },
+      "request": { "urlPath": "/wm/dates/formatted", "headers": { "X-Date": { "before": "2026-01-01T00:00:00Z", "actualFormat": "dd/MM/yyyy" } } }, "response": { "status": 200, "body": "before 2026 (dd/MM/yyyy)" } },
+    { "id": "c0040003-0004-4000-8000-000000000006", "name": "truncateExpected and truncateActual", "metadata": { "corpus": "value-matchers", "feature": "date-time" },
+      "request": { "urlPath": "/wm/dates/this-month", "headers": { "X-Date": { "equalToDateTime": "now", "truncateExpected": "first day of month", "truncateActual": "first day of month" } } },
+      "response": { "status": 200, "body": "same month as now" } }
+  ]
+}

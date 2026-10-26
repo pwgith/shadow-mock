@@ -1,0 +1,8 @@
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <c:GetClaimResponse xmlns:c="urn:claims">
+      <c:ClaimId>42</c:ClaimId>
+      <c:Status>APPROVED</c:Status>
+    </c:GetClaimResponse>
+  </soap:Body>
+</soap:Envelope>

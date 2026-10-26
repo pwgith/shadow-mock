@@ -1,0 +1,6 @@
+{
+  "name": "renamed-session",
+  "ttlSeconds": 7200,
+  "addMasks": [ { "id": "5d030001-5003-4000-8000-000000000002" } ],
+  "metadata": { "extendedBy": "corpus example" }
+}

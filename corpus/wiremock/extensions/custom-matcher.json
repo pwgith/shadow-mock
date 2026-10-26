@@ -1,0 +1,23 @@
+{
+  "mappings": [
+    {
+      "id": "c0160001-0016-4000-8000-000000000001",
+      "name": "Custom matcher (requires the is-even-id extension to be registered)",
+      "metadata": { "corpus": "extensions", "requires": "custom matcher 'is-even-id' (Go plug-in in Shadow Mock, Java extension in WireMock)" },
+      "request": { "method": "GET", "urlPath": "/wm/custom/even", "customMatcher": { "name": "is-even-id", "parameters": { "param": "id" } } },
+      "response": { "status": 200, "body": "id is even" }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000002",
+      "name": "Custom matcher combined with standard matching",
+      "metadata": { "corpus": "extensions" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/custom/even-and-json",
+        "bodyPatterns": [ { "matchesJsonPath": "$.id" } ],
+        "customMatcher": { "name": "is-even-id", "parameters": { "param": "id" } }
+      },
+      "response": { "status": 200, "body": "json body with an even id" }
+    }
+  ]
+}

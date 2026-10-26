@@ -1,0 +1,4 @@
+id,status,type,amount
+1,OPEN,motor,1271.00
+42,APPROVED,home,4200.00
+77,REJECTED,travel,310.25

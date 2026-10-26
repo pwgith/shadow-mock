@@ -1,0 +1,9 @@
+{
+  "sessionId": "${SESSION_ID}",
+  "request": {
+    "method": "POST",
+    "url": "/sm/payments",
+    "headers": { "Content-Type": "application/json" },
+    "body": "{ \"amount\": 120.5, \"tier\": \"vip\" }"
+  }
+}

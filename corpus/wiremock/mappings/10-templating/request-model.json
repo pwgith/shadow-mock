@@ -1,0 +1,78 @@
+{
+  "mappings": [
+    {
+      "id": "c0100001-0010-4000-8000-000000000001",
+      "name": "Echo the request model as JSON",
+      "metadata": { "corpus": "templating", "feature": "request-model" },
+      "request": { "method": "ANY", "urlPathPattern": "/wm/template/echo/.*" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json", "X-Echo-Method": "{{request.method}}" },
+        "body": "{\n  \"id\": \"{{request.id}}\",\n  \"method\": \"{{request.method}}\",\n  \"url\": \"{{request.url}}\",\n  \"path\": \"{{request.path}}\",\n  \"secondSegment\": \"{{request.pathSegments.[3]}}\",\n  \"baseUrl\": \"{{request.baseUrl}}\",\n  \"scheme\": \"{{request.scheme}}\",\n  \"host\": \"{{request.host}}\",\n  \"port\": {{request.port}},\n  \"queryStatus\": \"{{request.query.status}}\",\n  \"firstTag\": \"{{request.query.tag.0}}\",\n  \"lastTag\": \"{{request.query.tag.last}}\",\n  \"correlationId\": \"{{request.headers.X-Correlation-Id}}\",\n  \"sessionCookie\": \"{{request.cookies.session}}\",\n  \"bodyLength\": {{size request.body}}\n}",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100001-0010-4000-8000-000000000002",
+      "name": "Path parameters from urlPathTemplate",
+      "metadata": { "corpus": "templating", "feature": "request-model" },
+      "request": { "method": "GET", "urlPathTemplate": "/wm/template/customers/{customerId}/orders/{orderId}" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "customerId": "{{request.path.customerId}}", "orderId": "{{request.path.orderId}}", "status": "SHIPPED" },
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100001-0010-4000-8000-000000000003",
+      "name": "Body as base64 and multipart access",
+      "metadata": { "corpus": "templating", "feature": "request-model" },
+      "request": { "method": "POST", "urlPath": "/wm/template/raw" },
+      "response": { "status": 200, "body": "{{request.bodyAsBase64}}", "transformers": ["response-template"] }
+    },
+    {
+      "id": "c0100001-0010-4000-8000-000000000004",
+      "name": "Transformer parameters",
+      "metadata": { "corpus": "templating", "feature": "transformerParameters" },
+      "request": { "method": "GET", "urlPath": "/wm/template/parameters" },
+      "response": {
+        "status": 200,
+        "body": "Hello from {{parameters.region}} (tier {{parameters.tier}})",
+        "transformers": ["response-template"],
+        "transformerParameters": { "region": "ap-southeast-2", "tier": "gold" }
+      }
+    },
+    {
+      "id": "c0100001-0010-4000-8000-000000000005",
+      "name": "Templated bodyFileName and headers",
+      "metadata": { "corpus": "templating", "feature": "templated-file" },
+      "request": { "method": "GET", "urlPathTemplate": "/wm/template/claims/{claimId}" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json", "X-Claim-Id": "{{request.path.claimId}}", "Location": "{{request.baseUrl}}/wm/template/claims/{{request.path.claimId}}" },
+        "bodyFileName": "claims/claim-{{request.path.claimId}}.json",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100001-0010-4000-8000-000000000006",
+      "name": "Templated file contents (file is a template)",
+      "metadata": { "corpus": "templating", "feature": "templated-file" },
+      "request": { "method": "POST", "urlPath": "/wm/template/orders" },
+      "response": {
+        "status": 201,
+        "headers": { "Content-Type": "application/json" },
+        "bodyFileName": "templates/order-confirmation.json",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0100001-0010-4000-8000-000000000007",
+      "name": "Templating not enabled: braces returned literally",
+      "metadata": { "corpus": "templating", "feature": "disabled" },
+      "request": { "method": "GET", "urlPath": "/wm/template/literal" },
+      "response": { "status": 200, "body": "{{request.path}} is not rendered" }
+    }
+  ]
+}
