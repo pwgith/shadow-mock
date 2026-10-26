@@ -1,0 +1,5 @@
+Terms and conditions (corpus fixture)
+
+1. This text is served from __files/text/terms.txt.
+2. It exists to test plain-text bodyFileName responses.
+3. Unicode survives the round trip: café, naïve, 東京, ✓.

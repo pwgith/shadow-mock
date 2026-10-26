@@ -1,0 +1,48 @@
+{
+  "mappings": [
+    {
+      "id": "c0030002-0003-4000-8000-000000000001",
+      "name": "Query parameters: equalTo and matches, in any order",
+      "metadata": { "corpus": "request-attributes", "feature": "queryParameters" },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/query/search",
+        "queryParameters": { "status": { "equalTo": "OPEN" }, "page": { "matches": "[0-9]+" } }
+      },
+      "response": { "status": 200, "body": "status OPEN, page {{request.query.page}}", "transformers": ["response-template"] }
+    },
+    {
+      "id": "c0030002-0003-4000-8000-000000000002",
+      "name": "Repeated query parameter: hasExactly",
+      "metadata": { "corpus": "request-attributes", "feature": "multi-value" },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/query/exactly",
+        "queryParameters": { "id": { "hasExactly": [ { "equalTo": "1" }, { "equalTo": "2" } ] } }
+      },
+      "response": { "status": 200, "body": "ids exactly 1 and 2" }
+    },
+    {
+      "id": "c0030002-0003-4000-8000-000000000003",
+      "name": "Repeated query parameter: includes",
+      "metadata": { "corpus": "request-attributes", "feature": "multi-value" },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/query/includes",
+        "queryParameters": { "id": { "includes": [ { "equalTo": "1" }, { "matches": "9[0-9]" } ] } }
+      },
+      "response": {
+        "status": 200,
+        "body": "includes 1 and a 9x id; last id {{request.query.id.last}}",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0030002-0003-4000-8000-000000000004",
+      "name": "Query parameter must be absent",
+      "metadata": { "corpus": "request-attributes", "feature": "queryParameters" },
+      "request": { "method": "GET", "urlPath": "/wm/query/no-debug", "queryParameters": { "debug": { "absent": true } } },
+      "response": { "status": 200, "body": "debug not requested" }
+    }
+  ]
+}

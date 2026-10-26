@@ -19,6 +19,13 @@ jobs:
       - name: Lint (golangci-lint, file names, TODOs, go mod tidy, govulncheck)
         run: make lint
 
+  corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate the mapping corpus
+        run: node scripts/check-corpus.js
+
   test:
     runs-on: ubuntu-latest
     steps:

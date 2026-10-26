@@ -1,0 +1,12 @@
+{
+  "mappings": [
+    { "id": "c0120001-0012-4000-8000-000000000001", "name": "Fault: connection reset by peer", "metadata": { "corpus": "faults" },
+      "request": { "method": "ANY", "urlPath": "/wm/fault/reset" }, "response": { "fault": "CONNECTION_RESET_BY_PEER" } },
+    { "id": "c0120001-0012-4000-8000-000000000002", "name": "Fault: empty response", "metadata": { "corpus": "faults" },
+      "request": { "method": "ANY", "urlPath": "/wm/fault/empty" }, "response": { "fault": "EMPTY_RESPONSE" } },
+    { "id": "c0120001-0012-4000-8000-000000000003", "name": "Fault: malformed response chunk", "metadata": { "corpus": "faults" },
+      "request": { "method": "ANY", "urlPath": "/wm/fault/malformed" }, "response": { "status": 200, "fault": "MALFORMED_RESPONSE_CHUNK" } },
+    { "id": "c0120001-0012-4000-8000-000000000004", "name": "Fault: random data then close", "metadata": { "corpus": "faults" },
+      "request": { "method": "ANY", "urlPath": "/wm/fault/garbage" }, "response": { "fault": "RANDOM_DATA_THEN_CLOSE" } }
+  ]
+}

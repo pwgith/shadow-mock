@@ -1,0 +1,65 @@
+{
+  "mappings": [
+    {
+      "id": "c0010001-0001-4000-8000-000000000001",
+      "name": "url: exact path and query",
+      "metadata": { "corpus": "url-matching", "feature": "url" },
+      "request": { "method": "GET", "url": "/wm/url/exact?status=OPEN&page=1" },
+      "response": { "status": 200, "body": "url exact match" }
+    },
+    {
+      "id": "c0010001-0001-4000-8000-000000000002",
+      "name": "urlPath: exact path, any query",
+      "metadata": { "corpus": "url-matching", "feature": "urlPath" },
+      "request": { "method": "GET", "urlPath": "/wm/url/path" },
+      "response": { "status": 200, "body": "urlPath match" }
+    },
+    {
+      "id": "c0010001-0001-4000-8000-000000000003",
+      "name": "urlPattern: regex over path and query",
+      "metadata": { "corpus": "url-matching", "feature": "urlPattern" },
+      "request": { "method": "GET", "urlPattern": "/wm/url/pattern/[0-9]+(\\?page=[0-9]+)?" },
+      "response": { "status": 200, "body": "urlPattern match" }
+    },
+    {
+      "id": "c0010001-0001-4000-8000-000000000004",
+      "name": "urlPathPattern: regex over the path only",
+      "metadata": { "corpus": "url-matching", "feature": "urlPathPattern" },
+      "request": { "method": "GET", "urlPathPattern": "/wm/url/path-pattern/[a-z]+(-[a-z]+)*" },
+      "response": { "status": 200, "body": "urlPathPattern match" }
+    },
+    {
+      "id": "c0010001-0001-4000-8000-000000000005",
+      "name": "urlPathTemplate with constrained path parameters",
+      "metadata": { "corpus": "url-matching", "feature": "urlPathTemplate" },
+      "request": {
+        "method": "GET",
+        "urlPathTemplate": "/wm/url/claims/{claimId}/notes/{noteId}",
+        "pathParameters": {
+          "claimId": { "matches": "[0-9]+" },
+          "noteId": { "doesNotMatch": "draft-.*" }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": "{ \"claimId\": {{request.path.claimId}}, \"noteId\": \"{{request.path.noteId}}\" }",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "id": "c0010001-0001-4000-8000-000000000006",
+      "name": "URL matching is case-sensitive",
+      "metadata": { "corpus": "url-matching", "feature": "case-sensitivity" },
+      "request": { "method": "GET", "urlPath": "/wm/url/CaseSensitive" },
+      "response": { "status": 200, "body": "exact case only" }
+    },
+    {
+      "id": "c0010001-0001-4000-8000-000000000007",
+      "name": "Percent-encoded path",
+      "metadata": { "corpus": "url-matching", "feature": "encoding" },
+      "request": { "method": "GET", "urlPath": "/wm/url/files/my%20doc.pdf" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/pdf" }, "body": "%PDF-1.7 placeholder" }
+    }
+  ]
+}

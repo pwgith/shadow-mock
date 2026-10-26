@@ -1,0 +1,5 @@
+{
+  "id": 1,
+  "status": "DECLINED",
+  "source": "session file override (PUT /__admin/sessions/{id}/files/session/claim-from-file.json)"
+}

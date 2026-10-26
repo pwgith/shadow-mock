@@ -36,6 +36,25 @@ Feature: String value matchers
       | { "not": { "equalTo": "a" } }                              | b            | 200    |
       | { "not": { "equalTo": "a" } }                              | a            | 404    |
 
+  Scenario Outline: Number matchers compare numerically
+    Given the global mapping:
+      """json
+      { "request": { "urlPath": "/n", "queryParameters": { "v": <pattern> } }, "response": { "status": 200 } }
+      """
+    When I send a "GET" request to "/n?v=<value>"
+    Then the response status is <status>
+
+    Examples:
+      | pattern                                                          | value | status |
+      | { "equalToNumber": 5 }                                           | 5.00  | 200    |
+      | { "equalToNumber": 5 }                                           | 5.1   | 404    |
+      | { "greaterThanNumber": 1000 }                                    | 1000  | 404    |
+      | { "greaterThanEqualNumber": 1000 }                               | 1000  | 200    |
+      | { "lessThanNumber": 10 }                                         | 9.99  | 200    |
+      | { "lessThanEqualNumber": 10 }                                    | 10.5  | 404    |
+      | { "and": [ { "greaterThanNumber": 50 }, { "lessThanEqualNumber": 75 } ] } | 75 | 200 |
+      | { "greaterThanNumber": 1 }                                       | abc   | 404    |
+
   Scenario: Relative date-time matching uses the current time
     Given the test clock is at "2026-11-01T09:00:00Z"
     And the global mapping:

@@ -52,7 +52,7 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 * **FR-2.1** URL matching: `url`, `urlPath`, `urlPattern`, `urlPathPattern`, `urlPathTemplate` (with `pathParameters`).
 * **FR-2.2** `method`, including `ANY`.
 * **FR-2.3** `headers`, `queryParameters`, `cookies`, `formParameters`, `pathParameters`, `basicAuthCredentials`, `host`, `port`, `scheme`.
-* **FR-2.4** Value matchers: `equalTo` (with `caseInsensitive`), `contains`, `doesNotContain`, `matches`, `doesNotMatch`, `absent`, `before`/`after`/`equalToDateTime`, `hasExactly`/`including` (multi-value), `and`/`or`/`not` combinators.
+* **FR-2.4** Value matchers: `equalTo` (with `caseInsensitive`), `contains`, `doesNotContain`, `matches`, `doesNotMatch`, `absent`, `before`/`after`/`equalToDateTime` (with `actualFormat`, `truncateExpected`, `truncateActual`), number matchers (`equalToNumber`, `greaterThanNumber`, `greaterThanEqualNumber`, `lessThanNumber`, `lessThanEqualNumber`), `hasExactly`/`includes` (multi-value), `and`/`or`/`not` combinators.
 * **FR-2.5** Body matchers: `equalTo`, `binaryEqualTo`, `contains`, `matches`, `equalToJson` (`ignoreArrayOrder`, `ignoreExtraElements`, `${json-unit.*}` placeholders), `matchesJsonPath` (with sub-matchers), `matchesJsonSchema`, `equalToXml`, `matchesXPath` (with namespaces), and multipart patterns.
 * **FR-2.6** Priority: a lower number wins. Ties go to the most recently added mapping.
 * **FR-2.7** Custom matchers by name, through a Go plug-in interface (replaces Java extensions).

@@ -1,0 +1,39 @@
+{
+  "mappings": [
+    {
+      "id": "c0150001-0015-4000-8000-000000000001",
+      "name": "Mapping with rich metadata (find-by-metadata / remove-by-metadata)",
+      "metadata": { "corpus": "metadata", "team": "claims", "owner": { "name": "Ada", "email": "ada@example.com" }, "tags": ["regression", "smoke"], "ticket": "CLM-1234" },
+      "request": { "method": "GET", "urlPath": "/wm/metadata/claims" },
+      "response": { "status": 200, "body": "claims team stub" }
+    },
+    {
+      "id": "c0150001-0015-4000-8000-000000000002",
+      "name": "Mapping owned by another team",
+      "metadata": { "corpus": "metadata", "team": "billing", "tags": ["smoke"] },
+      "request": { "method": "GET", "urlPath": "/wm/metadata/billing" },
+      "response": { "status": 200, "body": "billing team stub" }
+    },
+    {
+      "id": "c0150001-0015-4000-8000-000000000003",
+      "name": "Near-miss target: needs header, query and body",
+      "metadata": { "corpus": "near-misses" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/near-miss/claims",
+        "headers": { "X-Tenant": { "equalTo": "acme" } },
+        "queryParameters": { "dryRun": { "equalTo": "false" } },
+        "bodyPatterns": [ { "matchesJsonPath": { "expression": "$.type", "equalTo": "motor" } } ]
+      },
+      "response": { "status": 201, "body": "only matched when everything is right" }
+    },
+    {
+      "id": "c0150001-0015-4000-8000-000000000004",
+      "name": "Persistent mapping (written back by /__admin/mappings/save)",
+      "metadata": { "corpus": "misc" },
+      "persistent": true,
+      "request": { "method": "GET", "urlPath": "/wm/misc/persistent" },
+      "response": { "status": 200, "body": "persistent" }
+    }
+  ]
+}

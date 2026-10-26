@@ -1,0 +1,18 @@
+{
+  "mappings": [
+    { "id": "c0040001-0004-4000-8000-000000000001", "name": "equalTo", "metadata": { "corpus": "value-matchers" },
+      "request": { "urlPath": "/wm/values/equal-to", "headers": { "X-Value": { "equalTo": "abc" } } }, "response": { "status": 200, "body": "equalTo" } },
+    { "id": "c0040001-0004-4000-8000-000000000002", "name": "equalTo, case-insensitive", "metadata": { "corpus": "value-matchers" },
+      "request": { "urlPath": "/wm/values/equal-to-ci", "headers": { "X-Value": { "equalTo": "abc", "caseInsensitive": true } } }, "response": { "status": 200, "body": "equalTo caseInsensitive" } },
+    { "id": "c0040001-0004-4000-8000-000000000003", "name": "contains", "metadata": { "corpus": "value-matchers" },
+      "request": { "urlPath": "/wm/values/contains", "headers": { "X-Value": { "contains": "bc" } } }, "response": { "status": 200, "body": "contains" } },
+    { "id": "c0040001-0004-4000-8000-000000000004", "name": "doesNotContain", "metadata": { "corpus": "value-matchers" },
+      "request": { "urlPath": "/wm/values/does-not-contain", "headers": { "X-Value": { "doesNotContain": "secret" } } }, "response": { "status": 200, "body": "doesNotContain" } },
+    { "id": "c0040001-0004-4000-8000-000000000005", "name": "matches (regex)", "metadata": { "corpus": "value-matchers" },
+      "request": { "urlPath": "/wm/values/matches", "headers": { "X-Value": { "matches": "^[A-Z]{3}-[0-9]{4}$" } } }, "response": { "status": 200, "body": "matches" } },
+    { "id": "c0040001-0004-4000-8000-000000000006", "name": "doesNotMatch (regex)", "metadata": { "corpus": "value-matchers" },
+      "request": { "urlPath": "/wm/values/does-not-match", "headers": { "X-Value": { "doesNotMatch": "^test-.*" } } }, "response": { "status": 200, "body": "doesNotMatch" } },
+    { "id": "c0040001-0004-4000-8000-000000000007", "name": "absent", "metadata": { "corpus": "value-matchers" },
+      "request": { "urlPath": "/wm/values/absent", "headers": { "X-Value": { "absent": true } } }, "response": { "status": 200, "body": "absent" } }
+  ]
+}

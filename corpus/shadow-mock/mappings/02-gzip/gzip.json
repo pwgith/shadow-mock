@@ -1,0 +1,32 @@
+{
+  "mappings": [
+    {
+      "id": "5d020001-5002-4000-8000-000000000001",
+      "name": "Large JSON response: gzip when the client accepts it",
+      "metadata": { "corpus": "gzip" },
+      "request": { "method": "GET", "urlPath": "/sm/gzip/claims" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "bodyFileName": "large/claims-page.json" }
+    },
+    {
+      "id": "5d020001-5002-4000-8000-000000000002",
+      "name": "Large JSON response with gzipDisabled",
+      "metadata": { "corpus": "gzip" },
+      "request": { "method": "GET", "urlPath": "/sm/gzip/claims-uncompressed" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "bodyFileName": "large/claims-page.json", "gzipDisabled": true }
+    },
+    {
+      "id": "5d020001-5002-4000-8000-000000000003",
+      "name": "Small body: never compressed (under 1 KiB)",
+      "metadata": { "corpus": "gzip" },
+      "request": { "method": "GET", "urlPath": "/sm/gzip/tiny" },
+      "response": { "status": 200, "body": "ok" }
+    },
+    {
+      "id": "5d020001-5002-4000-8000-000000000004",
+      "name": "Already-encoded body: not recompressed",
+      "metadata": { "corpus": "gzip" },
+      "request": { "method": "GET", "urlPath": "/sm/gzip/pre-encoded" },
+      "response": { "status": 200, "headers": { "Content-Encoding": "gzip", "Content-Type": "text/plain" }, "base64Body": "H4sIAAAAAAAACstIzcnJBwCGphA2BQAAAA==" }
+    }
+  ]
+}

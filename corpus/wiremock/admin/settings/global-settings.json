@@ -1,0 +1,5 @@
+{
+  "fixedDelay": 0,
+  "delayDistribution": { "type": "uniform", "lower": 10, "upper": 50 },
+  "extended": { "corpus": "global-settings", "environment": "system-test" }
+}

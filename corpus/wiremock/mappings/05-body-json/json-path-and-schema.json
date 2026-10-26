@@ -1,0 +1,91 @@
+{
+  "mappings": [
+    {
+      "id": "c0050002-0005-4000-8000-000000000001",
+      "name": "matchesJsonPath: presence",
+      "metadata": { "corpus": "body-json", "feature": "matchesJsonPath" },
+      "request": { "method": "POST", "urlPath": "/wm/jsonpath/present", "bodyPatterns": [ { "matchesJsonPath": "$.claim.id" } ] },
+      "response": { "status": 200, "body": "claim id present" }
+    },
+    {
+      "id": "c0050002-0005-4000-8000-000000000002",
+      "name": "matchesJsonPath: filter expression",
+      "metadata": { "corpus": "body-json", "feature": "matchesJsonPath" },
+      "request": { "method": "POST", "urlPath": "/wm/jsonpath/filter", "bodyPatterns": [ { "matchesJsonPath": "$.items[?(@.qty > 1 && @.sku =~ /A.*/)]" } ] },
+      "response": { "status": 200, "body": "an A-sku item with qty > 1" }
+    },
+    {
+      "id": "c0050002-0005-4000-8000-000000000003",
+      "name": "matchesJsonPath with equalTo sub-matcher",
+      "metadata": { "corpus": "body-json", "feature": "matchesJsonPath" },
+      "request": { "method": "POST", "urlPath": "/wm/jsonpath/equal", "bodyPatterns": [ { "matchesJsonPath": { "expression": "$.claim.status", "equalTo": "OPEN" } } ] },
+      "response": { "status": 200, "body": "open claim" }
+    },
+    {
+      "id": "c0050002-0005-4000-8000-000000000004",
+      "name": "matchesJsonPath with matches sub-matcher",
+      "metadata": { "corpus": "body-json", "feature": "matchesJsonPath" },
+      "request": { "method": "POST", "urlPath": "/wm/jsonpath/regex", "bodyPatterns": [ { "matchesJsonPath": { "expression": "$.customer.email", "matches": ".+@example\\.com" } } ] },
+      "response": { "status": 200, "body": "example.com customer" }
+    },
+    {
+      "id": "c0050002-0005-4000-8000-000000000005",
+      "name": "matchesJsonPath with equalToJson sub-matcher",
+      "metadata": { "corpus": "body-json", "feature": "matchesJsonPath" },
+      "request": { "method": "POST", "urlPath": "/wm/jsonpath/subtree", "bodyPatterns": [ { "matchesJsonPath": { "expression": "$.address", "equalToJson": { "postcode": "2000", "country": "AU" }, "ignoreExtraElements": true } } ] },
+      "response": { "status": 200, "body": "Sydney address" }
+    },
+    {
+      "id": "c0050002-0005-4000-8000-000000000006",
+      "name": "matchesJsonPath with absent sub-matcher",
+      "metadata": { "corpus": "body-json", "feature": "matchesJsonPath" },
+      "request": { "method": "POST", "urlPath": "/wm/jsonpath/no-discount", "bodyPatterns": [ { "matchesJsonPath": { "expression": "$.discountCode", "absent": true } } ] },
+      "response": { "status": 200, "body": "no discount code" }
+    },
+    {
+      "id": "c0050002-0005-4000-8000-000000000007",
+      "name": "matchesJsonPath with numeric sub-matcher",
+      "metadata": { "corpus": "body-json", "feature": "matchesJsonPath" },
+      "request": { "method": "POST", "urlPath": "/wm/jsonpath/amount", "bodyPatterns": [ { "matchesJsonPath": { "expression": "$.amount", "greaterThanNumber": 1000 } } ] },
+      "response": { "status": 200, "body": "large amount" }
+    },
+    {
+      "id": "c0050002-0005-4000-8000-000000000008",
+      "name": "matchesJsonSchema (draft 2020-12)",
+      "metadata": { "corpus": "body-json", "feature": "matchesJsonSchema" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/jsonschema/claim",
+        "bodyPatterns": [ {
+          "matchesJsonSchema": {
+            "type": "object",
+            "required": ["id", "amount"],
+            "properties": {
+              "id": { "type": "integer" },
+              "amount": { "type": "number", "minimum": 0 },
+              "currency": { "type": "string", "enum": ["AUD", "NZD", "USD"] }
+            },
+            "additionalProperties": false
+          },
+          "schemaVersion": "V202012"
+        } ]
+      },
+      "response": { "status": 201, "body": "valid claim" }
+    },
+    {
+      "id": "c0050002-0005-4000-8000-000000000009",
+      "name": "Several body patterns must all match",
+      "metadata": { "corpus": "body-json", "feature": "bodyPatterns" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/json/all-patterns",
+        "bodyPatterns": [
+          { "matchesJsonPath": "$.a" },
+          { "matchesJsonPath": "$.b" },
+          { "doesNotContain": "\"test\": true" }
+        ]
+      },
+      "response": { "status": 200, "body": "a and b present, not a test" }
+    }
+  ]
+}

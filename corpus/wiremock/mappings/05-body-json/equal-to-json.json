@@ -1,0 +1,51 @@
+{
+  "mappings": [
+    {
+      "id": "c0050001-0005-4000-8000-000000000001",
+      "name": "equalToJson strict (key order never matters)",
+      "metadata": { "corpus": "body-json", "feature": "equalToJson" },
+      "request": { "method": "POST", "urlPath": "/wm/json/strict", "bodyPatterns": [ { "equalToJson": { "id": 1, "tags": ["a", "b"] } } ] },
+      "response": { "status": 200, "body": "strict json match" }
+    },
+    {
+      "id": "c0050001-0005-4000-8000-000000000002",
+      "name": "equalToJson ignoreArrayOrder",
+      "metadata": { "corpus": "body-json", "feature": "equalToJson" },
+      "request": { "method": "POST", "urlPath": "/wm/json/array-order", "bodyPatterns": [ { "equalToJson": { "tags": ["a", "b", "c"] }, "ignoreArrayOrder": true } ] },
+      "response": { "status": 200, "body": "array order ignored" }
+    },
+    {
+      "id": "c0050001-0005-4000-8000-000000000003",
+      "name": "equalToJson ignoreExtraElements",
+      "metadata": { "corpus": "body-json", "feature": "equalToJson" },
+      "request": { "method": "POST", "urlPath": "/wm/json/extra", "bodyPatterns": [ { "equalToJson": { "customer": { "id": "C-1" } }, "ignoreExtraElements": true } ] },
+      "response": { "status": 200, "body": "extra elements ignored" }
+    },
+    {
+      "id": "c0050001-0005-4000-8000-000000000004",
+      "name": "equalToJson given as a string",
+      "metadata": { "corpus": "body-json", "feature": "equalToJson" },
+      "request": { "method": "POST", "urlPath": "/wm/json/string-form", "bodyPatterns": [ { "equalToJson": "{ \"active\": true }" } ] },
+      "response": { "status": 200, "body": "string-form json match" }
+    },
+    {
+      "id": "c0050001-0005-4000-8000-000000000005",
+      "name": "equalToJson placeholders (json-unit)",
+      "metadata": { "corpus": "body-json", "feature": "placeholders" },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/json/placeholders",
+        "bodyPatterns": [ {
+          "equalToJson": {
+            "id": "${json-unit.any-number}",
+            "name": "${json-unit.any-string}",
+            "active": "${json-unit.any-boolean}",
+            "ref": "${json-unit.regex}[A-Z]{3}-\\d+",
+            "note": "${json-unit.ignore}"
+          }
+        } ]
+      },
+      "response": { "status": 200, "body": "placeholders matched" }
+    }
+  ]
+}

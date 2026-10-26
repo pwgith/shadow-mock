@@ -1,0 +1,14 @@
+{
+  "name": "nested-in-claims-api-ci",
+  "ttlSeconds": 600,
+  "parentId": "${URL_MOCK_ID}",
+  "tokens": ["CLAIM-NESTED-01"],
+  "mappings": [
+    {
+      "id": "5d050002-5005-4000-8000-000000000001",
+      "name": "Nested key-based: policy 9 is active again for this one test",
+      "request": { "method": "GET", "urlPath": "/sm/policies/9" },
+      "response": { "status": 200, "jsonBody": { "policyId": "9", "active": true, "source": "nested key-based" } }
+    }
+  ]
+}

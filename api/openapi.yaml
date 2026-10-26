@@ -1711,6 +1711,11 @@ components:
         actualFormat: { type: string, examples: [dd/MM/yyyy] }
         truncateExpected: { type: string }
         truncateActual: { type: string }
+        equalToNumber: { type: number, description: 'Numeric equality, so "5", "5.0" and "5.00" all match 5.' }
+        greaterThanNumber: { type: number }
+        greaterThanEqualNumber: { type: number }
+        lessThanNumber: { type: number }
+        lessThanEqualNumber: { type: number }
         and:
           type: array
           items: { $ref: '#/components/schemas/StringValuePattern' }
@@ -1727,7 +1732,7 @@ components:
             hasExactly:
               type: array
               items: { $ref: '#/components/schemas/StringValuePattern' }
-            including:
+            includes:
               type: array
               items: { $ref: '#/components/schemas/StringValuePattern' }
     ContentPattern:

@@ -1,0 +1,6 @@
+{
+  "targetBaseUrl": "http://localhost:8089",
+  "filters": { "urlPathPattern": "/sm/jobs/.*" },
+  "repeatsAsCallResponses": true,
+  "persist": true
+}

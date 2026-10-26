@@ -1,0 +1,8 @@
+{
+  "id": 42,
+  "status": "APPROVED",
+  "type": "home",
+  "lodged": "2026-09-14T22:05:00Z",
+  "customer": { "id": "CUST-11111", "name": "Grace Hopper" },
+  "items": [ { "sku": "H2", "description": "Water damage repair", "qty": 1, "price": 4200.0 } ]
+}

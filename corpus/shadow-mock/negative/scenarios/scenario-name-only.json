@@ -1,0 +1,8 @@
+{
+  "_expect": { "status": 422, "error": "scenarios_not_supported" },
+  "mapping": {
+    "scenarioName": "order-flow",
+    "request": { "method": "GET", "urlPath": "/sm/neg/orders/1" },
+    "response": { "status": 200 }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "override-global-payments-by-id",
+  "ttlSeconds": 600,
+  "mappings": [
+    {
+      "id": "5d030001-5003-4000-8000-000000000001",
+      "name": "Session override of the global payments mapping (same id), only for VIP customers",
+      "request": {
+        "method": "POST",
+        "urlPath": "/sm/payments",
+        "bodyPatterns": [ { "matchesJsonPath": { "expression": "$.tier", "equalTo": "vip" } } ]
+      },
+      "response": { "status": 200, "jsonBody": { "status": "SETTLED_INSTANTLY", "source": "session override" } }
+    }
+  ]
+}

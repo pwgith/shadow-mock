@@ -1,0 +1,5 @@
+{
+  "request": { "method": "GET", "urlPath": "/sm/validate/me" },
+  "response": { "status": 200 },
+  "callResponses": [ { "every": 2, "response": { "status": 500 } } ]
+}

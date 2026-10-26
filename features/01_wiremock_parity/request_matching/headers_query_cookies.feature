@@ -32,7 +32,7 @@ Feature: Matching on headers, query parameters, cookies and form parameters
       | /q?status=OPEN           | 404    |
       | /q?status=OPEN&page=two  | 404    |
 
-  Scenario Outline: Multi-value query parameters with hasExactly and including
+  Scenario Outline: Multi-value query parameters with hasExactly and includes
     Given the global mapping:
       """json
       { "request": { "urlPath": "/multi", "queryParameters": { "id": { "<operator>": [ { "equalTo": "1" }, { "equalTo": "2" } ] } } },
@@ -45,8 +45,8 @@ Feature: Matching on headers, query parameters, cookies and form parameters
       | operator   | url                  | status |
       | hasExactly | /multi?id=1&id=2     | 200    |
       | hasExactly | /multi?id=1&id=2&id=3| 404    |
-      | including  | /multi?id=1&id=2&id=3| 200    |
-      | including  | /multi?id=1          | 404    |
+      | includes   | /multi?id=1&id=2&id=3| 200    |
+      | includes   | /multi?id=1          | 404    |
 
   Scenario: Cookie matching
     Given the global mapping:

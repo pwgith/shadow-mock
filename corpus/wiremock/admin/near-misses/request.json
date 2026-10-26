@@ -1,0 +1,6 @@
+{
+  "method": "POST",
+  "url": "/wm/near-miss/claims?dryRun=true",
+  "headers": { "X-Tenant": "globex", "Content-Type": "application/json" },
+  "body": "{ \"type\": \"home\" }"
+}

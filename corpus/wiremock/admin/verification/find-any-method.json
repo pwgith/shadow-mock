@@ -1,0 +1,4 @@
+{
+  "method": "ANY",
+  "urlPathPattern": "/wm/methods/.*"
+}

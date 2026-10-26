@@ -1,0 +1,6 @@
+{
+  "method": "POST",
+  "urlPath": "/wm/jsonpath/equal",
+  "headers": { "Content-Type": { "contains": "json" } },
+  "bodyPatterns": [ { "matchesJsonPath": { "expression": "$.claim.status", "equalTo": "OPEN" } } ]
+}

@@ -1,0 +1,187 @@
+# Requests for corpus/shadow-mock (VS Code REST Client: humao.rest-client).
+# Start the mock with: shadowmock --root corpus/shadow-mock
+# In SaaS, set @base to https://shadowmock.kaizentis.xyz/<org-handle> and add
+#   Authorization: Bearer {{token}}
+# to every /__admin request.
+@base = http://localhost:8080
+
+########## Call-count responses ##########
+
+### Reset all counters first
+POST {{base}}/__admin/counters/reset
+
+### Retry: send this 3 times → 503, 503, then 200 SETTLED
+POST {{base}}/sm/calls/payments
+
+### Polling: send 4 times → PENDING ×3, then COMPLETE
+GET {{base}}/sm/calls/jobs/7
+
+### Flaky: every 3rd call → 502
+GET {{base}}/sm/calls/flaky
+
+### Rule order: 7 calls → 200,200,418,200,429,500,429
+GET {{base}}/sm/calls/order
+
+### Call number in a template → {"attempt": "n"}
+GET {{base}}/sm/calls/attempt
+
+### Counters: list
+GET {{base}}/__admin/counters
+
+### Counters: jump to call 9, so the next call is the 10th → 500
+PUT {{base}}/__admin/counters/5d010001-5001-4000-8000-000000000011
+Content-Type: application/json
+
+< ./shadow-mock/sessions/counters/set-counter.json
+
+###
+GET {{base}}/sm/calls/tenth
+
+########## Gzip ##########
+
+### Compressed (Content-Encoding: gzip)
+GET {{base}}/sm/gzip/claims
+Accept-Encoding: gzip
+
+### gzipDisabled → no Content-Encoding
+GET {{base}}/sm/gzip/claims-uncompressed
+Accept-Encoding: gzip
+
+########## Key-based shadow mock ##########
+
+### Create a session with tokens and mappings
+# @name declined
+POST {{base}}/__admin/sessions/key-based
+Content-Type: application/json
+
+< ./shadow-mock/sessions/key-based/02-checkout-declined.json
+
+### With the key in the designated header → 402 card_declined (session)
+POST {{base}}/sm/payments
+X-Shadow-Mock-Key: {{declined.response.body.$.key}}
+
+### Without the key → 200 SETTLED (global)
+POST {{base}}/sm/payments
+
+### Key only inside the body (scan) → 402
+POST {{base}}/sm/payments
+Content-Type: application/json
+
+{ "testRun": "{{declined.response.body.$.key}}", "amount": 10 }
+
+### Match token in the body, no key at all → DECLINE (session)
+POST {{base}}/sm/credit-check
+Content-Type: application/json
+
+{ "customerId": "CUST-99812", "amount": 500 }
+
+### Not mocked by the session → falls through to global
+GET {{base}}/sm/customers/C-1
+X-Shadow-Mock-Key: {{declined.response.body.$.key}}
+
+### Add a session mapping that fails twice (per-session counters)
+POST {{base}}/__admin/sessions/{{declined.response.body.$.id}}/mappings
+Content-Type: application/json
+
+< ./shadow-mock/sessions/key-based/06-session-mapping-with-call-counts.json
+
+### Session journal: count POST /sm/payments
+POST {{base}}/__admin/sessions/{{declined.response.body.$.id}}/requests/count
+Content-Type: application/json
+
+{ "method": "POST", "urlPath": "/sm/payments" }
+
+### Session counters
+GET {{base}}/__admin/sessions/{{declined.response.body.$.id}}/counters
+
+### Override a session file
+PUT {{base}}/__admin/sessions/{{declined.response.body.$.id}}/files/session/claim-from-file.json
+Content-Type: application/json
+
+< ./shadow-mock/sessions/files/claim-from-file.json
+
+### Add a token, then extend and add a mask
+PATCH {{base}}/__admin/sessions/{{declined.response.body.$.id}}
+Content-Type: application/json
+
+< ./shadow-mock/sessions/key-based/patch-add-tokens.json
+
+###
+PATCH {{base}}/__admin/sessions/{{declined.response.body.$.id}}
+Content-Type: application/json
+
+< ./shadow-mock/sessions/key-based/patch-add-masks-and-extend.json
+
+### Keepalive
+POST {{base}}/__admin/sessions/{{declined.response.body.$.id}}/keepalive
+
+### Delete
+DELETE {{base}}/__admin/sessions/{{declined.response.body.$.id}}
+
+########## Override by id and masks ##########
+
+### Create the override session
+# @name override
+POST {{base}}/__admin/sessions/key-based
+Content-Type: application/json
+
+< ./shadow-mock/sessions/key-based/03-override-by-id.json
+
+### Non-VIP body: override hides global even though it does not match → 404
+POST {{base}}/sm/payments
+X-Shadow-Mock-Key: {{override.response.body.$.key}}
+Content-Type: application/json
+
+{ "tier": "standard" }
+
+### Masks session
+# @name masked
+POST {{base}}/__admin/sessions/key-based
+Content-Type: application/json
+
+< ./shadow-mock/sessions/key-based/04-masks.json
+
+### Masked specific rate → global catch-all answers
+GET {{base}}/sm/fx/rates
+X-Shadow-Mock-Key: {{masked.response.body.$.key}}
+
+########## URL-based shadow mock ##########
+
+### Create a 30-day CI mock
+# @name ci
+POST {{base}}/__admin/sessions/url-based
+Content-Type: application/json
+
+< ./shadow-mock/sessions/url-based/02-claims-api-ci.json
+
+### Through the URL insert → lapsed policy (url-based)
+GET {{ci.response.body.$.baseUrl}}/sm/policies/9
+
+### Not mocked → global policy
+GET {{ci.response.body.$.baseUrl}}/sm/policies/10
+
+### First call times out (504 after 2 s), then 200
+POST {{ci.response.body.$.baseUrl}}/sm/fraud/score
+
+### Nested key-based inside the URL-based mock (inline version of sessions/url-based/03-nested-key-based.json)
+POST {{base}}/__admin/sessions/key-based
+Content-Type: application/json
+
+{ "parentId": "{{ci.response.body.$.id}}", "ttlSeconds": 600, "mappings": [ { "request": { "method": "GET", "urlPath": "/sm/policies/9" }, "response": { "status": 200, "jsonBody": { "active": true, "source": "nested" } } } ] }
+
+### Unknown URL-based id → 404 unknown_url_based_mock
+GET {{base}}/d/aaaaaaaaaaaaaaaa/sm/policies/9
+
+########## Runtime ##########
+
+### Validate a mapping
+POST {{base}}/__admin/mappings/validate
+Content-Type: application/json
+
+< ./shadow-mock/sessions/runtime/validate-mapping.json
+
+### Negative: scenario fields are rejected → 422 scenarios_not_supported
+POST {{base}}/__admin/sessions/{{ci.response.body.$.id}}/mappings
+Content-Type: application/json
+
+{ "scenarioName": "flow", "request": { "urlPath": "/sm/neg" }, "response": { "status": 200 } }

@@ -1,0 +1,11 @@
+{
+  "id": 1,
+  "status": "OPEN",
+  "type": "motor",
+  "lodged": "2026-10-01T09:30:00Z",
+  "customer": { "id": "CUST-99812", "name": "Ada Lovelace" },
+  "items": [
+    { "sku": "A1", "description": "Front bumper", "qty": 1, "price": 850.0 },
+    { "sku": "B7", "description": "Headlight", "qty": 2, "price": 210.5 }
+  ]
+}

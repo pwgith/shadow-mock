@@ -1,0 +1,7 @@
+{
+  "id": "5d040002-5004-4000-8000-000000000001",
+  "name": "Session mapping: payments fail twice then succeed, for this test only",
+  "request": { "method": "POST", "urlPath": "/sm/payments" },
+  "response": { "status": 200, "jsonBody": { "status": "SETTLED", "source": "session" } },
+  "callResponses": [ { "calls": "1-2", "response": { "status": 503, "jsonBody": { "error": "temporarily_unavailable" } } } ]
+}

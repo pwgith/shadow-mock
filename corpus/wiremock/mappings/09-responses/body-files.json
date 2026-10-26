@@ -1,0 +1,43 @@
+{
+  "mappings": [
+    {
+      "id": "c0090002-0009-4000-8000-000000000001",
+      "name": "bodyFileName: JSON file",
+      "metadata": { "corpus": "responses", "feature": "bodyFileName" },
+      "request": { "method": "GET", "urlPath": "/wm/files/claim" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "bodyFileName": "claims/claim-1.json" }
+    },
+    {
+      "id": "c0090002-0009-4000-8000-000000000002",
+      "name": "bodyFileName: XML file",
+      "metadata": { "corpus": "responses", "feature": "bodyFileName" },
+      "request": { "method": "GET", "urlPath": "/wm/files/policy.xml" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/xml" }, "bodyFileName": "policies/policy-9.xml" }
+    },
+    {
+      "id": "c0090002-0009-4000-8000-000000000003",
+      "name": "bodyFileName: plain text file",
+      "metadata": { "corpus": "responses", "feature": "bodyFileName" },
+      "request": { "method": "GET", "urlPath": "/wm/files/terms" },
+      "response": { "status": 200, "headers": { "Content-Type": "text/plain; charset=utf-8" }, "bodyFileName": "text/terms.txt" }
+    },
+    {
+      "id": "c0090002-0009-4000-8000-000000000004",
+      "name": "bodyFileName: CSV download with a Content-Disposition header",
+      "metadata": { "corpus": "responses", "feature": "bodyFileName" },
+      "request": { "method": "GET", "urlPath": "/wm/files/export.csv" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=\"claims.csv\"" },
+        "bodyFileName": "exports/claims.csv"
+      }
+    },
+    {
+      "id": "c0090002-0009-4000-8000-000000000005",
+      "name": "bodyFileName that does not exist (500 with a clear message)",
+      "metadata": { "corpus": "responses", "feature": "bodyFileName" },
+      "request": { "method": "GET", "urlPath": "/wm/files/missing" },
+      "response": { "status": 200, "bodyFileName": "does-not-exist.json" }
+    }
+  ]
+}

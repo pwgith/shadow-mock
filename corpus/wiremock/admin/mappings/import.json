@@ -1,0 +1,19 @@
+{
+  "mappings": [
+    {
+      "id": "c0170001-0017-4000-8000-000000000001",
+      "name": "Imported: health of a downstream",
+      "metadata": { "corpus": "admin-import" },
+      "request": { "method": "GET", "urlPath": "/wm/imported/health" },
+      "response": { "status": 200, "jsonBody": { "status": "UP" } }
+    },
+    {
+      "id": "c0170001-0017-4000-8000-000000000002",
+      "name": "Imported: overwrite of an existing mapping id",
+      "metadata": { "corpus": "admin-import" },
+      "request": { "method": "GET", "urlPath": "/wm/imported/overwritten" },
+      "response": { "status": 200, "body": "second version" }
+    }
+  ],
+  "importOptions": { "duplicatePolicy": "OVERWRITE", "deleteAllNotInImport": false }
+}

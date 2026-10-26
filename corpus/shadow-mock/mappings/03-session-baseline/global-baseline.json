@@ -1,0 +1,56 @@
+{
+  "mappings": [
+    {
+      "id": "5d030001-5003-4000-8000-000000000001",
+      "name": "Global: payments succeed (overridden by session examples)",
+      "metadata": { "corpus": "session-baseline", "usedBy": "sessions/key-based/03-override-by-id.json" },
+      "priority": 1,
+      "request": { "method": "POST", "urlPath": "/sm/payments" },
+      "response": { "status": 200, "jsonBody": { "status": "SETTLED", "source": "global" } }
+    },
+    {
+      "id": "5d030001-5003-4000-8000-000000000002",
+      "name": "Global: customer lookup",
+      "metadata": { "corpus": "session-baseline" },
+      "request": { "method": "GET", "urlPathTemplate": "/sm/customers/{customerId}" },
+      "response": { "status": 200, "jsonBody": { "id": "{{request.path.customerId}}", "tier": "standard", "source": "global" }, "transformers": ["response-template"] }
+    },
+    {
+      "id": "5d030001-5003-4000-8000-000000000003",
+      "name": "Global: credit check approves (match-token examples)",
+      "metadata": { "corpus": "session-baseline", "usedBy": "sessions/key-based/02-checkout-declined.json" },
+      "request": { "method": "POST", "urlPath": "/sm/credit-check" },
+      "response": { "status": 200, "jsonBody": { "decision": "APPROVE", "source": "global" } }
+    },
+    {
+      "id": "5d030001-5003-4000-8000-000000000004",
+      "name": "Global: FX rate (masked by session examples)",
+      "metadata": { "corpus": "session-baseline", "usedBy": "sessions/key-based/04-masks.json" },
+      "request": { "method": "GET", "urlPath": "/sm/fx/rates" },
+      "response": { "status": 200, "jsonBody": { "pair": "AUDUSD", "rate": 0.66, "source": "global" } }
+    },
+    {
+      "id": "5d030001-5003-4000-8000-000000000005",
+      "name": "Global: FX catch-all, revealed when the specific rate is masked",
+      "metadata": { "corpus": "session-baseline" },
+      "priority": 9,
+      "request": { "method": "GET", "urlPathPattern": "/sm/fx/.*" },
+      "response": { "status": 200, "jsonBody": { "rate": 1.0, "source": "global catch-all" } }
+    },
+    {
+      "id": "5d030001-5003-4000-8000-000000000006",
+      "name": "Global: claims downstream used by URL-based examples",
+      "metadata": { "corpus": "session-baseline", "usedBy": "sessions/url-based/02-claims-api-ci.json" },
+      "request": { "method": "GET", "urlPathTemplate": "/sm/policies/{policyId}" },
+      "response": { "status": 200, "jsonBody": { "policyId": "{{request.path.policyId}}", "active": true, "source": "global" }, "transformers": ["response-template"] }
+    },
+    {
+      "id": "5d030001-5003-4000-8000-000000000007",
+      "name": "Global: order flow with a retry on the first call (per-session counters)",
+      "metadata": { "corpus": "session-baseline", "usedBy": "call-count isolation examples" },
+      "request": { "method": "POST", "urlPath": "/sm/orders" },
+      "response": { "status": 201, "jsonBody": { "status": "CREATED", "source": "global" } },
+      "callResponses": [ { "calls": "1", "response": { "status": 503 } } ]
+    }
+  ]
+}

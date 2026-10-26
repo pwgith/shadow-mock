@@ -5,7 +5,7 @@ GOLANGCI := go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLA
 
 export GOLANGCI_LINT_VERSION GOVULNCHECK_VERSION
 
-.PHONY: fmt lint lint-fix test acceptance cover-check bench ci
+.PHONY: fmt lint lint-fix test acceptance cover-check bench corpus ci
 
 fmt:
 	$(GOLANGCI) fmt ./...
@@ -28,4 +28,7 @@ acceptance:
 bench:
 	go test -run='^$$' -bench=. -benchmem ./internal/engine/... ./internal/match/... ./internal/detect/... ./internal/respond/...
 
-ci: lint cover-check acceptance
+corpus:
+	node scripts/check-corpus.js
+
+ci: lint corpus cover-check acceptance

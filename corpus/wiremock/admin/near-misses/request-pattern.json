@@ -1,0 +1,5 @@
+{
+  "method": "POST",
+  "urlPath": "/wm/near-miss/claims",
+  "headers": { "X-Tenant": { "equalTo": "acme" } }
+}
