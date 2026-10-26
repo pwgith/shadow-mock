@@ -2,10 +2,17 @@ module github.com/pwgith/shadow-mock
 
 go 1.26.0
 
+toolchain go1.27.3
+
 require (
+	github.com/fsnotify/fsnotify v1.10.1
+	github.com/google/go-cmp v0.7.0
+	github.com/ohler55/ojg v1.28.8
 	github.com/pb33f/libopenapi v0.41.7
 	github.com/pb33f/libopenapi-validator v0.16.1
+	github.com/petar-dambovaliev/aho-corasick v0.0.0-20250424160509-463d218d4745
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+	golang.org/x/sync v0.24.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -19,6 +26,6 @@ require (
 	github.com/pb33f/jsonschema/v6 v6.0.3 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.2 // indirect
 	golang.org/x/net v0.50.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 )

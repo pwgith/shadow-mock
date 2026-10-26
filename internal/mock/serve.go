@@ -1,0 +1,219 @@
+package mock
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/pwgith/shadow-mock/internal/apierr"
+	"github.com/pwgith/shadow-mock/internal/counter"
+	"github.com/pwgith/shadow-mock/internal/detect"
+	"github.com/pwgith/shadow-mock/internal/engine"
+	"github.com/pwgith/shadow-mock/internal/ids"
+	"github.com/pwgith/shadow-mock/internal/journal"
+	"github.com/pwgith/shadow-mock/internal/match"
+	"github.com/pwgith/shadow-mock/internal/respond"
+	"github.com/pwgith/shadow-mock/internal/session"
+	"github.com/pwgith/shadow-mock/internal/stats"
+	"github.com/pwgith/shadow-mock/internal/tenant"
+)
+
+// Traffic is a mock request after routing (DESIGN.md §8).
+type Traffic struct {
+	Tenant tenant.ID
+	// URLMockID is the URL-based shadow mock from a /d/<id> prefix, or "".
+	URLMockID string
+	// Path is the escaped path to match, with the org and /d/<id> prefixes stripped.
+	Path        string
+	ClientIP    string
+	AbsoluteURL string
+}
+
+// served is what one mock request produced, for the journal and stats.
+type served struct {
+	entry *journal.Entry
+	start time.Time
+	stage string
+}
+
+// ServeMock handles one mock request end to end.
+func (s *Service) ServeMock(w http.ResponseWriter, r *http.Request, tr Traffic) {
+	ctx := r.Context()
+	sv := &served{start: s.Clock.Now(), entry: &journal.Entry{
+		ID: ids.NewUUID(), LoggedAt: s.Clock.Now().UTC(), Tenant: tr.Tenant, AbsoluteURL: tr.AbsoluteURL,
+	}}
+	defer s.finish(sv)
+
+	body, err := readBody(w, r, s.Config.MaxBodyBytes)
+	if err != nil {
+		s.fail(w, sv, match.NewRequest(r, nil, tr.Path), err)
+		return
+	}
+	req := match.NewRequest(r, body, tr.Path)
+	if tr.ClientIP != "" {
+		req.ClientIP = tr.ClientIP
+	}
+	sv.entry.Request = req
+
+	stack, err := s.trafficStack(ctx, tr, req, sv)
+	if err != nil {
+		s.fail(w, sv, req, err)
+		return
+	}
+	res := engine.Resolve(req, stack)
+	if res.Stub == nil {
+		s.unmatched(w, req, stack, sv)
+		return
+	}
+	s.respond(ctx, w, r, req, stack, res, sv)
+}
+
+func readBody(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, error) {
+	if r.Body == nil {
+		return nil, nil
+	}
+	if limit > 0 {
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
+	}
+	b, err := io.ReadAll(r.Body)
+	var tooBig *http.MaxBytesError
+	if errors.As(err, &tooBig) {
+		return nil, apierr.New(http.StatusRequestEntityTooLarge, apierr.BodyTooLarge,
+			"The request body exceeds %d bytes.", limit)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read request body: %w", err)
+	}
+	return b, nil
+}
+
+// trafficStack checks the URL-based shadow mock, runs detection and builds the stack.
+func (s *Service) trafficStack(_ context.Context, tr Traffic, req *match.Request, sv *served) (engine.Stack, error) {
+	var sessions []string
+	if tr.URLMockID != "" {
+		sess, ok := s.Sessions.Get(tr.Tenant, tr.URLMockID)
+		if !ok || sess.Kind != session.URLBased {
+			// Never fall back to global silently (FR-8.6).
+			return nil, apierr.New(http.StatusNotFound, apierr.UnknownURLBasedMock,
+				"No active URL-based shadow mock %s.", tr.URLMockID)
+		}
+	}
+	hit, found, err := s.Detector.Detect(tr.Tenant, tr.URLMockID, req)
+	if hit.Stage != "" {
+		sv.entry.Detection = &journal.Detection{
+			Stage: string(hit.Stage), Offset: hit.Offset,
+			ScanTruncated: hit.ScanTruncated, Ambiguous: hit.Ambiguous,
+		}
+	}
+	if err != nil {
+		return nil, apierr.New(detect.StatusFor(err), apierr.AmbiguousSession,
+			"The request matches several key-based shadow mocks: %s.", strings.Join(hit.Ambiguous, ", "))
+	}
+	if found {
+		sessions = append(sessions, hit.SessionID)
+		sv.stage = string(hit.Stage)
+	}
+	if tr.URLMockID != "" {
+		sessions = append(sessions, tr.URLMockID)
+	}
+	sv.entry.Sessions = sessions
+	if len(sessions) > 0 {
+		sv.entry.SessionID = sessions[0]
+	}
+	return s.Layers.Stack(tr.Tenant, sessions...), nil
+}
+
+func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Request, req *match.Request, stack engine.Stack, res engine.Result, sv *served) {
+	stub := &res.Stub.Mapping
+	def := &stub.Response
+	sv.entry.Stub, sv.entry.StubScope, sv.entry.Layer = stub, res.Stub.Scope, string(res.Layer.Kind)
+	if stub.HasCallResponses() {
+		n, err := s.Counters.Next(ctx, counter.Key{RequestScope: stack.RequestScope(), StubScope: res.Stub.Scope, StubID: stub.ID}, s.Clock.Now().UTC())
+		if err != nil {
+			s.fail(w, sv, req, fmt.Errorf("call counter: %w", err))
+			return
+		}
+		sv.entry.CallNumber = n
+		def = stub.ResponseFor(n)
+	}
+	sv.entry.Definition = def
+	out, err := s.Renderer.Render(ctx, def, fileScopes(stack))
+	if err != nil {
+		s.fail(w, sv, req, err)
+		return
+	}
+	if s.Config.MatchedHeader {
+		out.Header.Set("X-Shadow-Mock-Matched", stub.ID+";layer="+string(res.Layer.Kind))
+	}
+	sv.entry.Response = journal.Response{Status: out.Status, Header: out.Header.Clone(), Body: out.Body}
+	sv.entry.AddedDelay = out.Delay.Milliseconds()
+	if err := s.Renderer.Write(ctx, w, r, out); err != nil {
+		s.Logger.DebugContext(ctx, "response not completed", "error", err.Error())
+	}
+}
+
+// unmatched sends WireMock's 404 diagnostic with the closest stubs (FR-3.6).
+func (s *Service) unmatched(w http.ResponseWriter, req *match.Request, stack engine.Stack, sv *served) {
+	near := engine.NearMisses(req, stack, 3)
+	var b strings.Builder
+	b.WriteString("Request was not matched\n=======================\n\n")
+	fmt.Fprintf(&b, "Request: %s %s\n", req.Method, req.URL())
+	if len(near) > 0 {
+		b.WriteString("\nClosest stubs:\n")
+		for _, nm := range near {
+			name := nm.Stub.Mapping.Name
+			if name == "" {
+				name = nm.Stub.ID()
+			}
+			fmt.Fprintf(&b, "  %s (%s layer, distance %.2f)\n", name, nm.Layer.Kind, nm.Distance)
+		}
+	}
+	body := []byte(b.String())
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write(body)
+	sv.entry.Response = journal.Response{Status: http.StatusNotFound, Header: w.Header().Clone(), Body: body}
+}
+
+// fail sends an engine error on a mock path and records it.
+func (s *Service) fail(w http.ResponseWriter, sv *served, req *match.Request, err error) {
+	if sv.entry.Request == nil {
+		sv.entry.Request = req
+	}
+	var ae *apierr.Error
+	if !errors.As(err, &ae) {
+		s.Logger.Error("mock request failed", "error", err.Error())
+		ae = apierr.New(http.StatusInternalServerError, "internal_error", "The engine could not serve this request.")
+	}
+	ae.Write(w)
+	sv.entry.Response = journal.Response{Status: ae.Status, Header: w.Header().Clone(), Body: []byte(ae.Message)}
+}
+
+func (s *Service) finish(sv *served) {
+	e := sv.entry
+	e.ProcessTime = s.Clock.Now().Sub(sv.start).Milliseconds()
+	if e.Request != nil {
+		s.Journal.Append(e)
+	}
+	path := ""
+	if e.Request != nil {
+		path = e.Request.Path
+	}
+	s.Stats.Record(stats.Event{
+		At: s.Clock.Now(), Tenant: e.Tenant, Layer: e.Layer, Path: path,
+		Latency: s.Clock.Now().Sub(sv.start), Stage: sv.stage,
+	})
+}
+
+// Render exposes rendering for dry runs.
+func (s *Service) render(ctx context.Context, res engine.Result, stack engine.Stack, n int64) (*respond.Response, error) {
+	def := &res.Stub.Mapping.Response
+	if res.Stub.Mapping.HasCallResponses() {
+		def = res.Stub.Mapping.ResponseFor(n)
+	}
+	return s.Renderer.Render(ctx, def, fileScopes(stack))
+}

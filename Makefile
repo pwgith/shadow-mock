@@ -17,7 +17,7 @@ lint-fix:
 	bash scripts/lint.sh --fix
 
 test:
-	go test -race -shuffle=on -coverprofile=coverage.out ./...
+	go test -race -shuffle=on -coverpkg=./internal/...,./cmd/... -coverprofile=coverage.out ./...
 
 cover-check: test
 	bash scripts/coverage.sh coverage.out
