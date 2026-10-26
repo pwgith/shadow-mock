@@ -561,6 +561,8 @@ func (o *Org) Allows(ip netip.Addr) bool {
 
 ## 10. Admin API
 
+The full contract is in [api/openapi.yaml](../api/openapi.yaml) (OpenAPI 3.1): every WireMock-compatible endpoint, its session-scoped twin, the session and runtime extensions, platform endpoints and error codes. The CI token exchange served by the management app is in [api/ci-token.openapi.yaml](../api/ci-token.openapi.yaml). This section describes how requests flow through the engine.
+
 ### 10.1 Pipeline
 
 ```
