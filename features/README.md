@@ -142,9 +142,9 @@ And I remember the response JSON at "$.id" as "ID"         # use later as ${ID}
 * **Upstream stub servers and webhook receivers** are added to the SaaS egress allowlist for the run, so proxying and webhook features work in both modes. `04_saas/operations/egress_policy.feature` tests the policy itself.
 * **Timing assertions** ("within 1 s", "after at least 500 ms") use real time, apart from TTL and retention steps, which use the test clock.
 
-## Details these specs pin down that the design docs should reflect
+## API details these specs pin down
 
-Writing the examples surfaced a few concrete API details that DESIGN.md does not list yet:
+Writing the examples surfaced these concrete API details. All of them are now defined in [api/openapi.yaml](../api/openapi.yaml):
 
 | Detail | Where specified |
 |---|---|

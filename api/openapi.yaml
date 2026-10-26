@@ -1,0 +1,2231 @@
+openapi: 3.1.0
+info:
+  title: Shadow Mock Engine API
+  version: 0.1.0
+  summary: WireMock-compatible admin API plus Shadow Mock sessions, runtime and platform endpoints.
+  description: |
+    The admin and runtime API of the Shadow Mock engine (the Go service).
+    Requirements: docs/REQUIREMENTS.md. Design: docs/DESIGN.md §10. SaaS context: docs/SAAS.md.
+    Executable examples: features/.
+
+    ## Modes
+    * **Standalone**: base URL `http://localhost:8080`. There is no authentication (every call
+      runs as user `local` in org `local` with the admin role). The org segment is optional and,
+      if present, must be `local`.
+    * **SaaS**: base URL `https://shadowmock.kaizentis.xyz/{orgHandle}`. Every `/__admin` call
+      needs a Clerk JWT (session JWT for users, M2M JWT for CI) whose `org_id` matches the org of
+      `{orgHandle}`, otherwise `403 org_mismatch`. A per-org IP allowlist can also apply
+      (`applyToAdmin`).
+
+    ## Scopes
+    Most WireMock endpoints act on the **global session**. Each also exists under
+    `/__admin/sessions/{sessionId}/…`, acting on that key-based or URL-based shadow mock.
+    Alternatively, send `X-Shadow-Mock-Key: <session key or id>` on the global path to scope the
+    call to a session (FR-7.3).
+
+    In SaaS, **global-scope writes are rejected** with `403 global_writes_via_management_app`,
+    because the management app makes them. Operations affected are marked
+    `x-saas: global-write-rejected`. Operations marked `x-saas: unavailable` return
+    `404 not_available_in_saas`.
+
+    ## Mock traffic
+    Mock traffic is not part of this API's operations because its paths are user-defined:
+    * Global and key-based traffic: `{base}/{any path}`
+    * URL-based traffic: `{base}/d/{urlMockId}/{any path}`. The prefix is stripped before matching.
+
+    Mock traffic never needs a JWT. Engine-generated responses on mock paths use the
+    `MockTrafficError` body (for example `unknown_org`, `unknown_url_based_mock`,
+    `ip_not_allowed`, `rate_limited`, `monthly_request_cap`, `ambiguous_session`,
+    `egress_blocked`). Unmatched requests get a WireMock-style 404 diagnostic body.
+
+    ## Errors
+    WireMock-compatible validation failures use WireMock's `{"errors": [...]}` shape
+    (`WireMockErrors`). Every other engine error uses `{"error": "<code>", "message": "…"}`
+    (`Error`), with codes listed in `ErrorCode`.
+  license:
+    name: Proprietary
+  contact:
+    name: Shadow Mock
+    url: https://github.com/pwgith/shadow-mock
+
+servers:
+  - url: http://localhost:8080
+    description: Standalone (no authentication)
+  - url: https://shadowmock.kaizentis.xyz/{orgHandle}
+    description: SaaS (Clerk JWT required on /__admin)
+    variables:
+      orgHandle:
+        default: acme
+        description: The org's immutable Shadow Mock handle (or an alias of it).
+
+security:
+  - clerkJWT: []
+  - {}
+
+tags:
+  - name: Mappings
+    description: Stub mappings (WireMock-compatible).
+  - name: Files
+    description: Response body files (`__files`).
+  - name: Journal
+    description: Request journal (hot tier; FR-5.1, FR-5.5).
+  - name: Verification
+    description: Count and find requests (FR-5.2).
+  - name: Near misses
+    description: Closest mappings for unmatched requests (FR-5.3).
+  - name: Scenarios
+    description: Stateful scenarios (FR-4.1, FR-7.6).
+  - name: Recordings
+    description: Record and snapshot (FR-6.1).
+  - name: Settings
+    description: Global settings.
+  - name: System
+    description: Reset, shutdown, health and version.
+  - name: Sessions
+    description: Key-based and URL-based shadow mocks (FR-7, FR-8).
+  - name: Session scope
+    description: WireMock endpoints scoped to one session (FR-7.3, FR-8.4).
+  - name: Runtime
+    description: Shadow Mock extensions used mainly by the management app.
+  - name: Platform
+    description: Health, readiness and metrics outside any org prefix.
+
+paths:
+  # ───────────────────────────── Mappings (global scope) ─────────────────────────────
+  /__admin/mappings:
+    get:
+      tags: [Mappings]
+      operationId: listMappings
+      summary: List stub mappings
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Mappings, most recent first.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMappingList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Mappings]
+      operationId: createMapping
+      summary: Create a stub mapping
+      x-saas: global-write-rejected
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody: { $ref: '#/components/requestBodies/StubMapping' }
+      responses:
+        '201':
+          description: Created. The id is generated if not supplied.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMapping' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Mappings]
+      operationId: deleteAllMappings
+      summary: Delete all stub mappings
+      x-saas: global-write-rejected
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /__admin/mappings/{stubMappingId}:
+    parameters:
+      - $ref: '#/components/parameters/StubMappingId'
+      - $ref: '#/components/parameters/ScopeKey'
+    get:
+      tags: [Mappings]
+      operationId: getMapping
+      summary: Get a stub mapping
+      responses:
+        '200':
+          description: The mapping, including any unknown fields as stored (FR-1.4).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMapping' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Mappings]
+      operationId: replaceMapping
+      summary: Replace a stub mapping
+      x-saas: global-write-rejected
+      requestBody: { $ref: '#/components/requestBodies/StubMapping' }
+      responses:
+        '200':
+          description: Replaced.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMapping' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Mappings]
+      operationId: deleteMapping
+      summary: Delete a stub mapping
+      x-saas: global-write-rejected
+      responses:
+        '200': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/mappings/import:
+    post:
+      tags: [Mappings]
+      operationId: importMappings
+      summary: Import several mappings
+      x-saas: global-write-rejected
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportRequest' }
+      responses:
+        '200': { description: Imported. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /__admin/mappings/reset:
+    post:
+      tags: [Mappings]
+      operationId: resetMappings
+      summary: Restore mappings to those loaded from storage
+      description: Removes mappings created through the API and reloads the stored ones.
+      x-saas: global-write-rejected
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200': { description: Reset. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /__admin/mappings/save:
+    post:
+      tags: [Mappings]
+      operationId: saveMappings
+      summary: Persist API-created persistent mappings to the mappings folder
+      x-saas: unavailable
+      responses:
+        '200': { description: Saved. }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/mappings/unmatched:
+    get:
+      tags: [Mappings]
+      operationId: listUnmatchedMappings
+      summary: List mappings that have not matched any request in the journal
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200':
+          description: Unmatched mappings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMappingList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/mappings/find-by-metadata:
+    post:
+      tags: [Mappings]
+      operationId: findMappingsByMetadata
+      summary: Find mappings whose metadata matches a pattern
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody: { $ref: '#/components/requestBodies/ContentPattern' }
+      responses:
+        '200':
+          description: Matching mappings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMappingList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/mappings/remove-by-metadata:
+    post:
+      tags: [Mappings]
+      operationId: removeMappingsByMetadata
+      summary: Remove mappings whose metadata matches a pattern
+      x-saas: global-write-rejected
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody: { $ref: '#/components/requestBodies/ContentPattern' }
+      responses:
+        '200': { description: Removed. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /__admin/mappings/validate:
+    post:
+      tags: [Runtime]
+      operationId: validateMapping
+      summary: Validate a mapping without saving it
+      description: Used by the management app before writing a global mapping to the database. It runs the engine's own parser and matcher compilation.
+      requestBody: { $ref: '#/components/requestBodies/StubMapping' }
+      responses:
+        '200':
+          description: The validation result. Invalid mappings also return 200, with `valid` set to false.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidateResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/mappings/dry-run:
+    post:
+      tags: [Runtime]
+      operationId: dryRunRequest
+      summary: Resolve a sample request without recording it
+      description: Shows which layer and mapping would serve the request, and the rendered response. It never changes scenario state or the journal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DryRunRequest' }
+      responses:
+        '200':
+          description: Resolution result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DryRunResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───────────────────────────── Files ─────────────────────────────
+  /__admin/files:
+    get:
+      tags: [Files]
+      operationId: listFiles
+      summary: List response body files
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200':
+          description: File names.
+          content:
+            application/json:
+              schema: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/files/{fileId}:
+    parameters:
+      - $ref: '#/components/parameters/FileId'
+      - $ref: '#/components/parameters/ScopeKey'
+    get:
+      tags: [Files]
+      operationId: getFile
+      summary: Get a response body file
+      responses:
+        '200':
+          description: File content.
+          content:
+            application/octet-stream:
+              schema: { type: string, contentMediaType: application/octet-stream }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Files]
+      operationId: putFile
+      summary: Create or replace a response body file
+      x-saas: global-write-rejected
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, contentMediaType: application/octet-stream }
+      responses:
+        '200': { description: Stored. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+    delete:
+      tags: [Files]
+      operationId: deleteFile
+      summary: Delete a response body file
+      x-saas: global-write-rejected
+      responses:
+        '200': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───────────────────────────── Journal and verification ─────────────────────────────
+  /__admin/requests:
+    get:
+      tags: [Journal]
+      operationId: listRequests
+      summary: List journal entries, most recent first
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Since'
+      responses:
+        '200':
+          description: Journal entries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServeEventList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Journal]
+      operationId: clearRequests
+      summary: Clear the journal
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200': { description: Cleared. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/requests/{requestId}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/ScopeKey'
+    get:
+      tags: [Journal]
+      operationId: getRequest
+      summary: Get one journal entry
+      responses:
+        '200':
+          description: The entry.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServeEvent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Journal]
+      operationId: deleteRequest
+      summary: Delete one journal entry
+      responses:
+        '200': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/requests/count:
+    post:
+      tags: [Verification]
+      operationId: countRequests
+      summary: Count requests matching a pattern
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody: { $ref: '#/components/requestBodies/RequestPattern' }
+      responses:
+        '200':
+          description: Count.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CountResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/requests/find:
+    post:
+      tags: [Verification]
+      operationId: findRequests
+      summary: Find requests matching a pattern
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody: { $ref: '#/components/requestBodies/RequestPattern' }
+      responses:
+        '200':
+          description: Matching requests.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FindRequestsResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/requests/remove:
+    post:
+      tags: [Verification]
+      operationId: removeRequests
+      summary: Remove requests matching a pattern from the journal
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody: { $ref: '#/components/requestBodies/RequestPattern' }
+      responses:
+        '200':
+          description: The removed requests.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FindRequestsResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/requests/unmatched:
+    get:
+      tags: [Verification]
+      operationId: listUnmatchedRequests
+      summary: List requests that matched no mapping
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200':
+          description: Unmatched requests.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FindRequestsResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/requests/unmatched/near-misses:
+    get:
+      tags: [Near misses]
+      operationId: nearMissesForUnmatchedRequests
+      summary: Near misses for every unmatched request in the journal
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200':
+          description: Near misses.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NearMissList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/near-misses/request:
+    post:
+      tags: [Near misses]
+      operationId: nearMissesForRequest
+      summary: Closest mappings for a given request
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SampleRequest' }
+      responses:
+        '200':
+          description: Near misses ranked by distance, across all layers in scope.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NearMissList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/near-misses/request-pattern:
+    post:
+      tags: [Near misses]
+      operationId: nearMissesForRequestPattern
+      summary: Journal requests that nearly match a pattern
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody: { $ref: '#/components/requestBodies/RequestPattern' }
+      responses:
+        '200':
+          description: Near misses.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NearMissList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ───────────────────────────── Scenarios ─────────────────────────────
+  /__admin/scenarios:
+    get:
+      tags: [Scenarios]
+      operationId: listScenarios
+      summary: List scenarios and their current state
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200':
+          description: Scenarios.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScenarioList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/scenarios/reset:
+    post:
+      tags: [Scenarios]
+      operationId: resetScenarios
+      summary: Reset every scenario to Started
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200': { description: Reset. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/scenarios/{scenarioName}/state:
+    put:
+      tags: [Scenarios]
+      operationId: setScenarioState
+      summary: Set one scenario's state, or reset it with an empty body
+      parameters:
+        - $ref: '#/components/parameters/ScenarioName'
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScenarioStateUpdate' }
+      responses:
+        '200': { description: Updated. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───────────────────────────── Recordings ─────────────────────────────
+  /__admin/recordings/start:
+    post:
+      tags: [Recordings]
+      operationId: startRecording
+      summary: Start recording through a target upstream into the global session
+      x-saas: global-write-rejected
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordSpec' }
+      responses:
+        '200': { description: Recording started. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /__admin/recordings/stop:
+    post:
+      tags: [Recordings]
+      operationId: stopRecording
+      summary: Stop recording and return the generated mappings
+      x-saas: global-write-rejected
+      responses:
+        '200':
+          description: Generated mappings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SnapshotResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /__admin/recordings/status:
+    get:
+      tags: [Recordings]
+      operationId: getRecordingStatus
+      summary: Get the recording status
+      responses:
+        '200':
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecordingStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/recordings/snapshot:
+    post:
+      tags: [Recordings]
+      operationId: snapshotRecording
+      summary: Create mappings from proxied requests already in the journal
+      x-saas: global-write-rejected
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SnapshotSpec' }
+      responses:
+        '200':
+          description: Generated mappings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SnapshotResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ───────────────────────────── Settings and system ─────────────────────────────
+  /__admin/settings:
+    get:
+      tags: [Settings]
+      operationId: getSettings
+      summary: Get global settings
+      responses:
+        '200':
+          description: Settings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettingsEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Settings]
+      operationId: updateSettings
+      summary: Update global settings
+      x-saas: global-write-rejected
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GlobalSettings' }
+      responses:
+        '200': { description: Updated. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /__admin/reset:
+    post:
+      tags: [System]
+      operationId: resetAll
+      summary: Reset API mappings, the journal and scenarios
+      x-saas: global-write-rejected
+      responses:
+        '200': { description: Reset. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /__admin/shutdown:
+    post:
+      tags: [System]
+      operationId: shutdown
+      summary: Shut the server down
+      x-saas: unavailable
+      responses:
+        '200': { description: Shutting down. }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/health:
+    get:
+      tags: [System]
+      operationId: getAdminHealth
+      summary: WireMock-compatible health
+      security: [{}]
+      responses:
+        '200':
+          description: Healthy.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+  /__admin/version:
+    get:
+      tags: [System]
+      operationId: getVersion
+      summary: Engine version
+      responses:
+        '200':
+          description: Version.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: string, examples: ['0.1.0'] }
+
+  # ───────────────────────────── Sessions ─────────────────────────────
+  /__admin/sessions:
+    get:
+      tags: [Sessions]
+      operationId: listSessions
+      summary: List the org's active sessions
+      parameters:
+        - name: kind
+          in: query
+          schema: { $ref: '#/components/schemas/SessionKind' }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Active sessions.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /__admin/sessions/key-based:
+    post:
+      tags: [Sessions]
+      operationId: createKeyBasedSession
+      summary: Create a key-based shadow mock
+      description: |
+        Returns the session key **once**. Requests carrying the key (or a registered match token)
+        in a designated header, query parameter or cookie, or anywhere in the metadata or body,
+        are resolved against this session first, then the global session (FR-7.1–FR-7.5).
+        Requires the `editor` role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateKeyBasedSessionRequest' }
+            examples:
+              withToken:
+                value: { name: checkout-declined-card, ttlSeconds: 600, tokens: [CUST-99812] }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedKeyBasedSession' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /__admin/sessions/url-based:
+    post:
+      tags: [Sessions]
+      operationId: createURLBasedSession
+      summary: Create a URL-based shadow mock
+      description: |
+        Returns a base URL `{base}/d/{id}` for the API under test to use for outbound calls
+        (FR-8.1, FR-8.2). Default TTL is 24 h, and the maximum is 30 days (7 days on the Free tier).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateURLBasedSessionRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /__admin/sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Sessions]
+      operationId: getSession
+      summary: Get a session
+      description: The raw session key is never returned after creation. `keyPrefix` identifies it.
+      responses:
+        '200':
+          description: The session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Sessions]
+      operationId: updateSession
+      summary: Rename, extend, or add and remove tokens and masks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionPatch' }
+      responses:
+        '200':
+          description: Updated session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Sessions]
+      operationId: deleteSession
+      summary: Delete a session and everything it owns
+      description: Deletes the session's mappings, files, journal and scenario state, and any nested key-based shadow mocks.
+      responses:
+        '200': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/keepalive:
+    post:
+      tags: [Sessions]
+      operationId: keepSessionAlive
+      summary: Extend the TTL by its original duration
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Updated session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  # ───────────────────────────── Session scope ─────────────────────────────
+  /__admin/sessions/{sessionId}/mappings:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Session scope]
+      operationId: listSessionMappings
+      summary: List the session's mappings
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Mappings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMappingList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Session scope]
+      operationId: createSessionMapping
+      summary: Add a mapping to the session
+      description: A mapping with the same id as a global mapping overrides it for this session (FR-7.7).
+      requestBody: { $ref: '#/components/requestBodies/StubMapping' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMapping' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Session scope]
+      operationId: deleteAllSessionMappings
+      summary: Delete all of the session's mappings
+      responses:
+        '200': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/mappings/{stubMappingId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - $ref: '#/components/parameters/StubMappingId'
+    get:
+      tags: [Session scope]
+      operationId: getSessionMapping
+      summary: Get a session mapping
+      responses:
+        '200':
+          description: The mapping.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMapping' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Session scope]
+      operationId: replaceSessionMapping
+      summary: Replace a session mapping
+      requestBody: { $ref: '#/components/requestBodies/StubMapping' }
+      responses:
+        '200':
+          description: Replaced.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StubMapping' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Session scope]
+      operationId: deleteSessionMapping
+      summary: Delete a session mapping
+      responses:
+        '200': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/mappings/import:
+    post:
+      tags: [Session scope]
+      operationId: importSessionMappings
+      summary: Import several mappings into the session
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportRequest' }
+      responses:
+        '200': { description: Imported. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /__admin/sessions/{sessionId}/files:
+    get:
+      tags: [Session scope]
+      operationId: listSessionFiles
+      summary: List the session's response files
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: File names. They are resolved before global `__files`.
+          content:
+            application/json:
+              schema: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/files/{fileId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - $ref: '#/components/parameters/FileId'
+    get:
+      tags: [Session scope]
+      operationId: getSessionFile
+      summary: Get a session response file
+      responses:
+        '200':
+          description: File content.
+          content:
+            application/octet-stream:
+              schema: { type: string, contentMediaType: application/octet-stream }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Session scope]
+      operationId: putSessionFile
+      summary: Create or replace a session response file
+      description: Overrides a global file of the same name for this session only.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, contentMediaType: application/octet-stream }
+      responses:
+        '200': { description: Stored. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+    delete:
+      tags: [Session scope]
+      operationId: deleteSessionFile
+      summary: Delete a session response file
+      responses:
+        '200': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/requests:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Session scope]
+      operationId: listSessionRequests
+      summary: List the session's journal
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Since'
+      responses:
+        '200':
+          description: Requests attributed to this session (FR-7.11).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServeEventList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Session scope]
+      operationId: clearSessionRequests
+      summary: Clear the session's journal
+      responses:
+        '200': { description: Cleared. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/requests/count:
+    post:
+      tags: [Session scope]
+      operationId: countSessionRequests
+      summary: Count the session's requests matching a pattern
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody: { $ref: '#/components/requestBodies/RequestPattern' }
+      responses:
+        '200':
+          description: Count, including requests served on any engine instance.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CountResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/requests/find:
+    post:
+      tags: [Session scope]
+      operationId: findSessionRequests
+      summary: Find the session's requests matching a pattern
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody: { $ref: '#/components/requestBodies/RequestPattern' }
+      responses:
+        '200':
+          description: Matching requests.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FindRequestsResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/requests/remove:
+    post:
+      tags: [Session scope]
+      operationId: removeSessionRequests
+      summary: Remove the session's requests matching a pattern
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody: { $ref: '#/components/requestBodies/RequestPattern' }
+      responses:
+        '200':
+          description: Removed requests.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FindRequestsResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/requests/unmatched:
+    get:
+      tags: [Session scope]
+      operationId: listSessionUnmatchedRequests
+      summary: The session's unmatched requests
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Unmatched requests.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FindRequestsResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/requests/unmatched/near-misses:
+    get:
+      tags: [Session scope]
+      operationId: sessionNearMissesForUnmatched
+      summary: Near misses for the session's unmatched requests
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Near misses from every layer in the session's stack.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NearMissList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/requests/export:
+    post:
+      tags: [Session scope]
+      operationId: exportSessionRequests
+      summary: Export the session's journal history to a download link
+      x-saas: saas-only
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '202':
+          description: The export is written to object storage. The link expires after 60 s.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExportResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/near-misses/request:
+    post:
+      tags: [Session scope]
+      operationId: sessionNearMissesForRequest
+      summary: Closest mappings for a request, through the session's layer stack
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SampleRequest' }
+      responses:
+        '200':
+          description: Near misses.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NearMissList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/scenarios:
+    get:
+      tags: [Session scope]
+      operationId: listSessionScenarios
+      summary: The session's scenario states
+      description: The session's own copy, forked from its parent at creation (FR-7.6).
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Scenarios.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScenarioList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/scenarios/reset:
+    post:
+      tags: [Session scope]
+      operationId: resetSessionScenarios
+      summary: Reset the session's scenarios to Started
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200': { description: Reset. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/scenarios/{scenarioName}/state:
+    put:
+      tags: [Session scope]
+      operationId: setSessionScenarioState
+      summary: Set or reset one scenario in the session
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/ScenarioName'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScenarioStateUpdate' }
+      responses:
+        '200': { description: Updated. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/recordings/start:
+    post:
+      tags: [Session scope]
+      operationId: startSessionRecording
+      summary: Record into the session
+      description: Only traffic attributed to the session is recorded. This is the only form of recording in SaaS.
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordSpec' }
+      responses:
+        '200': { description: Recording started. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /__admin/sessions/{sessionId}/recordings/stop:
+    post:
+      tags: [Session scope]
+      operationId: stopSessionRecording
+      summary: Stop recording into the session
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Mappings added to the session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SnapshotResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/recordings/status:
+    get:
+      tags: [Session scope]
+      operationId: getSessionRecordingStatus
+      summary: Session recording status
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecordingStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───────────────────────────── Runtime ─────────────────────────────
+  /__admin/stats/live:
+    get:
+      tags: [Runtime]
+      operationId: getLiveStats
+      summary: Live counters for the org
+      parameters:
+        - name: window
+          in: query
+          description: Look-back window.
+          schema: { type: string, enum: [5m, 15m, 1h], default: 15m }
+      responses:
+        '200':
+          description: Live stats.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveStats' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/usage:
+    get:
+      tags: [Runtime]
+      operationId: getUsage
+      summary: Current-period usage against plan limits
+      x-saas: saas-only
+      responses:
+        '200':
+          description: Usage.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Usage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ───────────────────────────── Platform (outside the org prefix) ─────────────────────────────
+  /__health:
+    servers:
+      - url: http://localhost:8080
+      - url: https://shadowmock.kaizentis.xyz
+    get:
+      tags: [Platform]
+      operationId: getLiveness
+      summary: Liveness
+      security: [{}]
+      responses:
+        '200':
+          description: The process is alive.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+  /__ready:
+    servers:
+      - url: http://localhost:8080
+      - url: https://shadowmock.kaizentis.xyz
+    get:
+      tags: [Platform]
+      operationId: getReadiness
+      summary: Readiness (storage and cache connected)
+      security: [{}]
+      responses:
+        '200':
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: Not ready.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+  /__metrics:
+    servers:
+      - url: http://localhost:8080
+    get:
+      tags: [Platform]
+      operationId: getMetrics
+      summary: Prometheus metrics
+      description: Exposed on the admin listener in standalone and central-server mode. In SaaS it is scraped internally and not exposed publicly.
+      security: [{}]
+      responses:
+        '200':
+          description: Prometheus text exposition format.
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  securitySchemes:
+    clerkJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        SaaS only. A Clerk session JWT from the `shadowmock` template (claims `sub`, `org_id`,
+        `org_role`, `aud: shadowmock`), or a Clerk M2M JWT from the CI token exchange (claims
+        `org_id`, `org_role`, `ci_key_id`; see `api/ci-token.openapi.yaml`). Opaque API keys are
+        never accepted. Ignored in standalone mode.
+
+  parameters:
+    ScopeKey:
+      name: X-Shadow-Mock-Key
+      in: header
+      required: false
+      description: Scope this global endpoint to a session, by session key or session id (FR-7.3).
+      schema: { type: string }
+    StubMappingId:
+      name: stubMappingId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Key-based `ses_…` id, or the 16-character URL-based mock id.
+      schema: { type: string, pattern: '^(ses_[0-9A-Z]{26}|[a-z2-7]{16})$' }
+    RequestId:
+      name: requestId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    FileId:
+      name: fileId
+      in: path
+      required: true
+      description: File name, which may include sub-folders (URL-encoded).
+      schema: { type: string }
+    ScenarioName:
+      name: scenarioName
+      in: path
+      required: true
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 1000 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    Since:
+      name: since
+      in: query
+      description: Only entries logged at or after this time.
+      schema: { type: string, format: date-time }
+
+  requestBodies:
+    StubMapping:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/StubMapping' }
+    RequestPattern:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RequestPattern' }
+    ContentPattern:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ContentPattern' }
+
+  responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/WireMockErrors' }
+    ValidationFailed:
+      description: The mapping or payload is invalid (WireMock error format), or a TTL or token rule failed (`Error`).
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/WireMockErrors'
+              - $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: SaaS only. The JWT is missing or invalid.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            expired: { value: { error: token_expired, message: The token expired at 2026-11-01T10:00:00Z. } }
+    Forbidden:
+      description: SaaS only. Org mismatch, insufficient role, IP not allowed, or a global write.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            orgMismatch:
+              value: { error: org_mismatch, message: "Token is for org globex, URL is for org acme; switch active org." }
+            globalWrite:
+              value: { error: global_writes_via_management_app, message: Global session changes are made in the management app. }
+    NotFound:
+      description: Not found, not in this org, or not available in this mode.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflict (for example a match token in use, or a recording already running).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PayloadTooLarge:
+      description: The body exceeds `limits.maxBodyBytes`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: A plan limit was reached (session ceiling or rate limit).
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds to wait before retrying.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    # ── Errors ──
+    ErrorCode:
+      type: string
+      enum:
+        # authentication (401)
+        - invalid_token
+        - token_expired
+        - token_not_active
+        - untrusted_issuer
+        - invalid_audience
+        # authorisation (403)
+        - no_active_org
+        - org_mismatch
+        - forbidden
+        - ip_not_allowed
+        - global_writes_via_management_app
+        # not found (404)
+        - not_found
+        - unknown_org
+        - unknown_url_based_mock
+        - not_available_in_saas
+        # validation (422) and conflicts (409)
+        - validation_failed
+        - ttl_must_be_positive
+        - ttl_exceeds_maximum
+        - ttl_exceeds_plan_maximum
+        - token_too_short
+        - token_in_use
+        - recording_in_progress
+        - parent_not_found
+        # limits (413, 429)
+        - body_too_large
+        - rate_limited
+        - monthly_request_cap
+        - session_limit_reached
+        # mock traffic only
+        - ambiguous_session
+        - egress_blocked
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error: { $ref: '#/components/schemas/ErrorCode' }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+    MockTrafficError:
+      description: Engine-generated error body on mock traffic paths.
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            ip: { type: string, description: The client IP the engine saw (`ip_not_allowed` only). }
+    WireMockErrors:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: integer }
+              title: { type: string }
+              detail: { type: string }
+              source:
+                type: object
+                properties:
+                  pointer: { type: string, examples: [/request] }
+
+    # ── Stub mappings (WireMock wire model) ──
+    StubMapping:
+      type: object
+      description: WireMock StubMapping. Unknown fields are preserved and returned unchanged (FR-1.4).
+      required: [request, response]
+      additionalProperties: true
+      properties:
+        id: { type: string, format: uuid }
+        uuid: { type: string, format: uuid }
+        name: { type: string }
+        priority: { type: integer, minimum: 1, description: Lower wins within a layer. The default is 5. }
+        persistent: { type: boolean }
+        request: { $ref: '#/components/schemas/RequestPattern' }
+        response: { $ref: '#/components/schemas/ResponseDefinition' }
+        scenarioName: { type: string }
+        requiredScenarioState: { type: string }
+        newScenarioState: { type: string }
+        metadata: { type: object, additionalProperties: true }
+        postServeActions:
+          type: array
+          items: { $ref: '#/components/schemas/ServeEventListener' }
+        serveEventListeners:
+          type: array
+          items: { $ref: '#/components/schemas/ServeEventListener' }
+    StubMappingList:
+      type: object
+      properties:
+        mappings:
+          type: array
+          items: { $ref: '#/components/schemas/StubMapping' }
+        meta:
+          type: object
+          properties:
+            total: { type: integer }
+    ImportRequest:
+      type: object
+      required: [mappings]
+      properties:
+        mappings:
+          type: array
+          items: { $ref: '#/components/schemas/StubMapping' }
+        importOptions:
+          type: object
+          properties:
+            duplicatePolicy: { type: string, enum: [OVERWRITE, IGNORE], default: OVERWRITE }
+            deleteAllNotInImport: { type: boolean, default: false }
+
+    RequestPattern:
+      type: object
+      description: At most one of url, urlPath, urlPattern, urlPathPattern and urlPathTemplate may be set.
+      additionalProperties: true
+      properties:
+        method: { type: string, examples: [GET, POST, ANY] }
+        url: { type: string, description: Exact path and query. }
+        urlPath: { type: string, description: 'Exact path, any query.' }
+        urlPattern: { type: string, description: Regex over path and query. }
+        urlPathPattern: { type: string, description: Regex over the path. }
+        urlPathTemplate: { type: string, examples: ['/claims/{claimId}'] }
+        pathParameters:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/StringValuePattern' }
+        queryParameters:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/MultiValuePattern' }
+        headers:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/MultiValuePattern' }
+        cookies:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/StringValuePattern' }
+        formParameters:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/MultiValuePattern' }
+        basicAuthCredentials:
+          type: object
+          properties:
+            username: { type: string }
+            password: { type: string }
+        host: { $ref: '#/components/schemas/StringValuePattern' }
+        port: { type: integer }
+        scheme: { type: string, enum: [http, https] }
+        bodyPatterns:
+          type: array
+          items: { $ref: '#/components/schemas/ContentPattern' }
+        multipartPatterns:
+          type: array
+          items: { $ref: '#/components/schemas/MultipartPattern' }
+        customMatcher:
+          type: object
+          required: [name]
+          properties:
+            name: { type: string }
+            parameters: { type: object, additionalProperties: true }
+
+    StringValuePattern:
+      type: object
+      description: Exactly one operator, plus its modifiers.
+      minProperties: 1
+      properties:
+        equalTo: { type: string }
+        caseInsensitive: { type: boolean }
+        contains: { type: string }
+        doesNotContain: { type: string }
+        matches: { type: string, description: Regex. }
+        doesNotMatch: { type: string }
+        absent: { type: boolean }
+        before: { type: string, description: 'ISO date-time, or relative such as "now -1 days".' }
+        after: { type: string }
+        equalToDateTime: { type: string }
+        actualFormat: { type: string, examples: [dd/MM/yyyy] }
+        truncateExpected: { type: string }
+        truncateActual: { type: string }
+        and:
+          type: array
+          items: { $ref: '#/components/schemas/StringValuePattern' }
+        or:
+          type: array
+          items: { $ref: '#/components/schemas/StringValuePattern' }
+        not: { $ref: '#/components/schemas/StringValuePattern' }
+    MultiValuePattern:
+      description: A StringValuePattern, or a multi-value operator.
+      allOf:
+        - $ref: '#/components/schemas/StringValuePattern'
+        - type: object
+          properties:
+            hasExactly:
+              type: array
+              items: { $ref: '#/components/schemas/StringValuePattern' }
+            including:
+              type: array
+              items: { $ref: '#/components/schemas/StringValuePattern' }
+    ContentPattern:
+      description: A body or metadata pattern. It is a StringValuePattern, or one of the structured body operators.
+      allOf:
+        - $ref: '#/components/schemas/StringValuePattern'
+        - type: object
+          properties:
+            binaryEqualTo: { type: string, contentEncoding: base64 }
+            equalToJson: { description: 'A JSON value, or a JSON string. Supports `${json-unit.*}` placeholders.' }
+            ignoreArrayOrder: { type: boolean }
+            ignoreExtraElements: { type: boolean }
+            matchesJsonPath:
+              oneOf:
+                - type: string
+                - type: object
+                  required: [expression]
+                  properties:
+                    expression: { type: string }
+                  additionalProperties: true
+            matchesJsonSchema:
+              oneOf:
+                - type: string
+                - type: object
+            schemaVersion: { type: string, examples: [V202012] }
+            equalToXml: { type: string }
+            enablePlaceholders: { type: boolean }
+            placeholderOpeningDelimiterRegex: { type: string }
+            placeholderClosingDelimiterRegex: { type: string }
+            exemptedComparisons: { type: array, items: { type: string } }
+            matchesXPath:
+              oneOf:
+                - type: string
+                - type: object
+                  required: [expression]
+                  properties:
+                    expression: { type: string }
+                  additionalProperties: true
+            xPathNamespaces:
+              type: object
+              additionalProperties: { type: string }
+    MultipartPattern:
+      type: object
+      properties:
+        name: { type: string }
+        matchingType: { type: string, enum: [ANY, ALL], default: ANY }
+        headers:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/MultiValuePattern' }
+        bodyPatterns:
+          type: array
+          items: { $ref: '#/components/schemas/ContentPattern' }
+
+    ResponseDefinition:
+      type: object
+      additionalProperties: true
+      properties:
+        status: { type: integer, minimum: 100, maximum: 599, default: 200 }
+        statusMessage: { type: string }
+        headers:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: array
+                items: { type: string }
+        body: { type: string }
+        jsonBody: { description: 'Any JSON value, serialised as the body.' }
+        base64Body: { type: string, contentEncoding: base64 }
+        bodyFileName: { type: string, description: 'Resolved in the session''s files first, then global `__files`. It can be templated.' }
+        fixedDelayMilliseconds: { type: integer, minimum: 0 }
+        delayDistribution: { $ref: '#/components/schemas/DelayDistribution' }
+        chunkedDribbleDelay:
+          type: object
+          required: [numberOfChunks, totalDuration]
+          properties:
+            numberOfChunks: { type: integer, minimum: 1 }
+            totalDuration: { type: integer, minimum: 0 }
+        fault:
+          type: string
+          enum: [CONNECTION_RESET_BY_PEER, EMPTY_RESPONSE, MALFORMED_RESPONSE_CHUNK, RANDOM_DATA_THEN_CLOSE]
+          description: In SaaS behind the platform proxy, faults reach clients as 502.
+        proxyBaseUrl: { type: string, format: uri }
+        additionalProxyRequestHeaders:
+          type: object
+          additionalProperties: { type: string }
+        removeProxyRequestHeaders:
+          type: array
+          items: { type: string }
+        proxyUrlPrefixToRemove: { type: string }
+        transformers:
+          type: array
+          items: { type: string, examples: [response-template] }
+        transformerParameters: { type: object, additionalProperties: true }
+        gzipDisabled: { type: boolean, description: 'Shadow Mock extension: never gzip this response, even if the client accepts gzip (FR-3.5a).' }
+    DelayDistribution:
+      oneOf:
+        - type: object
+          required: [type, lower, upper]
+          properties:
+            type: { const: uniform }
+            lower: { type: integer }
+            upper: { type: integer }
+        - type: object
+          required: [type, median, sigma]
+          properties:
+            type: { const: lognormal }
+            median: { type: integer }
+            sigma: { type: number }
+            maxValue: { type: integer }
+        - type: object
+          required: [type, milliseconds]
+          properties:
+            type: { const: fixed }
+            milliseconds: { type: integer }
+    ServeEventListener:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, examples: [webhook] }
+        requestPhases: { type: array, items: { type: string } }
+        parameters:
+          type: object
+          additionalProperties: true
+          properties:
+            method: { type: string }
+            url: { type: string, format: uri }
+            headers: { type: object, additionalProperties: { type: string } }
+            body: { type: string }
+            base64Body: { type: string, contentEncoding: base64 }
+            delay: { $ref: '#/components/schemas/DelayDistribution' }
+
+    # ── Journal ──
+    LoggedRequest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        url: { type: string }
+        absoluteUrl: { type: string }
+        method: { type: string }
+        clientIp: { type: string }
+        headers: { type: object, additionalProperties: true }
+        cookies: { type: object, additionalProperties: true }
+        queryParams: { type: object, additionalProperties: true }
+        body: { type: string }
+        bodyAsBase64: { type: string, contentEncoding: base64 }
+        loggedDate: { type: integer, format: int64, description: Epoch milliseconds. }
+        loggedDateString: { type: string, format: date-time }
+    ServeEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        request: { $ref: '#/components/schemas/LoggedRequest' }
+        stubMapping: { $ref: '#/components/schemas/StubMapping' }
+        responseDefinition: { $ref: '#/components/schemas/ResponseDefinition' }
+        response:
+          type: object
+          properties:
+            status: { type: integer }
+            headers: { type: object, additionalProperties: true }
+            body: { type: string }
+            bodyAsBase64: { type: string }
+        wasMatched: { type: boolean }
+        timing:
+          type: object
+          properties:
+            addedDelay: { type: integer }
+            processTime: { type: integer }
+            responseSendTime: { type: integer }
+            serveTime: { type: integer }
+            totalTime: { type: integer }
+        shadowMock: { $ref: '#/components/schemas/ServeEventShadowMock' }
+    ServeEventShadowMock:
+      type: object
+      description: Shadow Mock attribution for a journal entry (FR-5.4).
+      properties:
+        tenant: { type: string }
+        sessionId: { type: [string, 'null'] }
+        layer: { $ref: '#/components/schemas/Layer' }
+        detection:
+          type: object
+          properties:
+            stage: { type: string, enum: [Header, Query, Cookie, ScanMeta, ScanBody] }
+            offset: { type: integer }
+            scanTruncated: { type: boolean }
+            ambiguousSessionIds: { type: array, items: { type: string } }
+        bodyTruncated: { type: boolean, description: True when the hot copy truncated a body over 64 KiB. }
+    ServeEventList:
+      type: object
+      properties:
+        requests:
+          type: array
+          items: { $ref: '#/components/schemas/ServeEvent' }
+        meta:
+          type: object
+          properties:
+            total: { type: integer }
+        requestJournalDisabled: { type: boolean }
+    CountResult:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer }
+    FindRequestsResult:
+      type: object
+      properties:
+        requests:
+          type: array
+          items: { $ref: '#/components/schemas/LoggedRequest' }
+    SampleRequest:
+      type: object
+      description: A request to evaluate without sending it as mock traffic.
+      required: [method, url]
+      properties:
+        method: { type: string }
+        url: { type: string }
+        headers: { type: object, additionalProperties: { type: string } }
+        cookies: { type: object, additionalProperties: { type: string } }
+        body: { type: string }
+        bodyAsBase64: { type: string, contentEncoding: base64 }
+    NearMiss:
+      type: object
+      properties:
+        request: { $ref: '#/components/schemas/LoggedRequest' }
+        requestPattern: { $ref: '#/components/schemas/RequestPattern' }
+        stubMapping: { $ref: '#/components/schemas/StubMapping' }
+        layer: { $ref: '#/components/schemas/Layer' }
+        matchResult:
+          type: object
+          properties:
+            distance: { type: number, minimum: 0, maximum: 1 }
+    NearMissList:
+      type: object
+      properties:
+        nearMisses:
+          type: array
+          items: { $ref: '#/components/schemas/NearMiss' }
+
+    # ── Scenarios ──
+    Scenario:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        state: { type: string, examples: [Started] }
+        possibleStates: { type: array, items: { type: string } }
+    ScenarioList:
+      type: object
+      properties:
+        scenarios:
+          type: array
+          items: { $ref: '#/components/schemas/Scenario' }
+    ScenarioStateUpdate:
+      type: object
+      description: An empty object resets the scenario to Started.
+      properties:
+        state: { type: string }
+
+    # ── Recordings ──
+    RecordSpec:
+      type: object
+      properties:
+        targetBaseUrl: { type: string, format: uri }
+        filters:
+          allOf:
+            - $ref: '#/components/schemas/RequestPattern'
+            - type: object
+              properties:
+                ids: { type: array, items: { type: string, format: uuid } }
+        captureHeaders:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              caseInsensitive: { type: boolean }
+        requestBodyPattern:
+          type: object
+          properties:
+            matcher: { type: string, enum: [equalTo, equalToJson, equalToXml, auto] }
+            ignoreArrayOrder: { type: boolean }
+            ignoreExtraElements: { type: boolean }
+            caseInsensitive: { type: boolean }
+        extractBodyCriteria:
+          type: object
+          properties:
+            textSizeThreshold: { type: string, examples: [2kb] }
+            binarySizeThreshold: { type: string, examples: [10kb] }
+        persist: { type: boolean }
+        repeatsAsScenarios: { type: boolean }
+        transformers: { type: array, items: { type: string } }
+        transformerParameters: { type: object, additionalProperties: true }
+    SnapshotSpec:
+      description: As RecordSpec, but without targetBaseUrl. It works on the existing journal.
+      allOf:
+        - $ref: '#/components/schemas/RecordSpec'
+    RecordingStatus:
+      type: object
+      properties:
+        status: { type: string, enum: [NeverStarted, Recording, Stopped] }
+    SnapshotResult:
+      type: object
+      properties:
+        mappings:
+          type: array
+          items: { $ref: '#/components/schemas/StubMapping' }
+
+    # ── Settings and system ──
+    GlobalSettings:
+      type: object
+      properties:
+        fixedDelay: { type: integer, minimum: 0 }
+        delayDistribution: { $ref: '#/components/schemas/DelayDistribution' }
+        proxyPassThrough: { type: boolean }
+        extended: { type: object, additionalProperties: true }
+    SettingsEnvelope:
+      type: object
+      properties:
+        settings: { $ref: '#/components/schemas/GlobalSettings' }
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [healthy, unhealthy] }
+        message: { type: string }
+        version: { type: string }
+        uptimeInSeconds: { type: integer }
+        timestamp: { type: string, format: date-time }
+        checks:
+          type: object
+          description: Readiness only. Per-dependency status.
+          additionalProperties: { type: string, enum: [up, down] }
+
+    # ── Sessions ──
+    SessionKind:
+      type: string
+      enum: [key-based, url-based]
+    Layer:
+      type: string
+      enum: [key-based, url-based, global]
+    Mask:
+      description: Hides a parent mapping for this session, by id or by request pattern (FR-7.8).
+      oneOf:
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string, format: uuid }
+        - type: object
+          required: [request]
+          properties:
+            request: { $ref: '#/components/schemas/RequestPattern' }
+    SeedFrom:
+      type: object
+      description: Copy mappings from a saved mapping set at creation (FR-8.7). Later changes to the set do not affect the session.
+      required: [mappingSet]
+      properties:
+        mappingSet: { type: string }
+    CreateKeyBasedSessionRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 200 }
+        ttlSeconds: { type: integer, minimum: 1, maximum: 86400, default: 3600 }
+        tokens:
+          type: array
+          description: Match tokens. Unique among the org's active sessions; minimum length 6 by default.
+          items: { type: string, minLength: 6 }
+        mappings:
+          type: array
+          items: { $ref: '#/components/schemas/StubMapping' }
+        masks:
+          type: array
+          items: { $ref: '#/components/schemas/Mask' }
+        parentId:
+          type: string
+          description: Create inside a URL-based shadow mock (FR-8.5). Its expiry is capped at the parent's.
+        seedFrom: { $ref: '#/components/schemas/SeedFrom' }
+        metadata: { type: object, additionalProperties: true }
+    CreateURLBasedSessionRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 200 }
+        ttlSeconds: { type: integer, minimum: 1, maximum: 2592000, default: 86400 }
+        mappings:
+          type: array
+          items: { $ref: '#/components/schemas/StubMapping' }
+        masks:
+          type: array
+          items: { $ref: '#/components/schemas/Mask' }
+        seedFrom: { $ref: '#/components/schemas/SeedFrom' }
+        metadata: { type: object, additionalProperties: true }
+    Session:
+      type: object
+      required: [id, kind, createdBy, createdAt, expiresAt]
+      properties:
+        id: { type: string }
+        kind: { $ref: '#/components/schemas/SessionKind' }
+        name: { type: string }
+        tenant: { type: string }
+        createdBy: { type: string, examples: [user_2abc, 'ci:ck_ACME0000000000000', local] }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        ttlSeconds: { type: integer }
+        parentId: { type: [string, 'null'] }
+        keyPrefix: { type: string, description: 'Key-based only: the first 8 characters of the session key.' }
+        tokens: { type: array, items: { type: string }, description: Key-based only. }
+        baseUrl: { type: string, format: uri, description: 'URL-based only: `{base}/d/{id}`.' }
+        masks:
+          type: array
+          items: { $ref: '#/components/schemas/Mask' }
+        mappingCount: { type: integer }
+        requestCount: { type: integer }
+        metadata: { type: object, additionalProperties: true }
+    CreatedKeyBasedSession:
+      allOf:
+        - $ref: '#/components/schemas/Session'
+        - type: object
+          required: [key]
+          properties:
+            key:
+              type: string
+              pattern: '^smk_[0-9A-Z]{26}$'
+              description: The session key. **Returned only here**, and stored only as a hash.
+    SessionPatch:
+      type: object
+      properties:
+        name: { type: string }
+        ttlSeconds: { type: integer, minimum: 1, description: 'New TTL from now, within the kind''s (and plan''s) maximum.' }
+        addTokens: { type: array, items: { type: string, minLength: 6 } }
+        removeTokens: { type: array, items: { type: string } }
+        addMasks:
+          type: array
+          items: { $ref: '#/components/schemas/Mask' }
+        removeMasks:
+          type: array
+          items: { $ref: '#/components/schemas/Mask' }
+        metadata: { type: object, additionalProperties: true }
+    SessionList:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items: { $ref: '#/components/schemas/Session' }
+        meta:
+          type: object
+          properties:
+            total: { type: integer }
+
+    # ── Runtime ──
+    ValidateResult:
+      type: object
+      required: [valid]
+      properties:
+        valid: { type: boolean }
+        errors: { $ref: '#/components/schemas/WireMockErrors/properties/errors' }
+    DryRunRequest:
+      type: object
+      required: [request]
+      properties:
+        request: { $ref: '#/components/schemas/SampleRequest' }
+        sessionId: { type: string, description: Resolve through this session's stack. Omit for the global session. }
+        urlMockId: { type: string, description: Resolve as URL-based traffic through this mock. }
+    DryRunResult:
+      type: object
+      required: [matched]
+      properties:
+        matched: { type: boolean }
+        layer: { $ref: '#/components/schemas/Layer' }
+        sessionId: { type: [string, 'null'] }
+        detection: { $ref: '#/components/schemas/ServeEventShadowMock/properties/detection' }
+        stubMapping: { $ref: '#/components/schemas/StubMapping' }
+        response:
+          type: object
+          properties:
+            status: { type: integer }
+            headers: { type: object, additionalProperties: true }
+            body: { type: string }
+        nearMisses:
+          type: array
+          items: { $ref: '#/components/schemas/NearMiss' }
+    LiveStats:
+      type: object
+      properties:
+        window: { type: string }
+        requestsPerMinute:
+          type: array
+          items:
+            type: object
+            properties:
+              minute: { type: string, format: date-time }
+              layer: { $ref: '#/components/schemas/Layer' }
+              count: { type: integer }
+        matchRate: { type: number, minimum: 0, maximum: 1 }
+        unmatched: { type: integer }
+        topUnmatchedPaths:
+          type: array
+          items:
+            type: object
+            properties:
+              path: { type: string }
+              count: { type: integer }
+        latencyMs:
+          type: object
+          properties:
+            p50: { type: number }
+            p99: { type: number }
+        detectionHits:
+          type: object
+          additionalProperties: { type: integer }
+          examples: [{ Header: 120, Query: 3, Cookie: 0, ScanMeta: 14, ScanBody: 9 }]
+        activeSessions:
+          type: object
+          properties:
+            keyBased: { type: integer }
+            urlBased: { type: integer }
+        ipRejections:
+          type: array
+          items:
+            type: object
+            properties:
+              ip: { type: string }
+              count: { type: integer }
+    Usage:
+      type: object
+      properties:
+        plan: { type: string, examples: [Team] }
+        period:
+          type: object
+          properties:
+            start: { type: string, format: date-time }
+            end: { type: string, format: date-time }
+            mockRequests:
+              type: object
+              properties:
+                used: { type: integer }
+                included: { type: integer }
+                overage: { type: integer }
+                hardCap: { type: [integer, 'null'] }
+            concurrentSessionsP95:
+              type: object
+              properties:
+                current: { type: integer }
+                included: { type: integer }
+                ceiling: { type: integer }
+        limits:
+          type: object
+          properties:
+            requestsPerSecond: { type: integer }
+            hotJournalEntries: { type: integer }
+            retentionDays: { type: integer }
+            ciKeys: { type: integer }
+            ipAllowlist: { type: boolean }
+    ExportResult:
+      type: object
+      properties:
+        url: { type: string, format: uri }
+        expiresAt: { type: string, format: date-time }
