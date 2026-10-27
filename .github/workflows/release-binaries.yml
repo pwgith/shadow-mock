@@ -1,0 +1,62 @@
+name: release-binaries
+
+# Builds the engine for every supported OS and CPU and publishes the archives as a GitHub
+# Release. The binaries live only on the release, never in the repository.
+#
+#   merge to main   -> pre-release "main-<short sha>", so every merge has downloadable binaries
+#   push a v* tag   -> release "<tag>", for a real version (git tag v0.2.0 && git push --tags)
+#   manual run      -> same as a merge, for re-running a failed publish from main
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release and its tag
+
+# Builds for different commits do not cancel each other; every merge keeps its binaries.
+concurrency:
+  group: release-binaries-${{ github.sha }}
+
+jobs:
+  release:
+    # Manual runs publish only from main or a version tag, so a branch build never makes a release.
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git describe needs tags and history to stamp the version
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Work out the release name
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
+            echo "PRERELEASE=false" >> "$GITHUB_ENV"
+          else
+            echo "TAG=main-${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+            echo "PRERELEASE=true" >> "$GITHUB_ENV"
+          fi
+      - name: Cross-compile and pack every target
+        run: bash scripts/build-release.sh "$TAG"
+      - name: Smoke test the linux/amd64 binary
+        run: |
+          tar -xzf dist/shadowmock_*_linux_amd64.tar.gz -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP"/shadowmock_*_linux_amd64/shadowmock -version
+      - name: Verify the checksums
+        run: cd dist && sha256sum --check SHA256SUMS
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Re-running replaces the files of an existing release instead of failing.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            flags=(--target "$GITHUB_SHA" --title "$TAG" --generate-notes)
+            [[ "$PRERELEASE" == "true" ]] && flags+=(--prerelease)
+            gh release create "$TAG" dist/* "${flags[@]}"
+          fi

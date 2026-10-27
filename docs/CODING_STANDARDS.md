@@ -193,6 +193,9 @@ Blanket `//nolint` or file-wide suppressions are rejected (`nolintlint`). Projec
 make fmt      # gofumpt + goimports
 make lint     # golangci-lint + scripts/lint.sh (file names, TODOs, go mod tidy, govulncheck)
 make test     # go test -race ./... with coverage
+make release  # cross-compile every supported OS and CPU into dist/
 ```
 
 CI runs the same targets on every pull request (`.github/workflows/ci.yml`), and a pull request cannot merge with lint findings.
+
+**Release binaries.** `.github/workflows/release-binaries.yml` runs `scripts/build-release.sh` and publishes the archives, with a `SHA256SUMS` file, as a GitHub Release. The binaries live only on the release, never in the repository (`dist/` is git-ignored). A merge to `main` creates the pre-release `main-<short sha>`; pushing a `v*` tag (for example `git tag v0.2.0 && git push origin v0.2.0`) creates the release for that version. It builds Linux (amd64, arm64, armv7), macOS (amd64, arm64) and Windows (amd64, arm64), all pure Go with `CGO_ENABLED=0`. Adding a platform means adding a line to `TARGETS` in the script; anything that needs cgo must be reviewed against this, because it would break the single-runner cross-compile. Run the workflow by hand from the Actions tab to build any branch.
