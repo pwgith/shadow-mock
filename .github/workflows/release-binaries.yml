@@ -1,10 +1,10 @@
 name: release-binaries
 
 # Builds the engine for every supported OS and CPU and publishes the archives as a GitHub
-# Release. The binaries live only on the release, never in the repository.
+# Release. The binaries live only on the release, never in the repository. See docs/RELEASING.md.
 #
-#   merge to main   -> pre-release "main-<short sha>", so every merge has downloadable binaries
-#   push a v* tag   -> release "<tag>", for a real version (git tag v0.2.0 && git push --tags)
+#   push a v* tag   -> the release for that version (v0.2.0 is a release; v0.2.0-rc.1 is a pre-release)
+#   merge to main   -> the rolling pre-release "edge", replaced on every merge
 #   manual run      -> same as a merge, for re-running a failed publish from main
 on:
   push:
@@ -15,9 +15,11 @@ on:
 permissions:
   contents: write # create the release and its tag
 
-# Builds for different commits do not cancel each other; every merge keeps its binaries.
+# A newer merge to main replaces an older edge build, so only the latest publishes. A version tag
+# is never cancelled.
 concurrency:
-  group: release-binaries-${{ github.sha }}
+  group: release-binaries-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 jobs:
   release:
@@ -27,36 +29,59 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # git describe needs tags and history to stamp the version
+          fetch-depth: 0 # the nearest version tag is needed to name an edge build
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Work out the release name
+      - name: Work out the version
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
-            echo "PRERELEASE=false" >> "$GITHUB_ENV"
+            TAG="$GITHUB_REF_NAME"
+            semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'
+            if ! [[ "$TAG" =~ $semver ]]; then
+              echo "::error::$TAG is not a semantic version. Use vMAJOR.MINOR.PATCH, or vMAJOR.MINOR.PATCH-rc.1 for a pre-release."
+              exit 1
+            fi
+            VERSION="${TAG#v}"
+            PRERELEASE=false
+            [[ "$TAG" == *-* ]] && PRERELEASE=true
           else
-            echo "TAG=main-${GITHUB_SHA::8}" >> "$GITHUB_ENV"
-            echo "PRERELEASE=true" >> "$GITHUB_ENV"
+            TAG=edge
+            base="$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo v0.0.0)"
+            VERSION="${base#v}-edge.${GITHUB_SHA::8}"
+            PRERELEASE=true
           fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "PRERELEASE=$PRERELEASE" >> "$GITHUB_ENV"
+          echo "Building $VERSION for release $TAG"
       - name: Cross-compile and pack every target
-        run: bash scripts/build-release.sh "$TAG"
+        run: bash scripts/build-release.sh "$VERSION"
       - name: Smoke test the linux/amd64 binary
         run: |
           tar -xzf dist/shadowmock_*_linux_amd64.tar.gz -C "$RUNNER_TEMP"
-          "$RUNNER_TEMP"/shadowmock_*_linux_amd64/shadowmock -version
+          got="$("$RUNNER_TEMP"/shadowmock_*_linux_amd64/shadowmock -version)"
+          if [[ "$got" != "$VERSION" ]]; then
+            echo "::error::the binary reports version '$got', expected '$VERSION'"
+            exit 1
+          fi
       - name: Verify the checksums
         run: cd dist && sha256sum --check SHA256SUMS
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Re-running replaces the files of an existing release instead of failing.
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          if [[ "$TAG" == edge ]]; then
+            # The rolling pre-release: remove the old one and its tag, then publish the new build.
+            gh release delete edge --cleanup-tag --yes 2>/dev/null || true
+            gh release create edge dist/* --target "$GITHUB_SHA" --prerelease --latest=false \
+              --title "edge (latest main)" \
+              --notes "Build of main at commit ${GITHUB_SHA}. It is replaced on every merge and is not a stable release. For a stable version, use the newest v* release."
+          elif gh release view "$TAG" >/dev/null 2>&1; then
+            # Re-running replaces the files of an existing release instead of failing.
             gh release upload "$TAG" dist/* --clobber
           else
-            flags=(--target "$GITHUB_SHA" --title "$TAG" --generate-notes)
-            [[ "$PRERELEASE" == "true" ]] && flags+=(--prerelease)
+            flags=(--title "$TAG" --generate-notes --verify-tag)
+            if [[ "$PRERELEASE" == "true" ]]; then flags+=(--prerelease); else flags+=(--latest); fi
             gh release create "$TAG" dist/* "${flags[@]}"
           fi
