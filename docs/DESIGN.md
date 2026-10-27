@@ -741,6 +741,8 @@ egress: { blockPrivate: false }   # SaaS sets true: no webhooks or proxying to p
 
 There is no global lock on the request path, so key-based shadow mocks scale with the number of tests.
 
+**Metrics.** `internal/metrics` owns a private Prometheus registry (`prometheus/client_golang`), so two engines in one process never share counters. `mock.Service.finish` reports every served mock request once, through the small `mock.Observer` interface: method, status, the layer that served it and the detection stage, if any. The detector reports each rebuild (pattern count and duration, timed with the injected clock) through `detect.Index.Observe`, and the active-session gauge reads the registry when scraped. The package's methods take only the permitted label values (org, method, status, layer, stage), so a session id, path or client address cannot become a label by accident; a unit test and an acceptance scenario check the exposition. `/__metrics` is served on the admin listener when there is one, and not on the mock listener.
+
 ## 13. Moving to SaaS (what changes)
 
 The full SaaS platform context (Next.js and Clerk on Vercel, the separate management app, Supabase Postgres, the engine on Render with Render Key Value, and R2 object storage) is in [SAAS.md](SAAS.md). Engine-side summary:

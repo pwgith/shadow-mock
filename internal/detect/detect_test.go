@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pwgith/shadow-mock/internal/match"
 	"github.com/pwgith/shadow-mock/internal/session"
@@ -223,4 +224,35 @@ func TestLazyRebuild(t *testing.T) {
 	if _, found := detected(t, ix, req(t, "GET", "/a", "", hdr)); found {
 		t.Error("a deleted session was still detected")
 	}
+}
+
+func TestObserveReportsEachRebuild(t *testing.T) {
+	t.Parallel()
+	var sizes []int
+	var took []time.Duration
+	clock := time.Unix(0, 0)
+	ix := New(DefaultConfig())
+	ix.Observe(func() time.Time { clock = clock.Add(4 * time.Millisecond); return clock }, func(patterns int, d time.Duration) {
+		sizes, took = append(sizes, patterns), append(took, d)
+	})
+	active := sessions()
+	want := 0
+	for i := range active {
+		if active[i].Kind == session.KeyBased {
+			want += 1 + len(active[i].Tokens) // the key and each token
+		}
+	}
+	ix.Rebuild(active)
+	ix.Rebuild(nil)
+	if len(sizes) != 2 || sizes[0] != want || sizes[1] != 0 {
+		t.Errorf("reported sizes %v, want [%d 0]", sizes, want)
+	}
+	if took[0] != 4*time.Millisecond {
+		t.Errorf("reported duration %v, want the 4ms the clock advanced", took[0])
+	}
+}
+
+func TestRebuildWithoutAnObserverIsFine(t *testing.T) {
+	t.Parallel()
+	New(DefaultConfig()).Rebuild(sessions())
 }

@@ -86,12 +86,38 @@ Also keep the request body limit (`limits.maxBodyBytes`) at a size you are comfo
 | `GET /__health` | Liveness: is the process up |
 | `GET /__ready` | Readiness: is it ready for traffic |
 | `GET /__admin/health` | WireMock-style health |
-| `GET /__metrics` | Prometheus metrics. Currently the number of active sessions |
+| `GET /__metrics` | Prometheus metrics |
 
 These sit outside the admin prefix so a load balancer can use them. When the admin API has its own
 listener, `/__metrics` is served there and is not exposed on the mock port.
 
-More metrics, tracing and a Docker image are being added.
+### Metrics
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `shadowmock_requests_total` | counter | `org`, `method`, `status` | Mock requests served |
+| `shadowmock_matches_total` | counter | `org`, `layer` | Requests answered by a mapping, by the layer it came from (`global`, `key-based`, `url-based`) |
+| `shadowmock_detection_hits_total` | counter | `org`, `stage` | Requests assigned to a shadow mock, by the detection stage that found it (`Header`, `Query`, `Cookie`, `ScanMeta`, `ScanBody`) |
+| `shadowmock_active_sessions` | gauge | none | Active key-based and URL-based shadow mocks |
+| `shadowmock_automaton_patterns` | gauge | none | Keys and tokens in the session detector |
+| `shadowmock_automaton_rebuild_seconds` | histogram | none | How long a detector rebuild takes |
+
+Labels are limited to `org`, `layer`, `stage`, `status` and `method`. Session ids, session keys,
+paths and client addresses are never labels, so the metrics stay small and do not leak who is
+calling. Unmatched requests count in `shadowmock_requests_total` but not in
+`shadowmock_matches_total`. Admin calls are not counted as mock requests.
+
+A scrape configuration:
+
+```yaml
+scrape_configs:
+  - job_name: shadowmock
+    metrics_path: /__metrics
+    static_configs:
+      - targets: ["mocks.example.com:9090"]   # the admin listener, if you set one
+```
+
+Tracing and a Docker image are being added.
 
 ## Logs
 
