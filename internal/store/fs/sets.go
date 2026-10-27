@@ -22,6 +22,10 @@ func LoadMappingSet(dir, name string) ([]model.StubMapping, error) {
 	}
 	defer root.Close()
 	name = path.Clean(name)
+	// A name is a set inside dir: not dir itself, and nothing that climbs out of it.
+	if name == "." || !iofs.ValidPath(name) {
+		return nil, fmt.Errorf("mapping set %s: %w", name, store.ErrNotFound)
+	}
 	if data, readErr := root.ReadFile(name + ".json"); readErr == nil {
 		return model.DecodeMappings(data)
 	}

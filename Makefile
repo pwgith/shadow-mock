@@ -5,7 +5,7 @@ GOLANGCI := go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLA
 
 export GOLANGCI_LINT_VERSION GOVULNCHECK_VERSION
 
-.PHONY: fmt lint lint-fix test contract acceptance cover-check bench corpus release ci
+.PHONY: fmt lint lint-fix test contract contract-live acceptance cover-check bench corpus release ci
 
 fmt:
 	$(GOLANGCI) fmt ./...
@@ -26,6 +26,10 @@ cover-check: test
 # SHADOWMOCK_CONTRACT_TOKEN in SaaS) to also call every operation on a running engine.
 contract:
 	go test -count=1 ./test/contract/
+
+# The live half: builds the engine, starts it and calls every operation in api/openapi.yaml.
+contract-live:
+	bash scripts/live-contract.sh
 
 acceptance:
 	go test -race -count=1 ./test/acceptance/...

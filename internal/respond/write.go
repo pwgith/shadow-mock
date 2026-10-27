@@ -21,9 +21,13 @@ const gzipMinBytes = 1024
 // Write sends the response: it waits for the delay, simulates a fault, or writes the status,
 // headers and body (gzipped if the client accepts it). It returns the body actually sent, or
 // an error if the client went away during the delay.
-func (r *Renderer) Write(ctx context.Context, w http.ResponseWriter, req *http.Request, resp *Response) error {
+func (r *Renderer) Write(ctx context.Context, w http.ResponseWriter, req *http.Request, resp *Response, beforeSend func()) error {
 	if resp.Delay > 0 && !r.Clock.Sleep(ctx, resp.Delay) {
 		return fmt.Errorf("delay: %w", ctx.Err())
+	}
+	// The caller records the request before the client can see the response (FR-5.5).
+	if beforeSend != nil {
+		beforeSend()
 	}
 	if resp.Fault != "" {
 		return fault(w, resp.Fault)
@@ -52,12 +56,21 @@ func (r *Renderer) Write(ctx context.Context, w http.ResponseWriter, req *http.R
 	return nil
 }
 
+// acceptsGzip reports whether an Accept-Encoding header allows gzip: it names gzip with a
+// quality above zero (gzip;q=0 refuses it, and gzip;q=0.8 allows it).
 func acceptsGzip(ae string) bool {
 	for _, part := range strings.Split(ae, ",") {
 		coding, params, _ := strings.Cut(strings.TrimSpace(part), ";")
-		if strings.EqualFold(strings.TrimSpace(coding), "gzip") && !strings.Contains(strings.ReplaceAll(params, " ", ""), "q=0") {
-			return true
+		if !strings.EqualFold(strings.TrimSpace(coding), "gzip") {
+			continue
 		}
+		q := 1.0
+		if name, value, found := strings.Cut(strings.ReplaceAll(params, " ", ""), "="); found && strings.EqualFold(name, "q") {
+			if parsed, err := strconv.ParseFloat(value, 64); err == nil {
+				q = parsed
+			}
+		}
+		return q > 0
 	}
 	return false
 }
