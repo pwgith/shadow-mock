@@ -7,7 +7,6 @@ Feature: Custom request matchers through the Go extension interface
     Given Shadow Mock is built with the custom matcher "is-even-id" that matches when query parameter "id" is even
     And Shadow Mock is running
 
-  @p3-matchers
   Scenario: A mapping can require a custom matcher by name
     Given the global mapping:
       """json
@@ -19,7 +18,6 @@ Feature: Custom request matchers through the Go extension interface
     When I send a "GET" request to "/even?id=5"
     Then the response status is 404
 
-  @p3-matchers
   Scenario: An unknown custom matcher is rejected when the mapping is created
     When I call admin "POST" "/mappings" with:
       """json

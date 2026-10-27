@@ -6,6 +6,7 @@ toolchain go1.27.3
 
 require (
 	github.com/antchfx/xmlquery v1.4.4
+	github.com/antchfx/xpath v1.3.6
 	github.com/cucumber/godog v0.16.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/google/go-cmp v0.7.0
@@ -20,7 +21,6 @@ require (
 )
 
 require (
-	github.com/antchfx/xpath v1.3.3 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/basgys/goxml2json v1.1.1-0.20231018121955-e66ee54ceaad // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect

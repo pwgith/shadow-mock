@@ -187,7 +187,7 @@ root directory and test clock, and drives it over HTTP. It runs what the engine 
 |---|---|
 | `@saas`, `@multi-instance` | SaaS needs the Postgres, Redis and Clerk work in P5 |
 | `@P4`, `@P5` | Later phases (DESIGN.md §15) |
-| `@p3-matchers`, `@p3-harness` | P3 scenarios whose work is not merged yet: XML, XPath, multipart and custom matchers, and the harness steps for delays, faults, gzip and near misses. Remove the tag in the pull request that builds the work |
+| `@p3-harness` | P3 scenarios whose harness steps are not written yet: delays, faults, gzip and near misses. Remove the tag in the pull request that adds them |
 | `@perf` | Runs in the benchmark pipeline |
 | `@wip` | Not runnable yet. The comment above each tag says what is missing: a TLS listener in the harness, the audit log, detection metrics, a counting store wrapper, the blob store, key redaction, the Docker image, a WireMock Java client, and a separate process to measure memory |
 

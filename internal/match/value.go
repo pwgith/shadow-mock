@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pwgith/shadow-mock/pkg/extension"
+
 	"github.com/pwgith/shadow-mock/internal/model"
 )
 
@@ -35,6 +37,8 @@ func boolResult(ok bool) Result {
 type Options struct {
 	// Now returns the current time, for relative date matchers ("now +3 days").
 	Now func() time.Time
+	// CustomMatchers are the matchers registered through pkg/extension, by name.
+	CustomMatchers map[string]extension.RequestMatcher
 }
 
 func (o Options) now() time.Time {

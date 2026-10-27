@@ -1,7 +1,6 @@
 package match
 
 import (
-	"errors"
 	"testing"
 )
 
@@ -89,10 +88,6 @@ func TestCompileContentErrors(t *testing.T) {
 		if _, err := CompileContent(vp(t, p), opts()); err == nil {
 			t.Errorf("CompileContent(%s) succeeded, want an error", p)
 		}
-	}
-	_, err := CompileContent(vp(t, `{"equalToXml":"<a/>"}`), opts())
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("equalToXml error = %v, want ErrNotImplemented", err)
 	}
 	for _, v := range []string{"V4", "V6", "V7", "V201909", "V202012", "other"} {
 		if (draft(v) == nil) != (v == "other") {
