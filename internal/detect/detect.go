@@ -108,8 +108,11 @@ type Index struct {
 	groups atomic.Pointer[map[group]*groupIndex]
 
 	source func() []session.Session
-	dirty  atomic.Bool
-	mu     sync.Mutex // serialises rebuilds
+	// changes counts Invalidate calls and built the count the current snapshot reflects, so a
+	// lookup that arrives during a rebuild waits for it instead of reading the stale snapshot.
+	changes atomic.Uint64
+	built   atomic.Uint64
+	mu      sync.Mutex // serialises rebuilds
 }
 
 // New returns an empty index.
@@ -123,22 +126,24 @@ func New(cfg Config) *Index {
 // SetSource sets where Invalidate gets the active sessions from.
 func (ix *Index) SetSource(source func() []session.Session) {
 	ix.source = source
-	ix.dirty.Store(true)
+	ix.changes.Add(1)
 }
 
 // Invalidate marks the index stale; the next Detect rebuilds it from the source.
-func (ix *Index) Invalidate() { ix.dirty.Store(true) }
+func (ix *Index) Invalidate() { ix.changes.Add(1) }
 
-// refresh rebuilds a stale index. The flag is cleared before the sessions are read, so a
-// change made meanwhile marks it stale again.
+// refresh rebuilds a stale index. The change count is read before the sessions are, so a
+// change made meanwhile leaves the index stale for the next lookup. Lookups that find the
+// index stale queue on the lock, so none of them reads the old snapshot.
 func (ix *Index) refresh() {
-	if ix.source == nil || !ix.dirty.Load() {
+	if ix.source == nil || ix.built.Load() == ix.changes.Load() {
 		return
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
-	if ix.dirty.Swap(false) {
+	if n := ix.changes.Load(); ix.built.Load() != n {
 		ix.Rebuild(ix.source())
+		ix.built.Store(n)
 	}
 }
 

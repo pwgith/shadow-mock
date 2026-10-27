@@ -174,7 +174,7 @@ Other structure rules:
 
 * Prefer the standard library. Each new module needs a one-line justification in the pull request, and must have an acceptable licence (MIT, BSD, Apache-2.0 or ISC).
 * Approved at design time:
-  * `pgx/v5`, `go-redis/v9`, `aws-sdk-go-v2` (S3), `aymerick/raymond`, `petar-dambovaliev/aho-corasick`.
+  * `pgx/v5`, `go-redis/v9`, `aws-sdk-go-v2` (S3), `mailgun/raymond/v2`, `antchfx/xmlquery`, `petar-dambovaliev/aho-corasick`.
   * `golang-jwt/jwt/v5` with `MicahParks/keyfunc`, `fsnotify`, `go-cmp`, `godog`.
   * OpenTelemetry, `prometheus/client_golang`, `golang.org/x/sync`.
 * `go.mod` and `go.sum` must be tidy (`go mod tidy -diff` in `lint.sh`), and `govulncheck` must pass.

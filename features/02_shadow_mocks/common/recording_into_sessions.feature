@@ -8,6 +8,7 @@ Feature: Recording into a session
     And the upstream stub server "fx" returns 200 with JSON '{"rate":1.1}' for "GET /rates/EURUSD"
     And a URL-based shadow mock "U1"
 
+  @p3-proxy
   Scenario: Record through a URL-based mock into that mock
     When I call admin "POST" "/sessions/${U1.id}/recordings/start" with:
       """json
@@ -18,6 +19,7 @@ Feature: Recording into a session
     Then admin "GET" "/sessions/${U1.id}/mappings" lists 1 mappings
     And admin "GET" "/mappings" does not include a mapping for "/rates/EURUSD"
 
+  @p3-proxy
   Scenario: Recordings into a key-based mock only capture traffic attributed to it
     Given a key-based shadow mock "S1"
     When I call admin "POST" "/sessions/${S1.id}/recordings/start" with:

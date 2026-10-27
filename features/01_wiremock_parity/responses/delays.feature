@@ -12,6 +12,7 @@ Feature: Response delays
     When I send a "GET" request to "/slow"
     Then the response arrives after at least 500 ms
 
+  @p3-harness
   Scenario Outline: Random delay distributions stay within their bounds
     Given the global mapping:
       """json
@@ -25,6 +26,7 @@ Feature: Response delays
       | { "type": "uniform", "lower": 100, "upper": 200 }         | 100 | 250  |
       | { "type": "lognormal", "median": 80, "sigma": 0.1 }       | 40  | 400  |
 
+  @p3-harness
   Scenario: Chunked dribble delay spreads the body over time
     Given the global mapping:
       """json
@@ -47,6 +49,7 @@ Feature: Response delays
     When I send a "GET" request to "/any"
     Then the response arrives after at least 300 ms
 
+  @p3-harness
   Scenario: A client that disconnects during a delay frees the request
     Given the global mapping:
       """json

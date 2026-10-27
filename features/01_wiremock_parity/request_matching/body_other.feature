@@ -35,6 +35,7 @@ Feature: Plain, binary and multipart body matching
     Then the response status is 200
 
   @P3
+  @p3-matchers
   Scenario Outline: Multipart patterns with ANY and ALL matching
     Given the global mapping:
       """json

@@ -159,6 +159,12 @@ type Templating struct {
 	Global bool `yaml:"global"`
 }
 
+// Egress configures outbound calls made for mappings: webhooks and proxying.
+type Egress struct {
+	// BlockPrivate refuses private, loopback and link-local destinations (SaaS sets it).
+	BlockPrivate bool `yaml:"blockPrivate"`
+}
+
 // Log configures logging.
 type Log struct {
 	Level  string `yaml:"level"`  // debug | info | warn | error
@@ -180,6 +186,7 @@ type Config struct {
 	Sessions    Sessions   `yaml:"sessions"`
 	Limits      Limits     `yaml:"limits"`
 	Templating  Templating `yaml:"templating"`
+	Egress      Egress     `yaml:"egress"`
 	Log         Log        `yaml:"log"`
 }
 

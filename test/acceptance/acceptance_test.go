@@ -11,14 +11,20 @@ import (
 )
 
 // phases lists the delivery phases the engine implements (DESIGN.md §15). Scenarios for
-// later phases are tagged @P3 to @P5 and are not run.
-var phases = []string{"@P0", "@P1", "@P2"}
+// later phases are tagged @P4 and @P5 and are not run.
+var phases = []string{"@P0", "@P1", "@P2", "@P3"}
 
 // excluded lists what this harness does not run: SaaS and multi-instance behaviour, the
 // performance pipeline, later phases, and scenarios marked @wip with the reason beside them.
-var excluded = []string{"@saas", "@multi-instance", "@perf", "@P3", "@P4", "@P5", "@wip"}
+var excluded = []string{
+	"@saas", "@multi-instance", "@perf", "@P4", "@P5", "@wip",
+	// P3 scenarios whose engine work or harness steps are still to come, one tag per piece.
+	"@p3-proxy",
+	"@p3-matchers",
+	"@p3-harness",
+}
 
-// defaultTags selects the standalone P0–P2 scenarios. Godog tag filters are a comma-separated
+// defaultTags selects the standalone scenarios of the implemented phases. Godog tag filters are a comma-separated
 // list of alternatives, each a list of "&&" terms.
 func defaultTags() string {
 	alternatives := make([]string, 0, len(phases))

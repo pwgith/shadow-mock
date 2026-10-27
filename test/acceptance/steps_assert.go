@@ -88,6 +88,42 @@ func (w *world) initResponseAsserts(sc *godog.ScenarioContext) {
 		}
 		return nil
 	})
+	sc.Step(`^the response body matches "([^"]*)"$`, func(pattern string) error {
+		r, err := w.needLast()
+		if err != nil {
+			return err
+		}
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			return fmt.Errorf("compile %q: %w", pattern, err)
+		}
+		if !re.Match(r.body) {
+			return fmt.Errorf("body %s does not match %s", truncate(r.body), pattern)
+		}
+		return nil
+	})
+	sc.Step(`^the response body does not contain "([^"]*)"$`, func(part string) error {
+		r, err := w.needLast()
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(r.body), w.sub(part)) {
+			return fmt.Errorf("body contains %q: %s", part, truncate(r.body))
+		}
+		return nil
+	})
+	sc.Step(`^the response contains no file contents and no fetched content$`, func() error {
+		r, err := w.needLast()
+		if err != nil {
+			return err
+		}
+		for _, leak := range []string{"root:", "Example Domain"} {
+			if strings.Contains(string(r.body), leak) {
+				return fmt.Errorf("body leaks %q: %s", leak, truncate(r.body))
+			}
+		}
+		return nil
+	})
 	sc.Step(`^the response body is empty$`, func() error {
 		r, err := w.needLast()
 		if err != nil {

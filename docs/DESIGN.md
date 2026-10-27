@@ -568,7 +568,8 @@ func (o *Org) Allows(ip netip.Addr) bool {
 ## 9. Response rendering
 
 * `respond.Renderer` handles status, headers, the body source (inline, JSON, base64 or file via `FileRepository` with the **layer's scope first, then global**, so sessions can override `__files` too), and templating.
-* **Templating.** Use `github.com/aymerick/raymond` (Handlebars for Go) and register the WireMock helper set in `respond/template`. Compile templates once per stub and cache them on the `CompiledStub`.
+* **Templating.** `respond/template` wraps `github.com/mailgun/raymond/v2` (a maintained fork of raymond, Handlebars for Go) and registers the WireMock helper set. Parsed templates are cached by source text. Three things differ from stock Handlebars, to match WireMock: output is not HTML-escaped (values are marked safe, and lists and objects are unescaped after rendering through `template.Mark`); numeric path segments such as `request.query.tag.0` and the assigning forms `{{parseJson body 'x'}}` and `{{regexExtract s re 'x'}}` are rewritten to plain Handlebars before parsing; and raymond fixes each helper's argument count, so helpers take WireMock's documented arguments with options in the hash. Templates read only the data they are given, so there is no file or network helper (NFR-5.3). A stub is templated when it lists the `response-template` transformer or `templating.global` is on. A stub whose response mentions `callNumber` also takes a call number from the counter.
+* **Webhooks.** `serveEventListeners` and `postServeActions` entries named `webhook` are decoded with the mapping. After the response is written, `webhook.Dispatcher` sends each one in the background: it waits out the delay, renders the URL, headers and body with `originalRequest`, `response` and `parameters`, and calls through `egress.Client`. Failures are logged and never change the served response. With `egress.blockPrivate` the client refuses loopback, private and link-local addresses, after DNS resolution, and does not follow redirects.
 * **Compression.** Responses are gzip-compressed when the client sends `Accept-Encoding: gzip`, unless the mapping sets `"gzipDisabled": true`, the org setting turns it off, the response already has a `Content-Encoding`, or the body is under 1 KiB. This matches WireMock's default and is the main lever on outbound bandwidth cost (SAAS.md §11.4 C).
 * **Delays.** `time.Timer` honouring the request context, so a cancelled client frees the goroutine.
 * **Faults.** Use `http.Hijacker` to reset the connection, close it empty, or write garbage chunks.
@@ -719,6 +720,7 @@ sessions:
 limits:
   maxBodyBytes: 10485760
 templating: { global: false }
+egress: { blockPrivate: false }   # SaaS sets true: no webhooks or proxying to private addresses
 ```
 
 ## 12. Concurrency model

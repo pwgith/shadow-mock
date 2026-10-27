@@ -174,7 +174,7 @@ npx cucumber-js features/05_management_app --tags '@management-app'
 ## Running the suite
 
 ```bash
-make acceptance                                   # standalone engine, phases P0 to P2
+make acceptance                                   # standalone engine, phases P0 to P3 (parts of P3 are still tagged)
 ACCEPTANCE_TAGS='@FR-7.4' go test ./test/acceptance/   # a subset, by any godog tag filter
 ```
 
@@ -186,7 +186,8 @@ root directory and test clock, and drives it over HTTP. It runs what the engine 
 | Excluded | Why |
 |---|---|
 | `@saas`, `@multi-instance` | SaaS needs the Postgres, Redis and Clerk work in P5 |
-| `@P3`, `@P4`, `@P5` | Later phases (DESIGN.md §15) |
+| `@P4`, `@P5` | Later phases (DESIGN.md §15) |
+| `@p3-proxy`, `@p3-matchers`, `@p3-harness` | P3 scenarios whose work is not merged yet: proxying and recording, XML, XPath, multipart and custom matchers, and the harness steps for delays, faults, gzip and near misses. Remove the tag in the pull request that builds the work |
 | `@perf` | Runs in the benchmark pipeline |
 | `@wip` | Not runnable yet. The comment above each tag says what is missing: a TLS listener in the harness, the audit log, detection metrics, a counting store wrapper, the blob store, key redaction, the Docker image, a WireMock Java client, and a separate process to measure memory |
 

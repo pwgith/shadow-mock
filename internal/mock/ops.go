@@ -204,7 +204,7 @@ func (s *Service) DryRun(ctx context.Context, sc store.Scope, req DryRunRequest)
 	if err != nil {
 		return DryRunResult{}, fmt.Errorf("peek counter: %w", err)
 	}
-	out, err := s.render(ctx, res, stack, n)
+	out, err := s.render(ctx, res, stack, r, n)
 	if err != nil {
 		return DryRunResult{}, err
 	}

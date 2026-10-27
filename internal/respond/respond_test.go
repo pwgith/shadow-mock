@@ -71,7 +71,7 @@ func TestRenderBodies(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r, _, _ := newRenderer(t, true)
-			got, err := r.Render(t.Context(), def(t, tt.def), nil)
+			got, err := r.Render(t.Context(), def(t, tt.def), nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -90,10 +90,10 @@ func TestRenderBodies(t *testing.T) {
 func TestRenderErrors(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newRenderer(t, true)
-	if _, err := r.Render(t.Context(), def(t, `{"base64Body":"%%%"}`), nil); err == nil {
+	if _, err := r.Render(t.Context(), def(t, `{"base64Body":"%%%"}`), nil, nil); err == nil {
 		t.Error("an invalid base64Body should fail")
 	}
-	_, err := r.Render(t.Context(), def(t, `{"proxyBaseUrl":"http://upstream"}`), nil)
+	_, err := r.Render(t.Context(), def(t, `{"proxyBaseUrl":"http://upstream"}`), nil, nil)
 	var ae *apierr.Error
 	if !errors.As(err, &ae) || ae.Status != http.StatusNotImplemented || !strings.Contains(ae.Message, "http://upstream") {
 		t.Errorf("a proxy response = %v, want 501 until proxying is built", err)
@@ -122,15 +122,15 @@ func TestRenderBodyFilesPreferTheSession(t *testing.T) {
 		{"claim.json", "session first", "session"},
 		{"only-global.txt", "falls back to global", "G"},
 	} {
-		got, err := r.Render(ctx, def(t, `{"bodyFileName":"`+tt.file+`"}`), scopes)
+		got, err := r.Render(ctx, def(t, `{"bodyFileName":"`+tt.file+`"}`), scopes, nil)
 		if err != nil || string(got.Body) != tt.want {
 			t.Errorf("%s (%s): %q, %v; want %q", tt.file, tt.scopesWant, got.Body, err, tt.want)
 		}
 	}
-	if got, _ := r.Render(ctx, def(t, `{"bodyFileName":"claim.json"}`), []store.Scope{globalScope}); string(got.Body) != "global" {
+	if got, _ := r.Render(ctx, def(t, `{"bodyFileName":"claim.json"}`), []store.Scope{globalScope}, nil); string(got.Body) != "global" {
 		t.Errorf("another session's file leaked: %q", got.Body)
 	}
-	_, err := r.Render(ctx, def(t, `{"bodyFileName":"nope.json"}`), scopes)
+	_, err := r.Render(ctx, def(t, `{"bodyFileName":"nope.json"}`), scopes, nil)
 	var ae *apierr.Error
 	if !errors.As(err, &ae) || ae.Status != 500 || !strings.Contains(ae.Message, "nope.json") {
 		t.Errorf("a missing file = %v, want a 500 naming the file", err)
@@ -147,7 +147,7 @@ func TestDelays(t *testing.T) {
 		if got := r.Settings().FixedDelay; got != 50 {
 			t.Fatalf("Settings().FixedDelay = %d", got)
 		}
-		resp, _ := r.Render(t.Context(), def(t, `{"fixedDelayMilliseconds":100}`), nil)
+		resp, _ := r.Render(t.Context(), def(t, `{"fixedDelayMilliseconds":100}`), nil, nil)
 		if resp.Delay != ms(150) {
 			t.Errorf("Delay = %v, want 150ms", resp.Delay)
 		}
@@ -155,7 +155,7 @@ func TestDelays(t *testing.T) {
 	t.Run("a fixed distribution", func(t *testing.T) {
 		t.Parallel()
 		r, _, _ := newRenderer(t, true)
-		resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"fixed","milliseconds":70}}`), nil)
+		resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"fixed","milliseconds":70}}`), nil, nil)
 		if resp.Delay != ms(70) {
 			t.Errorf("Delay = %v", resp.Delay)
 		}
@@ -165,7 +165,7 @@ func TestDelays(t *testing.T) {
 		r, _, _ := newRenderer(t, true)
 		seen := map[time.Duration]bool{}
 		for range 200 {
-			resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"uniform","lower":10,"upper":20}}`), nil)
+			resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"uniform","lower":10,"upper":20}}`), nil, nil)
 			if resp.Delay < ms(10) || resp.Delay > ms(20) {
 				t.Fatalf("Delay = %v, want 10 to 20ms", resp.Delay)
 			}
@@ -174,7 +174,7 @@ func TestDelays(t *testing.T) {
 		if len(seen) < 3 {
 			t.Errorf("a uniform delay took only %d distinct values", len(seen))
 		}
-		resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"uniform","lower":30,"upper":30}}`), nil)
+		resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"uniform","lower":30,"upper":30}}`), nil, nil)
 		if resp.Delay != ms(30) {
 			t.Errorf("an empty range gives %v, want its lower bound", resp.Delay)
 		}
@@ -183,12 +183,12 @@ func TestDelays(t *testing.T) {
 		t.Parallel()
 		r, _, _ := newRenderer(t, true)
 		for range 200 {
-			resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"lognormal","median":500,"sigma":2,"maxValue":40}}`), nil)
+			resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"lognormal","median":500,"sigma":2,"maxValue":40}}`), nil, nil)
 			if resp.Delay > ms(40) {
 				t.Fatalf("Delay = %v, want at most 40ms", resp.Delay)
 			}
 		}
-		resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"lognormal","median":100,"sigma":0}}`), nil)
+		resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"lognormal","median":100,"sigma":0}}`), nil, nil)
 		if resp.Delay != ms(100) {
 			t.Errorf("a log-normal with no spread = %v, want its median", resp.Delay)
 		}
@@ -197,11 +197,11 @@ func TestDelays(t *testing.T) {
 		t.Parallel()
 		r, _, _ := newRenderer(t, true)
 		r.SetSettings(respond.Settings{DelayDistribution: &model.DelayDistribution{Type: "fixed", Milliseconds: 25}})
-		resp, _ := r.Render(t.Context(), def(t, `{}`), nil)
+		resp, _ := r.Render(t.Context(), def(t, `{}`), nil, nil)
 		if resp.Delay != ms(25) {
 			t.Errorf("Delay = %v", resp.Delay)
 		}
-		resp, _ = r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"fixed","milliseconds":5}}`), nil)
+		resp, _ = r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"fixed","milliseconds":5}}`), nil, nil)
 		if resp.Delay != ms(5) {
 			t.Errorf("the response's own distribution should win, got %v", resp.Delay)
 		}
@@ -209,7 +209,7 @@ func TestDelays(t *testing.T) {
 	t.Run("an unknown distribution adds nothing", func(t *testing.T) {
 		t.Parallel()
 		r, _, _ := newRenderer(t, true)
-		resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"poisson"}}`), nil)
+		resp, _ := r.Render(t.Context(), def(t, `{"delayDistribution":{"type":"poisson"}}`), nil, nil)
 		if resp.Delay != 0 {
 			t.Errorf("Delay = %v", resp.Delay)
 		}
@@ -256,7 +256,7 @@ func TestWriteGzip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r, _, _ := newRenderer(t, tt.gzipOn)
-			resp, err := r.Render(t.Context(), def(t, strings.ReplaceAll(tt.def, "BIG", big)), nil)
+			resp, err := r.Render(t.Context(), def(t, strings.ReplaceAll(tt.def, "BIG", big)), nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -292,7 +292,7 @@ func TestWriteWaitsForTheDelayThenRecordsBeforeSending(t *testing.T) {
 	t.Parallel()
 	r, _, clk := newRenderer(t, true)
 	start := clk.Now()
-	resp, _ := r.Render(t.Context(), def(t, `{"status":202,"body":"slow","fixedDelayMilliseconds":2000}`), nil)
+	resp, _ := r.Render(t.Context(), def(t, `{"status":202,"body":"slow","fixedDelayMilliseconds":2000}`), nil, nil)
 	rec := httptest.NewRecorder()
 	var sentBefore bool
 	var timeAtRecord time.Time
@@ -317,7 +317,7 @@ func TestWriteWaitsForTheDelayThenRecordsBeforeSending(t *testing.T) {
 func TestWriteGivesUpWhenTheClientLeavesDuringTheDelay(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newRenderer(t, true)
-	resp, _ := r.Render(t.Context(), def(t, `{"fixedDelayMilliseconds":1000}`), nil)
+	resp, _ := r.Render(t.Context(), def(t, `{"fixedDelayMilliseconds":1000}`), nil, nil)
 	ctx, cancel := cancelledContext(t)
 	defer cancel()
 	called := false
@@ -332,7 +332,7 @@ func TestWriteDribble(t *testing.T) {
 	t.Parallel()
 	r, _, clk := newRenderer(t, true)
 	start := clk.Now()
-	resp, _ := r.Render(t.Context(), def(t, `{"body":"0123456789ABCDEFGHIJ","chunkedDribbleDelay":{"numberOfChunks":4,"totalDuration":400}}`), nil)
+	resp, _ := r.Render(t.Context(), def(t, `{"body":"0123456789ABCDEFGHIJ","chunkedDribbleDelay":{"numberOfChunks":4,"totalDuration":400}}`), nil, nil)
 	rec := httptest.NewRecorder()
 	if err := r.Write(t.Context(), rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", http.NoBody), resp, nil); err != nil {
 		t.Fatal(err)
@@ -352,7 +352,7 @@ func TestWriteDribble(t *testing.T) {
 func TestWriteDribbleStopsWhenTheClientLeaves(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newRenderer(t, true)
-	resp, _ := r.Render(t.Context(), def(t, `{"body":"0123456789","chunkedDribbleDelay":{"numberOfChunks":5,"totalDuration":500}}`), nil)
+	resp, _ := r.Render(t.Context(), def(t, `{"body":"0123456789","chunkedDribbleDelay":{"numberOfChunks":5,"totalDuration":500}}`), nil, nil)
 	ctx, cancel := cancelledContext(t)
 	defer cancel()
 	err := r.Write(ctx, httptest.NewRecorder(), httptest.NewRequestWithContext(ctx, http.MethodGet, "/", http.NoBody), resp, nil)
@@ -367,7 +367,7 @@ func TestFaultsBreakTheConnection(t *testing.T) {
 		t.Run(fault, func(t *testing.T) {
 			t.Parallel()
 			r, _, _ := newRenderer(t, true)
-			resp, _ := r.Render(t.Context(), def(t, `{"fault":"`+fault+`"}`), nil)
+			resp, _ := r.Render(t.Context(), def(t, `{"fault":"`+fault+`"}`), nil, nil)
 			// The handler runs on the server's goroutine and may still be running when the client
 			// sees the broken connection, so its outcome is handed over on a channel.
 			type outcome struct {
@@ -405,7 +405,7 @@ func TestFaultsBreakTheConnection(t *testing.T) {
 func TestFaultNeedsAHijackableConnection(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newRenderer(t, true)
-	resp, _ := r.Render(t.Context(), def(t, `{"fault":"EMPTY_RESPONSE"}`), nil)
+	resp, _ := r.Render(t.Context(), def(t, `{"fault":"EMPTY_RESPONSE"}`), nil, nil)
 	err := r.Write(t.Context(), httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", http.NoBody), resp, nil)
 	if err == nil {
 		t.Error("a fault on a writer that cannot be hijacked should report an error")
