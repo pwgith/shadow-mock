@@ -35,6 +35,42 @@ Feature: Webhooks after a request is served
     Then the webhook receiver "hooks" receives nothing within 800 ms
     And within 2 s the webhook receiver "hooks" receives "GET /later"
 
+  Scenario: A webhook template can read the response that was served
+    Given the global mapping:
+      """json
+      { "request": { "urlPath": "/orders" },
+        "response": { "status": 201, "body": "created" },
+        "serveEventListeners": [ { "name": "webhook", "parameters": {
+            "method": "POST", "url": "${webhook.hooks}/audit",
+            "headers": { "Content-Type": "application/json" },
+            "body": "{ \"served\": {{response.status}}, \"text\": \"{{response.body}}\" }" } } ] }
+      """
+    When I send a "GET" request to "/orders"
+    Then within 2 s the webhook receiver "hooks" receives "POST /audit" with JSON at "$.served" equal to "201"
+    And within 2 s the webhook receiver "hooks" receives "POST /audit" with JSON at "$.text" equal to "created"
+
+  Scenario: A mapping can fire several webhooks
+    Given the global mapping:
+      """json
+      { "request": { "urlPath": "/multi" }, "response": { "status": 200 },
+        "serveEventListeners": [
+          { "name": "webhook", "parameters": { "method": "POST", "url": "${webhook.hooks}/first" } },
+          { "name": "webhook", "parameters": { "method": "POST", "url": "${webhook.hooks}/second" } } ] }
+      """
+    When I send a "GET" request to "/multi"
+    Then within 2 s the webhook receiver "hooks" receives "POST /first"
+    And within 2 s the webhook receiver "hooks" receives "POST /second"
+
+  Scenario: A shadow mock mapping can fire webhooks too
+    Given a key-based shadow mock "S1"
+    And the mapping in "S1":
+      """json
+      { "request": { "urlPath": "/sess" }, "response": { "status": 200 },
+        "serveEventListeners": [ { "name": "webhook", "parameters": { "method": "POST", "url": "${webhook.hooks}/from-session" } } ] }
+      """
+    When I send a "GET" request to "/sess" with header "X-Shadow-Mock-Key" set to "${S1.key}"
+    Then within 2 s the webhook receiver "hooks" receives "POST /from-session"
+
   Scenario: A failing webhook does not affect the served response
     Given the webhook receiver "hooks" responds 500 to everything
     And the global mapping:

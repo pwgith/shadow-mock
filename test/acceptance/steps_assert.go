@@ -367,6 +367,14 @@ func (w *world) initJSONAsserts(sc *godog.ScenarioContext) {
 		}
 		return nil
 	})
+	sc.Step(`^the response JSON at "([^"]*)" does not match "([^"]*)"$`, func(path, pattern string) error {
+		v, _, err := w.jsonOne(path)
+		re, rerr := regexp.Compile(pattern)
+		if rerr != nil || err != nil || re.MatchString(text(v)) {
+			return fmt.Errorf("%s = %v (%v), want no match for %s", path, v, err, pattern)
+		}
+		return nil
+	})
 	sc.Step(`^the response JSON at "([^"]*)" contains "([^"]*)"$`, func(path, part string) error {
 		v, _, err := w.jsonOne(path)
 		if err != nil {

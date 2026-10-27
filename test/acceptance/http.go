@@ -51,6 +51,10 @@ func (w *world) resolve(target string) (string, error) {
 		return w.srv.URL + target, nil
 	case strings.HasPrefix(target, "http://localhost:8080"):
 		return w.srv.URL + strings.TrimPrefix(target, "http://localhost:8080"), nil
+	case w.adminSrv != nil && strings.HasPrefix(target, "http://localhost:9090"):
+		return w.adminSrv.URL + strings.TrimPrefix(target, "http://localhost:9090"), nil
+	case w.adminSrv != nil && strings.HasPrefix(target, w.adminSrv.URL):
+		return target, nil
 	case strings.HasPrefix(target, w.srv.URL):
 		return target, nil
 	default:
@@ -110,7 +114,7 @@ func (w *world) adminCall(method, path, body string, header http.Header) (*reply
 	if err := w.ensure(); err != nil {
 		return nil, err
 	}
-	r := newRequest(method, w.adminPrefix()+w.sub(path))
+	r := newRequest(method, w.adminBase()+w.adminPrefix()+w.sub(path))
 	if body != "" {
 		r.body = []byte(w.sub(body))
 		if strings.Contains(path, "/files/") {
