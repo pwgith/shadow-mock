@@ -66,7 +66,9 @@ Date formats are Java-style patterns, such as `yyyy-MM-dd'T'HH:mm:ssXXX`.
 ### Strings and encoding
 
 `base64`, `urlEncode`, `trim`, `lower`, `upper`, `capitalize`, `replace`, `substring`, `join`,
-`size`, `regexExtract`.
+`size`, `regexExtract`, `pickRandom` (`{{pickRandom 'red' 'green'}}`), `randomDecimal` (`{{randomDecimal lower=1 upper=2}}`),
+`val` (`{{val request.query.id or='none'}}` gives the value, or the fallback when it is missing),
+and `date` (the same as `formatDate`).
 
 ```
 {{regexExtract request.path '[0-9]+'}}
@@ -93,10 +95,25 @@ This prints `123-order`. `m.0` is the first group and `m.1` the second.
 | `toJson`, `formatJson` | Print a value, or pretty-print JSON |
 | `jsonMerge`, `jsonRemove`, `jsonArrayAdd` | Change a JSON document |
 
+### Forms and SOAP
+
+`formData` reads a url-encoded form into a variable, and `soapXPath` evaluates an XPath inside the body
+of a SOAP envelope, naming elements by their local names:
+
+```
+{{formData request.body 'form' urlDecode=true}}Hello {{form.firstName}}
+{{soapXPath request.body '/GetClaim/ClaimId/text()'}}
+```
+
 ### Logic and maths
 
-`eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `and`, `or`, `not`, `math`, `array`, and the
-Handlebars built-ins `if`, `unless` and `each`.
+`eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `and`, `or`, `not`, `matches`, `math`, `array`,
+`arrayAdd`, `arrayJoin`, `range`, and the Handlebars built-ins `if`, `unless`, `each`, `with` and `lookup`.
+
+`matches` tests the whole text against a regular expression, as a block or as an expression:
+`{{#matches request.query.code '[0-9]+'}}numeric{{else}}no{{/matches}}`. `arrayAdd` returns a new list
+with an item added at the end, or at the start with `position='start'`. `arrayJoin` joins a list with a
+separator. `range` gives the whole numbers from one to another, both included.
 
 ```
 {{#if (eq request.method 'POST')}}created{{else}}ok{{/if}}
@@ -140,6 +157,10 @@ uses the request's `age` when there is one, and `5` when there is not.
 ```
 
 ## Errors
+
+A call to a helper that does not exist is an error, as it is in WireMock, so a typo in a helper name
+is found and does not render as blank text.
+
 
 A template that fails to render (for example, a helper given the wrong data) returns a
 `template_error` response and the cause is logged. Check the response body for the reason.

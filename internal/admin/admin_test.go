@@ -650,3 +650,46 @@ func TestAuthenticationAndAuthorisation(t *testing.T) {
 		}
 	})
 }
+
+// A journal entry carries the fields WireMock's does, which clients read: the body as text and as
+// base64 (always), the protocol, scheme, host and port, and the parsed form fields.
+func TestJournalEntriesCarryWireMocksFields(t *testing.T) {
+	t.Parallel()
+	a := newAPI(t)
+	a.want(201, "POST", "/mappings", `{"request":{"method":"POST","urlPath":"/f"},"response":{"status":201,"body":"done"}}`)
+	a.do("POST", "@/f", "k=v&k=w", "Content-Type", "application/x-www-form-urlencoded")
+	entry := a.want(200, "GET", "/requests", "")["requests"].([]any)[0].(map[string]any)
+	req := entry["request"].(map[string]any)
+
+	if req["body"] != "k=v&k=w" || req["bodyAsBase64"] != "az12Jms9dw==" {
+		t.Errorf("request body %q and base64 %q", req["body"], req["bodyAsBase64"])
+	}
+	if req["protocol"] != "HTTP/1.1" || req["scheme"] != "http" || req["host"] == "" || req["port"] == nil || req["browserProxyRequest"] != false {
+		t.Errorf("request address fields: %v", req)
+	}
+	form, _ := req["formParams"].(map[string]any)
+	if k, _ := form["k"].(map[string]any); k["key"] != "k" || len(k["values"].([]any)) != 2 {
+		t.Errorf("formParams = %v", form)
+	}
+	resp := entry["response"].(map[string]any)
+	if resp["body"] != "done" || resp["bodyAsBase64"] != "ZG9uZQ==" {
+		t.Errorf("response body %q and base64 %q", resp["body"], resp["bodyAsBase64"])
+	}
+}
+
+func TestJournalEntriesForEmptyBodiesStillHaveBothBodyFields(t *testing.T) {
+	t.Parallel()
+	a := newAPI(t)
+	a.want(201, "POST", "/mappings", `{"request":{"urlPath":"/e"},"response":{"status":204}}`)
+	a.mock("GET", "/e")
+	entry := a.want(200, "GET", "/requests", "")["requests"].([]any)[0].(map[string]any)
+	for name, part := range map[string]any{"request": entry["request"], "response": entry["response"]} {
+		m := part.(map[string]any)
+		if body, ok := m["body"]; !ok || body != "" {
+			t.Errorf("%s body = %v (present %v), want an empty string", name, body, ok)
+		}
+		if b64, ok := m["bodyAsBase64"]; !ok || b64 != "" {
+			t.Errorf("%s bodyAsBase64 = %v (present %v), want an empty string", name, b64, ok)
+		}
+	}
+}

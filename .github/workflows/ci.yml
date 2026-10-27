@@ -45,3 +45,36 @@ jobs:
           go-version-file: go.mod
       - name: Unit and acceptance tests with race detector and coverage targets
         run: make cover-check
+
+  # Real WireMock is the reference. Every corpus request is replayed against Shadow Mock and
+  # WireMock and the replies and journals compared, and the client suite must pass on both.
+  wiremock-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Start WireMock
+        run: WIREMOCK_HOME="$RUNNER_TEMP/wiremock" bash scripts/wiremock-reference.sh start
+      - name: Replay the corpus against Shadow Mock and WireMock and compare
+        run: SHADOWMOCK_WIREMOCK_URL=http://localhost:18080 go test ./test/conformance -run TestDifferentialAgainstRealWireMock -count=1
+      - name: Client suite against WireMock (every expectation in it must hold there)
+        run: BASE_URL=http://localhost:18081 node --test test/client/compat.test.mjs
+      - name: Client suite against Shadow Mock
+        run: |
+          go build -o shadowmock ./cmd/shadowmock
+          mkdir -p "$RUNNER_TEMP/sm-root"
+          ./shadowmock --port 18090 --root-dir "$RUNNER_TEMP/sm-root" &
+          for _ in $(seq 1 30); do curl -fs http://localhost:18090/__health >/dev/null && break; sleep 1; done
+          BASE_URL=http://localhost:18090 node --test test/client/compat.test.mjs
+      - name: WireMock logs
+        if: failure()
+        run: tail -n 60 "$RUNNER_TEMP"/wiremock/*.log || true

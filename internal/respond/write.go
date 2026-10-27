@@ -37,6 +37,11 @@ func (r *Renderer) Write(ctx context.Context, w http.ResponseWriter, req *http.R
 	for k, vs := range resp.Header {
 		h[k] = vs
 	}
+	// Without this Go guesses a Content-Type from the body. WireMock sends none when the stub gives
+	// none, and a client that checks the header would see the difference.
+	if _, set := h["Content-Type"]; !set {
+		h["Content-Type"] = nil
+	}
 	if r.Gzip && !resp.GzipDisabled && len(body) >= gzipMinBytes && h.Get("Content-Encoding") == "" &&
 		acceptsGzip(req.Header.Get("Accept-Encoding")) {
 		if z, err := compress(body); err == nil {

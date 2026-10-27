@@ -4,7 +4,7 @@
   "number": 2,
   "weight_kg": {{#if (neq this.weight_kg null)}}{{toJson this.weight_kg}}{{else}}5{{/if}},
   "colour": {{#if (neq this.colour null)}}{{toJson this.colour}}{{else}}"Blue"{{/if}},
-  "size": {{#if (neq this.size null)}}{{toJson this.size}}{{else}}"M"{{/if}},
+  "pack": {{#if (neq this.pack null)}}{{toJson this.pack}}{{else}}"M"{{/if}},
   "category": {{#if (neq this.category null)}}{{toJson this.category}}{{else}}"Household"{{/if}},
   "label": {{#if (neq this.label null)}}{{toJson this.label}}{{else}}"Books"{{/if}},
   "kind": {{#if (neq this.kind null)}}{{toJson this.kind}}{{else}}"Standard_Parcel"{{/if}},

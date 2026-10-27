@@ -233,8 +233,7 @@ func (h *Handler) dryRun(w http.ResponseWriter, r *http.Request, sc store.Scope)
 	v := dryRunView{Matched: res.Matched, StubMapping: res.Stub}
 	if res.Matched {
 		v.Layer = string(res.Layer)
-		body, _ := bodyFields(res.Body)
-		v.Response = &dryRunResponse{Status: res.Status, Headers: headerMap(res.Header), Body: body}
+		v.Response = &dryRunResponse{Status: res.Status, Headers: headerMap(res.Header), Body: bodyText(res.Body)}
 	} else {
 		v.NearMisses = stubNearMisses(matchSample(&req.Request), res.NearMisses, nil)
 	}

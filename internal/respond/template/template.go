@@ -79,6 +79,10 @@ func (e *Engine) compile(src string) (*compiled, error) {
 	}
 	main, inline := extractInline(src)
 	plain, assigns := rewrite(main)
+	known := e.helperNames()
+	if err := checkHelpers(plain, known); err != nil {
+		return nil, err
+	}
 	t, err := raymond.Parse(plain)
 	if err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
@@ -86,6 +90,9 @@ func (e *Engine) compile(src string) (*compiled, error) {
 	t.RegisterHelpers(e.helpers())
 	for _, p := range inline {
 		body, a := rewrite(p.body)
+		if err := checkHelpers(body, known); err != nil {
+			return nil, fmt.Errorf("partial %q: %w", p.name, err)
+		}
 		assigns = assigns || a
 		pt, perr := raymond.Parse(body)
 		if perr != nil {
@@ -128,6 +135,12 @@ func Safe(v any) any {
 			out[k] = Safe(x)
 		}
 		return out
+	case Headers:
+		out := make(Headers, len(t))
+		for k, x := range t {
+			out[k] = Safe(x)
+		}
+		return out
 	default:
 		return v
 	}
@@ -165,4 +178,13 @@ func unmark(s string) string {
 		b.WriteString(html.UnescapeString(s[i+len(markStart) : i+j]))
 		s = s[i+j+len(markEnd):]
 	}
+}
+
+// helperNames lists the helpers a template may call.
+func (e *Engine) helperNames() map[string]bool {
+	names := map[string]bool{"assign": true}
+	for name := range e.helpers() {
+		names[name] = true
+	}
+	return names
 }

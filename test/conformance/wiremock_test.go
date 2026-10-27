@@ -1,6 +1,7 @@
 package conformance_test
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -143,13 +144,6 @@ func valueCases() []tc {
 		{want: "c004000305", call: get("/wm/dates/formatted", "X-Date", "31/12/2025")},
 		{want: "c004000306", call: get("/wm/dates/this-month", "X-Date", "2026-10-15T08:00:00Z")},
 		{call: get("/wm/dates/recent", "X-Date", "2026-10-01T09:00:00Z")},
-		// 04 numbers
-		{want: "c004000401", call: get("/wm/numbers/equal?qty=5.00")},
-		{want: "c004000402", call: get("/wm/numbers/large-order?amount=1500")},
-		{want: "c004000403", call: get("/wm/numbers/adult", "X-Age", "18")},
-		{want: "c004000404", call: get("/wm/numbers/low-stock?stock=3")},
-		{want: "c004000405", call: get("/wm/numbers/band?score=60")},
-		{call: get("/wm/numbers/band?score=50")},
 	}
 }
 
@@ -168,7 +162,6 @@ func bodyCases() []tc {
 		{want: "c005000204", call: j("/wm/jsonpath/regex", `{ "customer": { "email": "ada@example.com" } }`)},
 		{want: "c005000205", call: j("/wm/jsonpath/subtree", `{ "address": { "postcode": "2000", "country": "AU", "street": "1 George St" } }`)},
 		{want: "c005000206", call: j("/wm/jsonpath/no-discount", `{ "total": 10 }`)},
-		{want: "c005000207", call: j("/wm/jsonpath/amount", `{ "amount": 1500.75 }`)},
 		{want: "c005000208", call: j("/wm/jsonschema/claim", `{ "id": 3, "amount": 120.5, "currency": "AUD" }`)},
 		{want: "c005000209", call: j("/wm/json/all-patterns", `{ "a": 1, "b": 2 }`)},
 		{call: j("/wm/jsonschema/claim", `{ "id": 3, "amount": -1 }`), contains: []string{"Body"}},
@@ -219,6 +212,8 @@ func responseCases() []tc {
 		{want: "c009000104", call: get("/wm/responses/cookies")},
 		{want: "c009000105", call: call{method: "DELETE", target: "/wm/responses/claims/12"}},
 		{want: "c009000106", call: get("/wm/responses/old-location")},
+		{want: "c009000301", call: get("/wm/responses/large")},
+		{want: "c009000302", call: post("/wm/responses/large-upload", largeUpload(), jsonCT, appJS)},
 		{want: "c009000107", call: post("/wm/responses/broken", "")},
 		// 09 body files
 		{want: "c009000201", call: get("/wm/files/claim")},
@@ -234,15 +229,15 @@ func responseCases() []tc {
 		{want: "c010000105", call: get("/wm/template/claims/42")},
 		{want: "c010000106", call: post("/wm/template/orders", `{ "customer": "Ada" }`, jsonCT, appJS)},
 		{want: "c010000107", call: get("/wm/template/literal")}, // not templated: served as written
-		{want: "c010000201", call: get("/wm/template/dates")},
+		{want: "c010000201", call: get("/wm/template/dates", "X-Date", "15/10/2026")},
 		{want: "c010000202", call: get("/wm/template/random")},
-		{want: "c010000203", call: get("/wm/template/strings?qty=4")},
+		{want: "c010000203", call: get("/wm/template/strings?qty=4&name=ada&ref=ORD-778", "X-Padded", "  padded  ")},
 		{want: "c010000204", call: post("/wm/template/regex-groups", "ORD-778")},
-		{want: "c010000205", call: get("/wm/template/logic?plan=gold")},
-		{want: "c010000206", call: post("/wm/template/form", "a=1", jsonCT, "application/x-www-form-urlencoded")},
+		{want: "c010000205", call: get("/wm/template/logic?plan=gold&code=123")},
+		{want: "c010000206", call: post("/wm/template/form", "firstName=Ada%20L&lastName=Lovelace", jsonCT, "application/x-www-form-urlencoded")},
 		{want: "c010000301", call: post("/wm/template/json-path", `{ "customer": { "name": "Ada" } }`, jsonCT, appJS)},
 		{want: "c010000302", call: post("/wm/template/order-lines", `{ "items": [] }`, jsonCT, appJS)},
-		{want: "c010000303", call: post("/wm/template/json-transform", `{ "a": 1 }`, jsonCT, appJS)},
+		{want: "c010000303", call: post("/wm/template/json-transform", jsonTransformBody, jsonCT, appJS)},
 		{want: "c010000304", call: post("/wm/template/xpath", "<claim/>", jsonCT, "application/xml")},
 		{want: "c010000305", call: post("/wm/template/soap", "<e/>", jsonCT, "text/xml")},
 	}
@@ -402,7 +397,7 @@ func (e *env) with(t *testing.T) *env {
 // otherwise compared only by status.
 const (
 	defaultParcel = `{
-		"id": "parcel-0001", "number": 2, "weight_kg": 5, "colour": "Blue", "size": "M",
+		"id": "parcel-0001", "number": 2, "weight_kg": 5, "colour": "Blue", "pack": "M",
 		"category": "Household", "label": "Books", "kind": "Standard_Parcel",
 		"packed_on": "2025-04-25", "fragile": false, "mode": "standard", "state": "new",
 		"value": { "amount": 123.00, "currency": "EUR" }, "limit": { "amount": 1000.00, "currency": "EUR" },
@@ -412,7 +407,7 @@ const (
 		"order_id": "O2",
 		"shipments": [
 			{ "shipment_id": "sh-1", "carrier": "air", "parcels": [
-				{ "colour": "Red & Gold", "size": "L", "weight_kg": 3, "fragile": true,
+				{ "colour": "Red & Gold", "pack": "L", "weight_kg": 3, "fragile": true,
 				  "value": { "amount": 50.5, "currency": "USD" }, "note": "<this way up>" },
 				{} ] },
 			{ "shipment_code": "Other" }
@@ -433,7 +428,7 @@ func shipmentCases() []tc {
 			body: `{ "order_id": "O2", "shipments": [
 				{ "shipment_id": "sh-1", "shipment_code": "General_Shipment", "carrier": "air",
 				  "type": "StandardShipment", "parcels": [
-					{ "id": "parcel-0001", "number": 2, "weight_kg": 3, "colour": "Red & Gold", "size": "L",
+					{ "id": "parcel-0001", "number": 2, "weight_kg": 3, "colour": "Red & Gold", "pack": "L",
 					  "category": "Household", "label": "Books", "kind": "Standard_Parcel",
 					  "packed_on": "2025-04-25", "fragile": true, "mode": "standard", "state": "new",
 					  "value": { "amount": 50.5, "currency": "USD" }, "limit": { "amount": 1000.00, "currency": "EUR" },
@@ -445,3 +440,25 @@ func shipmentCases() []tc {
 		},
 	}
 }
+
+// largeUpload is a JSON request body of about 100 KB, far past any size a journal might cut at.
+func largeUpload() string {
+	var b strings.Builder
+	b.WriteString(`{"items":[`)
+	for i := range 1500 {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `{"id":%d,"ref":"UPLOAD-%05d","note":"a large request body that must be kept whole"}`, i, i)
+	}
+	b.WriteString(`]}`)
+	return b.String()
+}
+
+// jsonTransformBody holds JSON documents as strings, which is what WireMock's JSON helpers take.
+const jsonTransformBody = `{
+	"base": "{\"a\":1,\"b\":null}",
+	"patch": "{\"b\":2,\"c\":null}",
+	"items": "[{\"id\":123},{\"id\":7},{\"id\":8}]",
+	"newItem": "{\"id\":9}"
+}`

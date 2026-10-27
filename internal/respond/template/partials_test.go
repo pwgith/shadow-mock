@@ -108,3 +108,22 @@ func TestToJSONLeavesMarkupAlone(t *testing.T) {
 		t.Errorf("toJson = %q (%v), want the text unescaped", out, err)
 	}
 }
+
+// A JSON template often ends a tag with the closing brace of an object: {"a": {{x}}}. raymond
+// reads the three braces as the end of an unescaped tag, so the engine writes the brace itself.
+func TestATagFollowedByALiteralBrace(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct{ name, src, want string }{
+		{"a value", `{"name": {{toJson name}}}`, `{"name": "Ada & <Bob>"}`},
+		{"a block end", `{"a": {{#if flag}}1{{else}}2{{/if}}}`, `{"a": 1}`},
+		{"a nested object", `{"o": {"n": {{toJson name}}}}`, `{"o": {"n": "Ada & <Bob>"}}`},
+		{"an assigning tag", `{{parseJson body 'x'}}{"n": {{x.n}}}`, `{"n": 15}`},
+		{"an unescaped tag", `{"n": {{{name}}}}`, `{"n": Ada & <Bob>}`},
+		{"a tag with spaces then a brace", `{"n": {{ name }}}`, `{"n": Ada & <Bob>}`},
+	} {
+		out, err := engine().Render(tt.src, data())
+		if err != nil || out != tt.want {
+			t.Errorf("%s: %q gave %q (%v), want %q", tt.name, tt.src, out, err, tt.want)
+		}
+	}
+}
