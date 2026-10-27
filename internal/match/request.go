@@ -207,3 +207,14 @@ func clientIP(remote string) string {
 	}
 	return host
 }
+
+// WithBody returns a copy of the request that has body in place of its own. The copy shares
+// the other fields and starts with no parsed-body caches, so it is safe to keep after the
+// original is gone.
+func (r *Request) WithBody(body []byte) *Request {
+	return &Request{
+		Method: r.Method, Scheme: r.Scheme, Host: r.Host, Port: r.Port, Path: r.Path,
+		RawQuery: r.RawQuery, Query: r.Query, Header: r.Header, Cookies: r.Cookies,
+		Body: body, ClientIP: r.ClientIP,
+	}
+}

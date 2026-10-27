@@ -80,6 +80,10 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e.Write(w)
 		return
 	}
+	if isAdmin && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions && crossSite(r) {
+		apierr.New(http.StatusForbidden, apierr.Forbidden, "The admin API does not accept changes sent from a web page on another site.").Write(w)
+		return
+	}
 	ctx := tenant.With(r.Context(), org.ID)
 	if isAdmin {
 		r2 := r.Clone(admin.WithBasePath(ctx, prefix))
@@ -188,4 +192,22 @@ func (rt *Router) adminPath(rest string) (string, bool) {
 		return "", false
 	}
 	return "/__admin" + strings.TrimPrefix(rest, prefix), true
+}
+
+// crossSite reports whether a browser sent r from a page on another site. Browsers add Origin
+// and Sec-Fetch-Site to such requests, and scripts cannot remove them, so a web page cannot
+// use a visitor's browser to call an admin API that has no login. Command-line and library
+// clients send neither header and are not affected.
+func crossSite(r *http.Request) bool {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "", "same-origin", "none":
+	default:
+		return true
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return false
+	}
+	u, err := url.Parse(origin)
+	return err != nil || !strings.EqualFold(u.Host, r.Host)
 }

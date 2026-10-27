@@ -15,6 +15,7 @@ import (
 	"github.com/antchfx/xpath"
 
 	"github.com/pwgith/shadow-mock/internal/model"
+	"github.com/pwgith/shadow-mock/internal/xmlguard"
 )
 
 // xmlOptions are the equalToXml settings that sit beside the expected document.
@@ -64,6 +65,9 @@ func compileEqualToXML(p model.ValuePattern) (ContentMatcher, error) {
 		return nil, fmt.Errorf("equalToXml: the expected document is not valid XML: %w", err)
 	}
 	return contentFunc(func(c Content) Result {
+		if !xmlguard.DepthOK(c.Bytes) {
+			return miss()
+		}
 		got, err := xmlquery.Parse(bytes.NewReader(c.Bytes))
 		if err != nil {
 			return miss()
@@ -291,6 +295,9 @@ func compileXPath(p model.ValuePattern, o Options) (ContentMatcher, error) {
 		return nil, fmt.Errorf("matchesXPath: invalid expression %q: %w", expr, err)
 	}
 	return contentFunc(func(c Content) Result {
+		if !xmlguard.DepthOK(c.Bytes) {
+			return miss()
+		}
 		doc, err := xmlquery.Parse(bytes.NewReader(c.Bytes))
 		if err != nil {
 			return miss()
@@ -341,7 +348,15 @@ func usePrefixes(doc *xmlquery.Node, ns map[string]string) {
 
 // selectXPath evaluates an expression and returns the text of each result, and whether the
 // expression selected anything (a node, a true boolean, or a non-empty string or number).
-func selectXPath(e *xpath.Expr, doc *xmlquery.Node) ([]string, bool) {
+func selectXPath(e *xpath.Expr, doc *xmlquery.Node) (values []string, found bool) {
+	// The XPath library panics on some documents, for example when a comparison reads text that
+	// is not a number. A request body must not be able to do that to a request, so it counts as
+	// selecting nothing.
+	defer func() {
+		if recover() != nil {
+			values, found = nil, false
+		}
+	}()
 	switch v := e.Evaluate(xmlquery.CreateXPathNavigator(doc)).(type) {
 	case *xpath.NodeIterator:
 		var out []string

@@ -74,6 +74,11 @@ func (d *Dispatcher) Fire(hooks []model.Webhook, in *respond.Input, params map[s
 		go func(h model.Webhook) {
 			defer d.wg.Done()
 			defer func() { <-d.slots }()
+			defer func() {
+				if r := recover(); r != nil { // a hook must never stop the server
+					d.logger.Error("webhook panicked", "url", h.URL, "panic", fmt.Sprint(r))
+				}
+			}()
 			if err := d.send(h, data); err != nil {
 				d.report(h, err)
 			}

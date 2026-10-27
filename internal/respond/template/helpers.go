@@ -16,6 +16,8 @@ import (
 
 	"github.com/antchfx/xmlquery"
 	"github.com/mailgun/raymond/v2"
+
+	"github.com/pwgith/shadow-mock/internal/xmlguard"
 )
 
 // helpers returns WireMock's helper set. raymond fixes each helper's number of positional
@@ -442,6 +444,9 @@ func document(v any) any {
 
 // xPath evaluates an XPath over XML text and returns the text of the first match.
 func xPath(doc, expr any, _ *raymond.Options) any {
+	if !xmlguard.DepthOK([]byte(text(doc))) {
+		fail("xPath: the XML is nested more than %d levels deep", xmlguard.MaxDepth)
+	}
 	root, err := xmlquery.Parse(strings.NewReader(text(doc)))
 	if err != nil {
 		fail("xPath: the input is not valid XML: %v", err)

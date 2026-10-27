@@ -1,10 +1,12 @@
 package journal_test
 
 import (
+	"net/http"
 	"strconv"
 	"testing"
 
 	"github.com/pwgith/shadow-mock/internal/journal"
+	"github.com/pwgith/shadow-mock/internal/match"
 	"github.com/pwgith/shadow-mock/internal/model"
 	"github.com/pwgith/shadow-mock/internal/store"
 	"github.com/pwgith/shadow-mock/internal/tenant"
@@ -157,5 +159,45 @@ func TestMemoryGetAndRemove(t *testing.T) {
 	}
 	if _, ok := j.Get(store.Global("globex"), "c"); !ok {
 		t.Error("another org's entries must survive")
+	}
+}
+
+func TestMemoryCutsLongBodies(t *testing.T) {
+	t.Parallel()
+	j := journal.NewMemory(10)
+	j.LimitBodies(8)
+	big := []byte("0123456789abcdef")
+	e := entry("1", "acme")
+	e.Request = &match.Request{Method: "POST", Path: "/in", Body: big}
+	e.Response = journal.Response{Status: 200, Body: big}
+	j.Append(e)
+
+	got := j.Query(store.Global("acme"), nil, 0)[0]
+	if string(got.Request.Body) != "01234567" || string(got.Response.Body) != "01234567" {
+		t.Errorf("kept bodies %q and %q, want the first 8 bytes of each", got.Request.Body, got.Response.Body)
+	}
+	if got.Request.Method != http.MethodPost || got.Request.Path != "/in" {
+		t.Errorf("the rest of the request changed: %+v", got.Request)
+	}
+	if len(e.Request.Body) != len(big) || len(e.Response.Body) != len(big) {
+		t.Error("the caller's entry must not be changed")
+	}
+
+	short := entry("2", "acme")
+	short.Request = &match.Request{Body: []byte("tiny")}
+	j.Append(short)
+	if string(j.Query(store.Global("acme"), nil, 0)[0].Request.Body) != "tiny" {
+		t.Error("a body under the limit is kept whole")
+	}
+}
+
+func TestMemoryWithoutALimitKeepsBodiesWhole(t *testing.T) {
+	t.Parallel()
+	j := journal.NewMemory(10)
+	e := entry("1", "acme")
+	e.Request = &match.Request{Body: []byte("0123456789")}
+	j.Append(e)
+	if len(j.Query(store.Global("acme"), nil, 0)[0].Request.Body) != 10 {
+		t.Error("no limit set, so nothing is cut")
 	}
 }

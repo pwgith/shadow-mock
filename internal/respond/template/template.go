@@ -39,10 +39,18 @@ func New(c clock.Clock) *Engine {
 }
 
 // Render renders src with data as the root context. Text without any "{{" is returned as is.
-func (e *Engine) Render(src string, data map[string]any) (string, error) {
+func (e *Engine) Render(src string, data map[string]any) (out string, err error) {
 	if !strings.Contains(src, "{{") {
 		return src, nil
 	}
+	// raymond turns a helper's error into a returned error, but a runtime error inside a helper
+	// or in raymond itself (a nil value where one was expected) still panics. Request data
+	// reaches templates, and webhooks render in a goroutine that would take the server down.
+	defer func() {
+		if r := recover(); r != nil {
+			out, err = "", fmt.Errorf("render template: %v", r)
+		}
+	}()
 	c, err := e.compile(src)
 	if err != nil {
 		return "", err
@@ -55,11 +63,11 @@ func (e *Engine) Render(src string, data map[string]any) (string, error) {
 			return raymond.SafeString("")
 		})
 	}
-	out, err := t.Exec(data)
+	rendered, err := t.Exec(data)
 	if err != nil {
 		return "", fmt.Errorf("render template: %w", err)
 	}
-	return unmark(out), nil
+	return unmark(rendered), nil
 }
 
 func (e *Engine) compile(src string) (*compiled, error) {
