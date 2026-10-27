@@ -25,6 +25,7 @@ import (
 
 	"github.com/pwgith/shadow-mock/internal/app"
 	"github.com/pwgith/shadow-mock/internal/config"
+	"github.com/pwgith/shadow-mock/pkg/extension"
 )
 
 // testClock is the engine's clock. Until a scenario sets the time it follows the real clock;
@@ -126,6 +127,7 @@ type world struct {
 	// state for individual steps
 	receivers      map[string]*receiver
 	upstreams      map[string]*upstream
+	matchers       []extension.RequestMatcher
 	sessionNumbers map[string][]int
 
 	createdSession map[string]any
@@ -176,7 +178,7 @@ func (w *world) start() error {
 		}
 	}
 	logger := slog.New(slog.NewTextHandler(w.logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	a, err := app.New(cfg, app.Options{Logger: logger, Clock: w.clk, Version: "acceptance", Shutdown: w.markStopped})
+	a, err := app.New(cfg, app.Options{Logger: logger, Clock: w.clk, Version: "acceptance", Shutdown: w.markStopped, Matchers: w.matchers})
 	if err != nil {
 		return fmt.Errorf("build engine: %w", err)
 	}

@@ -34,6 +34,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/store/memory"
 	"github.com/pwgith/shadow-mock/internal/tenant"
 	"github.com/pwgith/shadow-mock/internal/webhook"
+	"github.com/pwgith/shadow-mock/pkg/extension"
 )
 
 // Options are the process-level dependencies of the engine.
@@ -43,6 +44,8 @@ type Options struct {
 	// Shutdown is called by POST /__admin/shutdown. Nil disables the endpoint.
 	Shutdown func()
 	Version  string
+	// Matchers are custom request matchers that mappings can name (FR-2.7).
+	Matchers []extension.RequestMatcher
 }
 
 // App is the wired engine.
@@ -74,6 +77,13 @@ func New(cfg config.Config, o Options) (*App, error) {
 }
 
 func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
+	custom := make(map[string]extension.RequestMatcher, len(o.Matchers))
+	for _, m := range o.Matchers {
+		if _, dup := custom[m.Name()]; dup {
+			return nil, fmt.Errorf("two custom matchers are named %q", m.Name())
+		}
+		custom[m.Name()] = m
+	}
 	global, globalFiles, err := a.globalStores(cfg, o.Logger)
 	if err != nil {
 		return nil, err
@@ -112,7 +122,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Mappings: mappings,
 		Files:    files,
 		Sessions: registry,
-		Layers:   engine.NewManager(mappings, registry, match.Options{Now: o.Clock.Now}, o.Logger),
+		Layers:   engine.NewManager(mappings, registry, match.Options{Now: o.Clock.Now, CustomMatchers: custom}, o.Logger),
 		Detector: detector,
 		Counters: counter.NewMemory(),
 		Journal:  journal.NewMemory(cfg.Storage.Journal.Hot.MaxEntries),

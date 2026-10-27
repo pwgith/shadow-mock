@@ -74,6 +74,8 @@ shadowmock/
 
 `pkg/extension` is the only public API surface. Everything else is `internal` so it can change freely.
 
+Today `pkg/extension` has one extension point, `RequestMatcher` (FR-2.7). A program that embeds Shadow Mock passes matchers in `app.Options.Matchers`; a mapping asks for one with `"customMatcher": {"name": "...", "parameters": {...}}`. Matchers get a copy of the request, so they cannot change what the engine matches or journals, and an unknown name rejects the mapping when it is created. Transformers and template helpers are not extensible yet.
+
 ## 4. Domain model
 
 ### 4.1 Tenancy and principal
@@ -343,6 +345,8 @@ func (l *Layer) Snapshot() *Snapshot { return l.snap.Load() }
 ```
 
 `CompiledStub` holds pre-compiled matchers (regexps compiled once, JSON expected values parsed once, path templates tokenised). The prefilter buckets stubs by method and by literal `url` or `urlPath`, so most requests evaluate only a small candidate set. Stubs that use patterns go into a wildcard bucket that is always evaluated.
+
+XML bodies are matched with `antchfx/xmlquery`. `equalToXml` compares the documents as XMLUnit does by default: whitespace between elements, comments, attribute order and namespace prefixes do not matter, element order does (unless `exemptedComparisons` lists `CHILD_NODELIST_SEQUENCE`), and `enablePlaceholders` turns on `${xmlunit.ignore}`, `isNumber`, `isDateTime` and `matchesRegex(...)`, with optional delimiter regexes. `matchesXPath` matches when the expression selects something, or when what it selects matches the sub-matcher; `xPathNamespaces` maps the expression's prefixes to namespace URIs, and the document's elements are renamed to those prefixes before the expression runs, so the document's own prefixes need not agree.
 
 A `LayerManager` holds `map[store.Scope]*Layer`. It subscribes to `Watch` events, rebuilds the affected layer's snapshot off the hot path, and swaps it in with an atomic store.
 

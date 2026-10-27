@@ -24,6 +24,7 @@ type RequestMatcher struct {
 	scheme     string
 	bodies     []ContentMatcher
 	multipart  []*multipartMatcher
+	custom     *customMatcher
 }
 
 // Compile compiles a request pattern. Errors describe the invalid part.
@@ -87,7 +88,11 @@ func (m *RequestMatcher) compileRest(p *model.RequestPattern, o Options) error {
 		m.multipart = append(m.multipart, mm)
 	}
 	if p.CustomMatcher != nil {
-		return fmt.Errorf("customMatcher %q: custom matchers are %w", p.CustomMatcher.Name, ErrNotImplemented)
+		cm, ok := o.CustomMatchers[p.CustomMatcher.Name]
+		if !ok {
+			return fmt.Errorf("unknown custom matcher %q", p.CustomMatcher.Name)
+		}
+		m.custom = &customMatcher{name: cm.Name(), matcher: cm, parameters: p.CustomMatcher.Parameters}
 	}
 	return nil
 }
@@ -277,6 +282,9 @@ func (m *RequestMatcher) evalBody(r *Request, s *scorer) bool {
 				return false
 			}
 		}
+	}
+	if m.custom != nil && !s.add("Custom matcher ["+m.custom.name+"]", boolResult(m.custom.matches(r))) {
+		return false
 	}
 	return true
 }

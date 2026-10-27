@@ -171,6 +171,14 @@ func bodyCases() []tc {
 		{call: j("/wm/jsonschema/claim", `{ "id": 3, "amount": -1 }`), contains: []string{"Body"}},
 		{call: j("/wm/json/all-patterns", `{ "a": 1, "b": 2, "test": true }`)},
 		{call: j("/wm/json/strict", `{ "id": 1, "tags": ["b", "a"] }`)},
+		// 06 XML bodies
+		{want: "c006000101", call: post("/wm/xml/equal", "<claim type=\"motor\" id=\"1\">\n  <status>OPEN</status>\n</claim>", jsonCT, "application/xml")},
+		{want: "c006000102", call: post("/wm/xml/placeholders", "<claim><id>9</id><lodged>2026-11-01T09:30:00Z</lodged><amount>12.5</amount></claim>", jsonCT, "application/xml")},
+		{want: "c006000103", call: post("/wm/xml/custom-delimiters", "<claim><id>anything</id></claim>", jsonCT, "application/xml")},
+		{want: "c006000104", call: post("/wm/xml/exempted", "<b:claim xmlns:b=\"urn:claims\"><b:id>1</b:id></b:claim>", jsonCT, "application/xml")},
+		{want: "c006000105", call: post("/wm/xpath/item", "<items><item sku=\"A1\" qty=\"3\"/></items>", jsonCT, "application/xml")},
+		{want: "c006000106", call: post("/wm/xpath/value", "<claim><status>OPEN</status></claim>", jsonCT, "application/xml")},
+		{want: "c006000107", call: post("/wm/soap/claims", "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><k:GetClaim xmlns:k=\"urn:claims\"><k:ClaimId>42</k:ClaimId></k:GetClaim></s:Body></s:Envelope>", jsonCT, "text/xml", "SOAPAction", "urn:claims/GetClaim")},
 		// 07 text, binary and multipart bodies
 		{want: "c007000101", call: post("/wm/text/equal", "hello world")},
 		{want: "c007000102", call: post("/wm/text/equal-ci", "Hello World")},
@@ -275,10 +283,6 @@ func miscCases() []tc {
 // stored (the corpus loads in full) but never compiled into the serving snapshot.
 var wiremockUnsupported = map[string]string{
 	"c003000403": "scheme and port matching needs an HTTPS listener on 8443",
-	"c006000101": "XML body matchers are P3", "c006000102": "XML body matchers are P3",
-	"c006000103": "XML body matchers are P3", "c006000104": "XML body matchers are P3",
-	"c006000105": "XPath body matchers are P3", "c006000106": "XPath body matchers are P3",
-	"c006000107": "XPath body matchers are P3",
 	"c013000101": "proxies to an upstream on 8089; the acceptance suite covers proxying", "c013000103": "proxies to an upstream on 8089; the acceptance suite covers proxying",
 	"c013000104": "proxies to an upstream on 8089; the acceptance suite covers proxying", "c013000105": "proxies to a templated host; the acceptance suite covers proxying",
 }

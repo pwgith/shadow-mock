@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -13,9 +12,6 @@ import (
 
 	"github.com/pwgith/shadow-mock/internal/model"
 )
-
-// ErrNotImplemented marks matchers that are planned (DESIGN.md §15, P3) but not built yet.
-var ErrNotImplemented = errors.New("not implemented yet")
 
 // Content is a body (or other document, such as mapping metadata) to match.
 type Content struct {
@@ -80,8 +76,10 @@ func CompileContent(p model.ValuePattern, o Options) (ContentMatcher, error) {
 			return nil, fmt.Errorf("binaryEqualTo is not valid base64: %w", err)
 		}
 		return contentFunc(func(c Content) Result { return boolResult(bytes.Equal(c.Bytes, want)) }), nil
-	case has(p, "equalToXml"), has(p, "matchesXPath"):
-		return nil, fmt.Errorf("XML body matchers: %w", ErrNotImplemented)
+	case has(p, "equalToXml"):
+		return compileEqualToXML(p)
+	case has(p, "matchesXPath"):
+		return compileXPath(p, o)
 	}
 	sm, err := CompileString(p, o)
 	if err != nil {
