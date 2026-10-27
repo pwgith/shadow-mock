@@ -28,7 +28,7 @@ contract:
 	go test -count=1 ./test/contract/
 
 acceptance:
-	go test -race ./test/acceptance/... -args -godog.tags='~@wip && ~@perf'
+	go test -race -count=1 ./test/acceptance/...
 
 bench:
 	go test -run='^$$' -bench=. -benchmem ./internal/engine/... ./internal/match/... ./internal/detect/... ./internal/respond/...
@@ -36,4 +36,4 @@ bench:
 corpus:
 	node scripts/check-corpus.js
 
-ci: lint corpus cover-check acceptance
+ci: lint corpus cover-check

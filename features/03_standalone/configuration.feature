@@ -32,6 +32,8 @@ Feature: Configuration from file, environment and flags
     When Shadow Mock starts
     Then start-up fails with an error mentioning "ambiguity must be one of first, reject, global"
 
+  # Needs Docker and the image build (P4).
+  @wip
   Scenario: The engine runs from the Docker image with defaults
     When I run the Docker image "shadowmock:latest" with port 8080 published
     Then "GET /__health" returns 200

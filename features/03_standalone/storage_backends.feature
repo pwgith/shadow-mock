@@ -39,6 +39,8 @@ Feature: Pluggable storage backends in standalone mode
     When Shadow Mock restarts
     Then admin "GET" "/sessions/${S1.id}/mappings" lists 1 mappings
 
+  # Needs a counting store wrapper.
+  @wip
   Scenario: The request path does not touch the store
     Given Shadow Mock is running with a store that counts reads
     And the global mapping:
@@ -48,6 +50,8 @@ Feature: Pluggable storage backends in standalone mode
     When I send 1000 "GET" requests to "/hot"
     Then the store recorded 0 reads during those requests
 
+  # The blob store is not built yet (P4).
+  @wip
   Scenario: Blobs use a local directory in standalone mode
     Given Shadow Mock is running with configuration:
       """yaml

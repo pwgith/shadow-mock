@@ -19,6 +19,8 @@ Feature: Standalone mode
       """
     Then the created session has "createdBy" equal to "local" and tenant "local"
 
+  # Needs the audit log (P4).
+  @wip
   Scenario: The authorisation chain runs even though it always passes
     When I call admin "POST" "/mappings" with:
       """json

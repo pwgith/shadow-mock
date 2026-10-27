@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"bytes"
@@ -43,19 +43,19 @@ func startEngine(t *testing.T, edit func(*config.Config)) *testEngine {
 		edit(&cfg)
 	}
 	clk := clock.NewFake(time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC))
-	a, err := build(cfg, slog.New(slog.DiscardHandler), clk, func() {})
+	a, err := New(cfg, Options{Logger: slog.New(slog.DiscardHandler), Clock: clk, Shutdown: func() {}, Version: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := a.close(); err != nil {
+		if err := a.Close(); err != nil {
 			t.Error(err)
 		}
 	})
-	if err := a.start(t.Context()); err != nil {
+	if err := a.Start(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(a.mockRoute)
+	srv := httptest.NewServer(a.Handler())
 	t.Cleanup(srv.Close)
 	return &testEngine{t: t, base: srv.URL, root: root, clk: clk}
 }
@@ -209,6 +209,30 @@ func TestURLBasedShadowMock(t *testing.T) {
 	e.expect(e.do("GET", "/d/"+id+"/file", ""), 404, "unknown_url_based_mock")
 }
 
+func newApp(t *testing.T, cfg config.Config) *App {
+	t.Helper()
+	a, err := New(cfg, Options{Logger: slog.New(slog.DiscardHandler), Clock: clock.NewFake(time.Unix(0, 0)), Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := a.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	if err := a.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	return a
+}
+
+func serveOnce(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, http.NoBody))
+	return rec
+}
+
 func TestSeparateAdminListener(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
@@ -216,45 +240,57 @@ func TestSeparateAdminListener(t *testing.T) {
 	cfg.Storage.Global.Driver = "memory"
 	cfg.Listen.Admin = ":0"
 	cfg.Tenancy.Local.IPAllowlist = []string{"10.0.0.0/8"}
-	a, err := build(cfg, slog.New(slog.DiscardHandler), clock.NewFake(time.Unix(0, 0)), nil)
-	if err != nil {
-		t.Fatal(err)
+	a := newApp(t, cfg)
+	handlers := a.Handlers()
+	if len(handlers) != 2 {
+		t.Fatalf("handlers = %d, want 2", len(handlers))
 	}
-	if err := a.start(t.Context()); err != nil {
-		t.Fatal(err)
+	if rec := serveOnce(t, handlers[":0"], "/__admin/version"); rec.Code != 200 {
+		t.Errorf("admin listener /__admin/version = %d", rec.Code)
 	}
-	if len(a.handlers()) != 2 {
-		t.Fatalf("handlers = %d, want 2", len(a.handlers()))
+	if rec := serveOnce(t, a.Handler(), "/__admin/version"); rec.Code != 404 {
+		t.Errorf("mock listener served admin: %d", rec.Code)
 	}
-	adminRec := httptest.NewRecorder()
-	a.adminOnly.ServeHTTP(adminRec, httptest.NewRequestWithContext(t.Context(), "GET", "/__admin/version", http.NoBody))
-	if adminRec.Code != 200 {
-		t.Errorf("admin listener /__admin/version = %d", adminRec.Code)
-	}
-	mockRec := httptest.NewRecorder()
-	a.mockRoute.ServeHTTP(mockRec, httptest.NewRequestWithContext(t.Context(), "GET", "/__admin/version", http.NoBody))
-	if mockRec.Code != 404 {
-		t.Errorf("mock listener served admin: %d", mockRec.Code)
-	}
-	blocked := httptest.NewRecorder()
-	a.mockRoute.ServeHTTP(blocked, httptest.NewRequestWithContext(t.Context(), "GET", "/anything", http.NoBody))
+	blocked := serveOnce(t, a.Handler(), "/anything")
 	if blocked.Code != 403 || !strings.Contains(blocked.Body.String(), "ip_not_allowed") {
 		t.Errorf("allowlist: %d %s", blocked.Code, blocked.Body)
 	}
-	if _, err := build(config.Config{Tenancy: config.Tenancy{Local: config.Local{IPAllowlist: []string{"nope"}}}, Storage: config.Storage{Global: config.GlobalStorage{Driver: "memory"}}}, slog.New(slog.DiscardHandler), clock.Real{}, nil); err == nil {
+	bad := config.Default()
+	bad.Storage.Global.Driver = "memory"
+	bad.Tenancy.Local.IPAllowlist = []string{"nope"}
+	if _, err := New(bad, Options{Logger: slog.New(slog.DiscardHandler), Clock: clock.Real{}}); err == nil {
 		t.Error("an invalid allowlist should fail to build")
+	}
+	bad.Tenancy.Local.IPAllowlist = nil
+	bad.Mode = "other"
+	if _, err := New(bad, Options{Logger: slog.New(slog.DiscardHandler), Clock: clock.Real{}}); err == nil {
+		t.Error("an invalid configuration should fail to build")
 	}
 }
 
-func TestRunVersionFlag(t *testing.T) {
+func TestAdminPrefixAndPersistedSessions(t *testing.T) {
 	t.Parallel()
-	if err := run([]string{"-version"}); err != nil {
-		t.Errorf("run(-version) = %v", err)
-	}
-	if err := run([]string{"-nope"}); err == nil {
-		t.Error("an unknown flag should fail")
-	}
-	if err := run([]string{"-config", filepath.Join(t.TempDir(), "missing.yaml")}); err == nil {
-		t.Error("a missing config file should fail")
+	root := t.TempDir()
+	cfg := config.Default()
+	cfg.Root = root
+	cfg.AdminPrefix = "/__control"
+	cfg.Storage.Sessions.Driver = "fs"
+	first := newApp(t, cfg)
+	srv := httptest.NewServer(first.Handler())
+	t.Cleanup(srv.Close)
+	e := &testEngine{t: t, base: srv.URL, root: root}
+	e.expect(e.do("GET", "/__control/mappings", ""), 200, `"mappings"`)
+	e.expect(e.do("GET", "/__admin/mappings", ""), 404, "")
+	created := e.do("POST", "/__control/sessions/key-based", `{"mappings":[{"request":{"urlPath":"/p"},"response":{"body":"kept"}}]}`)
+	e.expect(created, 201, `"key"`)
+	key := field(t, created.body, "key")
+
+	second := newApp(t, cfg) // a restart over the same root
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/p", http.NoBody)
+	req.Header.Set("X-Shadow-Mock-Key", key)
+	second.Handler().ServeHTTP(rec, req)
+	if rec.Code != 200 || rec.Body.String() != "kept" {
+		t.Errorf("persisted session after restart: %d %q", rec.Code, rec.Body)
 	}
 }

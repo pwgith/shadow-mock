@@ -76,7 +76,7 @@ func valueOperators() []string {
 func CompileString(p model.ValuePattern, o Options) (StringMatcher, error) {
 	op, ok := operator(p, valueOperators())
 	if !ok {
-		return nil, fmt.Errorf("no recognised matcher in %s", keys(p))
+		return nil, fmt.Errorf("unknown matcher in %s", keys(p))
 	}
 	switch op {
 	case opAnd, opOr:

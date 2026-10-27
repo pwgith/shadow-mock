@@ -92,7 +92,7 @@ func (p *RequestPattern) Validate(ptr string) error {
 		}
 	}
 	if set > 1 {
-		return apierr.Invalid(ptr, "set at most one of url, urlPath, urlPattern, urlPathPattern and urlPathTemplate")
+		return apierr.Invalid(ptr, "only one of url, urlPath, urlPattern, urlPathPattern and urlPathTemplate may be set")
 	}
 	if len(p.PathParameters) > 0 && p.URLPathTemplate == nil {
 		return apierr.Invalid(ptr+"/pathParameters", "pathParameters need urlPathTemplate")

@@ -170,3 +170,25 @@ godog run --tags='@saas && ~@management-app' features/
 # Management app
 npx cucumber-js features/05_management_app --tags '@management-app'
 ```
+
+## Running the suite
+
+```bash
+make acceptance                                   # standalone engine, phases P0 to P2
+ACCEPTANCE_TAGS='@FR-7.4' go test ./test/acceptance/   # a subset, by any godog tag filter
+```
+
+`make test` (and so CI) also runs it, because the coverage targets count what the specs exercise.
+
+The harness in `test/acceptance` starts the engine in process for each scenario, with its own
+root directory and test clock, and drives it over HTTP. It runs what the engine implements:
+
+| Excluded | Why |
+|---|---|
+| `@saas`, `@multi-instance` | SaaS needs the Postgres, Redis and Clerk work in P5 |
+| `@P3`, `@P4`, `@P5` | Later phases (DESIGN.md §15) |
+| `@perf` | Runs in the benchmark pipeline |
+| `@wip` | Not runnable yet. The comment above each tag says what is missing: a TLS listener in the harness, the audit log, detection metrics, a counting store wrapper, the blob store, key redaction, the Docker image, a WireMock Java client, and a separate process to measure memory |
+
+Scenarios without a mode tag run once, as standalone. When a scenario's work is built, remove
+its `@wip` tag (and its comment) in the same pull request.

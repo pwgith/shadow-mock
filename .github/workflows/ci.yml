@@ -33,7 +33,5 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Unit tests with race detector and coverage targets
+      - name: Unit and acceptance tests with race detector and coverage targets
         run: make cover-check
-      - name: Acceptance specs (godog)
-        run: make acceptance

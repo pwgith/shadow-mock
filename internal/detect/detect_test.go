@@ -191,3 +191,36 @@ func detected(t *testing.T, ix *Index, r *match.Request) (Hit, bool) {
 	}
 	return h, found
 }
+
+func TestLazyRebuild(t *testing.T) {
+	t.Parallel()
+	var active []session.Session
+	rebuilds := 0
+	ix := New(DefaultConfig())
+	ix.SetSource(func() []session.Session { rebuilds++; return active })
+
+	for i := range 50 {
+		active = append(active, session.Session{
+			ID: "ses_" + string(rune('A'+i%26)) + string(rune('a'+i/26)), Kind: session.KeyBased, Tenant: tenant.Local,
+			Key: "smk_KEY" + string(rune('A'+i%26)) + string(rune('a'+i/26)) + "XXXXXXXXXXXXXXXXXX",
+		})
+		ix.Invalidate() // creating many sessions must not rebuild each time
+	}
+	if rebuilds != 0 {
+		t.Fatalf("rebuilt %d times before any lookup, want 0", rebuilds)
+	}
+	hdr := map[string]string{"X-Shadow-Mock-Key": active[7].Key}
+	if h, found := detected(t, ix, req(t, "GET", "/a", "", hdr)); !found || h.SessionID != active[7].ID {
+		t.Errorf("Detect = %+v, %v, want %s", h, found, active[7].ID)
+	}
+	detected(t, ix, req(t, "GET", "/a", "", hdr))
+	if rebuilds != 1 {
+		t.Errorf("rebuilt %d times for a batch of changes, want 1", rebuilds)
+	}
+
+	active = active[:7] // deleting a session is visible to the very next lookup
+	ix.Invalidate()
+	if _, found := detected(t, ix, req(t, "GET", "/a", "", hdr)); found {
+		t.Error("a deleted session was still detected")
+	}
+}

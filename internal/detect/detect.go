@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
@@ -98,9 +99,17 @@ type groupIndex struct {
 }
 
 // Index is the detector. Lookups read an immutable snapshot; Rebuild swaps in a new one.
+//
+// With a source set, session changes only mark the index stale (Invalidate) and the next
+// lookup rebuilds it once, so creating many sessions costs one rebuild, and no lookup ever
+// sees a stale index.
 type Index struct {
 	cfg    Config
 	groups atomic.Pointer[map[group]*groupIndex]
+
+	source func() []session.Session
+	dirty  atomic.Bool
+	mu     sync.Mutex // serialises rebuilds
 }
 
 // New returns an empty index.
@@ -109,6 +118,28 @@ func New(cfg Config) *Index {
 	empty := map[group]*groupIndex{}
 	ix.groups.Store(&empty)
 	return ix
+}
+
+// SetSource sets where Invalidate gets the active sessions from.
+func (ix *Index) SetSource(source func() []session.Session) {
+	ix.source = source
+	ix.dirty.Store(true)
+}
+
+// Invalidate marks the index stale; the next Detect rebuilds it from the source.
+func (ix *Index) Invalidate() { ix.dirty.Store(true) }
+
+// refresh rebuilds a stale index. The flag is cleared before the sessions are read, so a
+// change made meanwhile marks it stale again.
+func (ix *Index) refresh() {
+	if ix.source == nil || !ix.dirty.Load() {
+		return
+	}
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	if ix.dirty.Swap(false) {
+		ix.Rebuild(ix.source())
+	}
 }
 
 // Rebuild replaces the index with one built from the active key-based sessions. It is
@@ -147,6 +178,7 @@ func (ix *Index) Rebuild(sessions []session.Session) {
 // Detect finds the session for a request. parentID is the URL-based shadow mock the request
 // came through ("" for plain traffic), so only sessions nested in it are considered.
 func (ix *Index) Detect(t tenant.ID, parentID string, r *match.Request) (Hit, bool, error) {
+	ix.refresh()
 	gi := (*ix.groups.Load())[group{tenant: t, parent: parentID}]
 	if gi == nil {
 		return Hit{}, false, nil // fast negative: no active sessions to find (DESIGN.md §7.2)
@@ -161,7 +193,11 @@ func (ix *Index) Detect(t tenant.ID, parentID string, r *match.Request) (Hit, bo
 	}
 	if ix.cfg.ScanBody && ix.scannable(r) {
 		body, truncated := ix.bodyToScan(r)
-		return ix.scan(gi, StageScanBody, body, truncated)
+		h, found, err := ix.scan(gi, StageScanBody, body, truncated)
+		if !found && err == nil && truncated {
+			h.ScanTruncated = true // recorded in the journal even though nothing was found
+		}
+		return h, found, err
 	}
 	return Hit{}, false, nil
 }

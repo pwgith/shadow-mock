@@ -375,6 +375,14 @@ linters:
           - dupl
           - gochecknoglobals
           - forbidigo
+      # Step tables are long flat lists of closures, and assertion messages mix several values,
+      # so the complexity and error-wrapping rules do not fit the harness.
+      - path: test/acceptance/
+        linters:
+          - gocognit
+          - errorlint
+          - perfsprint
+          - gosec
       # Route tables register one endpoint per line and look alike by design.
       - path: internal/admin/routes\.go
         linters:

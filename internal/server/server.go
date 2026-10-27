@@ -24,10 +24,12 @@ type Router struct {
 	RequireOrgSegment bool
 	// LocalOrg is the org used when there is no org segment (standalone).
 	LocalOrg string
-	Admin    *admin.Handler
-	Service  *mock.Service
-	Stats    *stats.Tracker
-	ClientIP ClientIP
+	// AdminPrefix is where the admin API is served, /__admin by default (FR-6.4).
+	AdminPrefix string
+	Admin       *admin.Handler
+	Service     *mock.Service
+	Stats       *stats.Tracker
+	ClientIP    ClientIP
 	// ServeAdmin and ServeMock choose what this listener serves (NFR-5.2).
 	ServeAdmin bool
 	ServeMock  bool
@@ -60,8 +62,8 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		apierr.New(http.StatusNotFound, apierr.UnknownOrg, "No org has the handle in this URL.").Write(w)
 		return
 	}
-	isAdmin := rest == "/__admin" || strings.HasPrefix(rest, "/__admin/")
-	if rest == "/__admin/health" {
+	adminPath, isAdmin := rt.adminPath(rest)
+	if adminPath == "/__admin/health" {
 		rt.health(w, nil)
 		return
 	}
@@ -81,7 +83,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := tenant.With(r.Context(), org.ID)
 	if isAdmin {
 		r2 := r.Clone(admin.WithBasePath(ctx, prefix))
-		setPath(r2.URL, rest)
+		setPath(r2.URL, adminPath)
 		rt.Admin.ServeHTTP(w, r2)
 		return
 	}
@@ -173,4 +175,17 @@ func WriteMetrics(svc *mock.Service) func(w http.ResponseWriter) {
 		fmt.Fprintf(w, "# HELP shadowmock_active_sessions Active key-based and URL-based shadow mocks.\n")
 		fmt.Fprintf(w, "# TYPE shadowmock_active_sessions gauge\nshadowmock_active_sessions %d\n", sessions)
 	}
+}
+
+// adminPath maps a path under the configured admin prefix to the /__admin path the admin
+// API routes on.
+func (rt *Router) adminPath(rest string) (string, bool) {
+	prefix := rt.AdminPrefix
+	if prefix == "" {
+		prefix = "/__admin"
+	}
+	if rest != prefix && !strings.HasPrefix(rest, prefix+"/") {
+		return "", false
+	}
+	return "/__admin" + strings.TrimPrefix(rest, prefix), true
 }

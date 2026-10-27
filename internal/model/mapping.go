@@ -51,7 +51,10 @@ type stubFields struct {
 // 422 scenarios_not_supported; other problems return a WireMock-format validation error.
 func DecodeStubMapping(data []byte) (StubMapping, error) {
 	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil || raw == nil {
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return StubMapping{}, apierr.Invalid("", "the mapping is not a valid JSON object: %v", err)
+	}
+	if raw == nil {
 		return StubMapping{}, apierr.Invalid("", "the mapping must be a JSON object")
 	}
 	// WireMock's scenario fields are rejected rather than ignored (FR-4.4).

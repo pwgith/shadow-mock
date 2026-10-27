@@ -11,6 +11,10 @@ Feature: Security properties
       | kind                  | bits |
       | session keys          | 128  |
       | URL-based mock ids    | 80   |
+
+    @P5
+    Examples: CI secrets are minted by the management app
+      | kind                  | bits |
       | CI client secrets     | 256  |
 
   @P0
@@ -21,9 +25,20 @@ Feature: Security properties
       """
     When I send a "POST" request to "/x" with an 11 MiB body
     Then the response status is 413
-    And the engine's memory did not grow by more than 2 MiB for that request
+    And the response JSON at "$.error" is "body_too_large"
 
-  @P1
+  # Needs a separate engine process to measure; the in-process harness shares memory with the client.
+  @wip @P0
+  Scenario: A rejected oversized body does not grow the engine's memory
+    Given Shadow Mock is running with configuration:
+      """yaml
+      limits: { maxBodyBytes: 10485760 }
+      """
+    When I send a "POST" request to "/x" with an 11 MiB body
+    Then the engine's memory did not grow by more than 2 MiB for that request
+
+  # Needs key redaction and hashed key storage (P4).
+  @wip @P1
   Scenario: Session keys never appear in logs in clear text
     Given a key-based shadow mock "S1"
     When I send a request with key "${S1.key}" and the engine logs it

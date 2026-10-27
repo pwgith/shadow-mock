@@ -70,7 +70,8 @@ func (s *Service) CreateSession(ctx context.Context, t tenant.ID, kind session.K
 	if err := s.Layers.Rebuild(ctx, sc); err != nil {
 		return session.Session{}, err
 	}
-	s.Detector.Rebuild(s.Sessions.All())
+	s.Detector.Invalidate()
+	s.persist(ctx)
 	s.Logger.InfoContext(ctx, "session created", "session_id", sess.ID, "kind", string(kind), "tenant", string(t))
 	return sess, nil
 }
@@ -143,13 +144,18 @@ func (s *Service) UpdateSession(ctx context.Context, t tenant.ID, id string, p s
 	if err := s.Layers.Rebuild(ctx, sess.Scope()); err != nil {
 		return session.Session{}, err
 	}
-	s.Detector.Rebuild(s.Sessions.All())
+	s.Detector.Invalidate()
+	s.persist(ctx)
 	return sess, nil
 }
 
 // KeepAlive extends a session's TTL by its original duration.
 func (s *Service) KeepAlive(ctx context.Context, t tenant.ID, id string) (session.Session, error) {
-	return s.Sessions.KeepAlive(ctx, t, id)
+	sess, err := s.Sessions.KeepAlive(ctx, t, id)
+	if err == nil {
+		s.persist(ctx)
+	}
+	return sess, err
 }
 
 // DeleteSession deletes a session, any sessions nested in it, and everything they own.
@@ -170,9 +176,12 @@ func (s *Service) forget(ctx context.Context, scopes []store.Scope) error {
 			s.Mappings.DeleteAll(ctx, sc),
 			s.Files.DeleteAll(ctx, sc),
 			s.Counters.ForgetScope(ctx, sc))
+		// A session's journal is discarded with it (FR-7.2).
+		s.Journal.Remove(sc, nil)
 		s.Layers.Drop(sc)
 	}
-	s.Detector.Rebuild(s.Sessions.All())
+	s.Detector.Invalidate()
+	s.persist(ctx)
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("delete session data: %w", err)
 	}

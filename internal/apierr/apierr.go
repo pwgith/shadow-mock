@@ -85,7 +85,8 @@ type ValidationError struct {
 func Invalid(pointer, format string, a ...any) *ValidationError {
 	return &ValidationError{Errors: []WireMockError{{
 		Code:   10,
-		Title:  fmt.Sprintf(format, a...),
+		Title:  "Error parsing JSON",
+		Detail: fmt.Sprintf(format, a...),
 		Source: &WireMockSource{Pointer: pointer},
 	}}}
 }
@@ -96,9 +97,9 @@ func (v *ValidationError) Error() string {
 		return "invalid"
 	}
 	if v.Errors[0].Source != nil {
-		return v.Errors[0].Source.Pointer + ": " + v.Errors[0].Title
+		return v.Errors[0].Source.Pointer + ": " + v.Errors[0].Detail
 	}
-	return v.Errors[0].Title
+	return v.Errors[0].Detail
 }
 
 // Write renders the validation error.

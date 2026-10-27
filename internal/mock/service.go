@@ -35,8 +35,16 @@ type Config struct {
 	SaaS bool
 }
 
+// SessionSaver persists the session registry (storage.sessions.driver: fs).
+type SessionSaver interface {
+	SaveSessions(sessions []session.Session) error
+}
+
 // Service is the Shadow Mock service.
 type Service struct {
+	// SessionStore persists sessions after every change; nil keeps them in memory only.
+	SessionStore SessionSaver
+
 	Mappings store.SplitMappings
 	Files    store.FileRepository
 	Sessions *session.Registry
@@ -82,6 +90,29 @@ func (s *Service) Start(ctx context.Context, tenants []tenant.ID, changes <-chan
 			}
 		}
 	}()
+	return nil
+}
+
+// persist saves the registry if sessions are persisted. A failure is logged, not returned:
+// the change has already taken effect in memory.
+func (s *Service) persist(ctx context.Context) {
+	if s.SessionStore == nil {
+		return
+	}
+	if err := s.SessionStore.SaveSessions(s.Sessions.All()); err != nil {
+		s.Logger.ErrorContext(ctx, "persist sessions", "error", err.Error())
+	}
+}
+
+// RestoreSessions loads persisted sessions into the registry and builds their layers.
+func (s *Service) RestoreSessions(ctx context.Context, sessions []session.Session) error {
+	s.Sessions.Restore(sessions)
+	for _, sess := range s.Sessions.All() {
+		if err := s.Layers.Rebuild(ctx, sess.Scope()); err != nil {
+			return err
+		}
+	}
+	s.Detector.Invalidate()
 	return nil
 }
 

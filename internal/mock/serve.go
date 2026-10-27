@@ -19,6 +19,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/respond"
 	"github.com/pwgith/shadow-mock/internal/session"
 	"github.com/pwgith/shadow-mock/internal/stats"
+	"github.com/pwgith/shadow-mock/internal/store"
 	"github.com/pwgith/shadow-mock/internal/tenant"
 )
 
@@ -103,7 +104,7 @@ func (s *Service) trafficStack(_ context.Context, tr Traffic, req *match.Request
 		}
 	}
 	hit, found, err := s.Detector.Detect(tr.Tenant, tr.URLMockID, req)
-	if hit.Stage != "" {
+	if hit.Stage != "" || hit.ScanTruncated {
 		sv.entry.Detection = &journal.Detection{
 			Stage: string(hit.Stage), Offset: hit.Offset,
 			ScanTruncated: hit.ScanTruncated, Ambiguous: hit.Ambiguous,
@@ -113,7 +114,8 @@ func (s *Service) trafficStack(_ context.Context, tr Traffic, req *match.Request
 		return nil, apierr.New(detect.StatusFor(err), apierr.AmbiguousSession,
 			"The request matches several key-based shadow mocks: %s.", strings.Join(hit.Ambiguous, ", "))
 	}
-	if found {
+	// The index can lag a session that has just expired, so confirm the session is still active.
+	if _, active := s.Sessions.Get(tr.Tenant, hit.SessionID); found && active {
 		sessions = append(sessions, hit.SessionID)
 		sv.stage = string(hit.Stage)
 	}
@@ -147,7 +149,7 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return
 	}
 	if s.Config.MatchedHeader {
-		out.Header.Set("X-Shadow-Mock-Matched", stub.ID+";layer="+string(res.Layer.Kind))
+		out.Header.Set("X-Shadow-Mock-Matched", layerLabel(res.Layer.Scope)+";layer="+string(res.Layer.Kind))
 	}
 	sv.entry.Response = journal.Response{Status: out.Status, Header: out.Header.Clone(), Body: out.Body}
 	sv.entry.AddedDelay = out.Delay.Milliseconds()
@@ -162,7 +164,9 @@ func (s *Service) unmatched(w http.ResponseWriter, req *match.Request, stack eng
 	var b strings.Builder
 	b.WriteString("Request was not matched\n=======================\n\n")
 	fmt.Fprintf(&b, "Request: %s %s\n", req.Method, req.URL())
-	if len(near) > 0 {
+	if len(near) == 0 {
+		b.WriteString("\nNo mappings are defined.\n")
+	} else {
 		b.WriteString("\nClosest stubs:\n")
 		for _, nm := range near {
 			name := nm.Stub.Mapping.Name
@@ -170,6 +174,9 @@ func (s *Service) unmatched(w http.ResponseWriter, req *match.Request, stack eng
 				name = nm.Stub.ID()
 			}
 			fmt.Fprintf(&b, "  %s (%s layer, distance %.2f)\n", name, nm.Layer.Kind, nm.Distance)
+			for _, why := range nm.Stub.Matcher.Mismatches(req) {
+				fmt.Fprintf(&b, "    %s does not match\n", why)
+			}
 		}
 	}
 	body := []byte(b.String())
@@ -216,4 +223,12 @@ func (s *Service) render(ctx context.Context, res engine.Result, stack engine.St
 		def = res.Stub.Mapping.ResponseFor(n)
 	}
 	return s.Renderer.Render(ctx, def, fileScopes(stack))
+}
+
+// layerLabel names a layer in the X-Shadow-Mock-Matched header: its session id, or "global".
+func layerLabel(sc store.Scope) string {
+	if sc.IsGlobal() {
+		return "global"
+	}
+	return sc.SessionID
 }

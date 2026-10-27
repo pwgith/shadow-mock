@@ -105,7 +105,7 @@ type timingView struct {
 }
 
 type detectionView struct {
-	Stage               string   `json:"stage"`
+	Stage               string   `json:"stage,omitempty"`
 	Offset              int      `json:"offset"`
 	ScanTruncated       bool     `json:"scanTruncated,omitempty"`
 	AmbiguousSessionIDs []string `json:"ambiguousSessionIds,omitempty"`
@@ -166,7 +166,7 @@ func eventView(e *journal.Entry) serveEvent {
 		id := e.SessionID
 		v.ShadowMock.SessionID = &id
 	}
-	if d := e.Detection; d != nil && d.Stage != "" {
+	if d := e.Detection; d != nil && (d.Stage != "" || d.ScanTruncated) {
 		v.ShadowMock.Detection = &detectionView{Stage: d.Stage, Offset: d.Offset, ScanTruncated: d.ScanTruncated, AmbiguousSessionIDs: d.Ambiguous}
 	}
 	return v

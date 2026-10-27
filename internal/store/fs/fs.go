@@ -125,7 +125,7 @@ func (r *Mappings) readAll(ctx context.Context) ([]model.StubMapping, map[string
 	for _, name := range names {
 		ms, err := r.readFile(name)
 		if err != nil {
-			r.logger.WarnContext(ctx, "skipping mapping file", "file", name, "error", err.Error())
+			r.logger.ErrorContext(ctx, "skipping mapping file", "file", "mappings/"+name, "error", err.Error())
 			continue
 		}
 		for i, m := range ms {

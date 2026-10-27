@@ -151,6 +151,14 @@ func (m *RequestMatcher) PathParams(r *Request) map[string]string { return m.url
 // Match reports whether the request matches, stopping at the first failure.
 func (m *RequestMatcher) Match(r *Request) bool { return m.eval(r, false).Matched }
 
+// Mismatches evaluates every part of the pattern and names those that did not match, such as
+// "Header [Accept]", for the 404 diagnostic.
+func (m *RequestMatcher) Mismatches(r *Request) []string {
+	s := &scorer{full: true}
+	m.evalInto(r, s)
+	return s.mismatched
+}
+
 // Score evaluates every part of the pattern and returns the overall distance, for near misses.
 func (m *RequestMatcher) Score(r *Request) Result { return m.eval(r, true) }
 
@@ -160,12 +168,15 @@ type scorer struct {
 	total  float64
 	n      int
 	failed bool
+	// mismatched names the components that did not match, in evaluation order.
+	mismatched []string
 }
 
 // add records a component result and reports whether evaluation should continue.
-func (s *scorer) add(r Result) bool {
+func (s *scorer) add(label string, r Result) bool {
 	s.n++
 	if !r.Matched {
+		s.mismatched = append(s.mismatched, label)
 		s.failed = true
 		s.total += max(r.Distance, 0.01)
 	}
@@ -181,42 +192,47 @@ func (s *scorer) result() Result {
 
 func (m *RequestMatcher) eval(r *Request, full bool) Result {
 	s := &scorer{full: full}
-	if m.method != "" && !s.add(boolResult(r.Method == m.method)) {
-		return s.result()
+	m.evalInto(r, s)
+	return s.result()
+}
+
+// evalInto evaluates the pattern into s, stopping at the first mismatch unless s.full.
+func (m *RequestMatcher) evalInto(r *Request, s *scorer) {
+	if m.method != "" && !s.add("Method", boolResult(r.Method == m.method)) {
+		return
 	}
 	ur, params := m.url.match(r)
-	if !s.add(ur) {
-		return s.result()
+	if !s.add("URL", ur) {
+		return
 	}
-	if m.scheme != "" && !s.add(boolResult(r.Scheme == m.scheme)) {
-		return s.result()
+	if m.scheme != "" && !s.add("Scheme", boolResult(r.Scheme == m.scheme)) {
+		return
 	}
-	if m.port != 0 && !s.add(boolResult(r.Port == m.port)) {
-		return s.result()
+	if m.port != 0 && !s.add("Port", boolResult(r.Port == m.port)) {
+		return
 	}
-	if m.host != nil && !s.add(m.host.MatchString(r.Host, r.Host != "")) {
-		return s.result()
+	if m.host != nil && !s.add("Host", m.host.MatchString(r.Host, r.Host != "")) {
+		return
 	}
-	if !m.evalParams(r, s, params) || !m.evalHeaders(r, s) || !m.evalBody(r, s) {
-		return s.result()
+	if m.evalParams(r, s, params) && m.evalHeaders(r, s) {
+		m.evalBody(r, s)
 	}
-	return s.result()
 }
 
 func (m *RequestMatcher) evalParams(r *Request, s *scorer, params map[string]string) bool {
 	for _, p := range m.pathParams {
 		v, ok := params[p.name]
-		if !s.add(p.m.MatchString(v, ok)) {
+		if !s.add("Path parameter ["+p.name+"]", p.m.MatchString(v, ok)) {
 			return false
 		}
 	}
 	for _, q := range m.query {
-		if !s.add(q.m.MatchValues(r.Query[q.name])) {
+		if !s.add("Query parameter ["+q.name+"]", q.m.MatchValues(r.Query[q.name])) {
 			return false
 		}
 	}
 	for _, f := range m.form {
-		if !s.add(f.m.MatchValues(r.Form()[f.name])) {
+		if !s.add("Form parameter ["+f.name+"]", f.m.MatchValues(r.Form()[f.name])) {
 			return false
 		}
 	}
@@ -225,7 +241,7 @@ func (m *RequestMatcher) evalParams(r *Request, s *scorer, params map[string]str
 
 func (m *RequestMatcher) evalHeaders(r *Request, s *scorer) bool {
 	for _, h := range m.headers {
-		if !s.add(h.m.MatchValues(r.Header.Values(h.name))) {
+		if !s.add("Header ["+h.name+"]", h.m.MatchValues(r.Header.Values(h.name))) {
 			return false
 		}
 	}
@@ -235,11 +251,11 @@ func (m *RequestMatcher) evalHeaders(r *Request, s *scorer) bool {
 		if ok {
 			v = vs[0]
 		}
-		if !s.add(c.m.MatchString(v, ok)) {
+		if !s.add("Cookie ["+c.name+"]", c.m.MatchString(v, ok)) {
 			return false
 		}
 	}
-	if m.basicAuth != "" && !s.add(boolResult(r.Header.Get("Authorization") == m.basicAuth)) {
+	if m.basicAuth != "" && !s.add("Basic auth", boolResult(r.Header.Get("Authorization") == m.basicAuth)) {
 		return false
 	}
 	return true
@@ -249,7 +265,7 @@ func (m *RequestMatcher) evalBody(r *Request, s *scorer) bool {
 	if len(m.bodies) > 0 {
 		c := Content{Bytes: r.Body, JSON: r.JSON}
 		for _, b := range m.bodies {
-			if !s.add(b.MatchContent(c)) {
+			if !s.add("Body", b.MatchContent(c)) {
 				return false
 			}
 		}
@@ -257,7 +273,7 @@ func (m *RequestMatcher) evalBody(r *Request, s *scorer) bool {
 	if len(m.multipart) > 0 {
 		parts := r.parts()
 		for _, mp := range m.multipart {
-			if !s.add(mp.match(parts)) {
+			if !s.add("Multipart body", mp.match(parts)) {
 				return false
 			}
 		}

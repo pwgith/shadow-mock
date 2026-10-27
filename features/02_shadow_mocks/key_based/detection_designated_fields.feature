@@ -70,6 +70,8 @@ Feature: Session detection through designated header, query parameter and cookie
     When I send a "GET" request to "/c?tsid=${S9.key}"
     Then the response body is "configured"
 
+  # Needs the detection metrics (P4).
+  @wip
   Scenario: Detection is skipped entirely when there are no active sessions
     Given I call admin "DELETE" "/sessions/${S1.id}"
     And there are no active sessions

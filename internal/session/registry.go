@@ -31,6 +31,23 @@ func NewRegistry(c clock.Clock, l Limits) *Registry {
 	return &Registry{clock: c, limits: l, sessions: map[tenant.ID]map[string]*Session{}}
 }
 
+// Restore adds sessions loaded from a store at start-up. Expired ones are skipped.
+func (r *Registry) Restore(sessions []Session) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	now := r.clock.Now()
+	for i := range sessions {
+		s := sessions[i].clone()
+		if s.Expired(now) {
+			continue
+		}
+		if r.sessions[s.Tenant] == nil {
+			r.sessions[s.Tenant] = map[string]*Session{}
+		}
+		r.sessions[s.Tenant][s.ID] = &s
+	}
+}
+
 // Limits returns the registry's rules.
 func (r *Registry) Limits() Limits { return r.limits }
 

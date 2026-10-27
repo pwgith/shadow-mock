@@ -9,9 +9,9 @@ import (
 
 // CallResponse is one callResponses rule as written: exactly one of Calls or Every.
 type CallResponse struct {
-	Calls    string             `json:"calls,omitempty"`
-	Every    int64              `json:"every,omitempty"`
-	Response ResponseDefinition `json:"response"`
+	Calls    string              `json:"calls,omitempty"`
+	Every    int64               `json:"every,omitempty"`
+	Response *ResponseDefinition `json:"response"`
 }
 
 // CallRule is a parsed callResponses rule (DESIGN.md §6.3).
@@ -38,6 +38,9 @@ func compileCallRules(in []CallResponse) ([]CallRule, error) {
 	out := make([]CallRule, 0, len(in))
 	for i := range in {
 		ptr := pointerJoin("/callResponses", strconv.Itoa(i))
+		if in[i].Response == nil {
+			return nil, apierr.Invalid(ptr, "response is required")
+		}
 		rule, err := compileCallRule(ptr, &in[i])
 		if err != nil {
 			return nil, err
@@ -58,13 +61,13 @@ func compileCallRule(ptr string, c *CallResponse) (CallRule, error) {
 		if c.Every < 2 {
 			return CallRule{}, apierr.Invalid(ptr+"/every", "every must be 2 or more")
 		}
-		return CallRule{Every: c.Every, Response: c.Response}, nil
+		return CallRule{Every: c.Every, Response: *c.Response}, nil
 	case c.Calls != "":
 		from, to, err := parseCalls(c.Calls)
 		if err != nil {
 			return CallRule{}, apierr.Invalid(ptr+"/calls", "%s", err.Error())
 		}
-		return CallRule{From: from, To: to, Response: c.Response}, nil
+		return CallRule{From: from, To: to, Response: *c.Response}, nil
 	default:
 		return CallRule{}, apierr.Invalid(ptr, "set exactly one of calls and every")
 	}
