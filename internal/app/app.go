@@ -18,6 +18,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/config"
 	"github.com/pwgith/shadow-mock/internal/counter"
 	"github.com/pwgith/shadow-mock/internal/detect"
+	"github.com/pwgith/shadow-mock/internal/egress"
 	"github.com/pwgith/shadow-mock/internal/engine"
 	"github.com/pwgith/shadow-mock/internal/journal"
 	"github.com/pwgith/shadow-mock/internal/match"
@@ -30,6 +31,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/store/fs"
 	"github.com/pwgith/shadow-mock/internal/store/memory"
 	"github.com/pwgith/shadow-mock/internal/tenant"
+	"github.com/pwgith/shadow-mock/internal/webhook"
 )
 
 // Options are the process-level dependencies of the engine.
@@ -99,6 +101,10 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Ambiguity: detect.Policy(d.Ambiguity),
 	})
 	detector.SetSource(registry.All)
+	renderer := respond.NewRenderer(files, o.Clock, cfg.Respond.Gzip != "off")
+	renderer.Templating = cfg.Templating.Global
+	hooks := webhook.New(egress.New(egress.Options{BlockPrivate: cfg.Egress.BlockPrivate}), renderer.Templates, o.Clock, o.Logger)
+	a.closers = append(a.closers, func() error { hooks.Close(); return nil })
 	svc := &mock.Service{
 		Mappings: mappings,
 		Files:    files,
@@ -107,7 +113,8 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Detector: detector,
 		Counters: counter.NewMemory(),
 		Journal:  journal.NewMemory(cfg.Storage.Journal.Hot.MaxEntries),
-		Renderer: respond.NewRenderer(files, o.Clock, cfg.Respond.Gzip != "off"),
+		Renderer: renderer,
+		Webhooks: hooks,
 		Stats:    stats.New(),
 		Clock:    o.Clock,
 		Logger:   o.Logger,

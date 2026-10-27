@@ -5,6 +5,7 @@ Feature: Proxying to a real upstream
     Given Shadow Mock is running
     And the upstream stub server "payments" returns 200 with body "real" for "GET /payments/1"
 
+  @p3-proxy
   Scenario: proxyBaseUrl forwards the request and returns the upstream response
     Given the global mapping:
       """json
@@ -14,6 +15,7 @@ Feature: Proxying to a real upstream
     Then the response body is "real"
     And the upstream "payments" received "GET /payments/1"
 
+  @p3-proxy
   Scenario: Adding and removing request headers on the way through
     Given the global mapping:
       """json
@@ -28,6 +30,7 @@ Feature: Proxying to a real upstream
     Then the upstream "payments" received header "X-Proxied-By" with value "shadow-mock"
     And the upstream "payments" did not receive header "X-Secret"
 
+  @p3-proxy
   Scenario: proxyUrlPrefixToRemove strips a prefix before forwarding
     Given the global mapping:
       """json
@@ -37,6 +40,7 @@ Feature: Proxying to a real upstream
     When I send a "GET" request to "/api/payments/1"
     Then the upstream "payments" received "GET /payments/1"
 
+  @p3-proxy
   Scenario: Partial mocking: specific stubs win, everything else is proxied
     Given the global mapping:
       """json

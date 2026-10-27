@@ -4,6 +4,7 @@ Feature: XML body matching
   Background:
     Given Shadow Mock is running
 
+  @p3-matchers
   Scenario Outline: equalToXml ignores formatting but not content
     Given the global mapping:
       """json
@@ -22,6 +23,7 @@ Feature: XML body matching
       | <claim>  <id>1</id>  <status>OPEN</status>  </claim>      | 200    |
       | <claim><id>1</id><status>CLOSED</status></claim>          | 404    |
 
+  @p3-matchers
   Scenario: equalToXml with placeholders
     Given the global mapping:
       """json
@@ -35,6 +37,7 @@ Feature: XML body matching
       """
     Then the response status is 200
 
+  @p3-matchers
   Scenario Outline: matchesXPath with and without sub-matchers
     Given the global mapping:
       """json
@@ -53,6 +56,7 @@ Feature: XML body matching
       | { "matchesXPath": "//item[@sku='A1']" }                                        | 200    |
       | { "matchesXPath": { "expression": "/claim/id/text()", "equalTo": "42" } }      | 200    |
 
+  @p3-matchers
   Scenario: matchesXPath with namespaces
     Given the global mapping:
       """json

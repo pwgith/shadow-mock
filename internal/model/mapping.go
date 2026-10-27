@@ -29,6 +29,11 @@ type StubMapping struct {
 	Response      ResponseDefinition
 	CallResponses []CallRule
 	Metadata      map[string]any
+	// Webhooks are the calls made after the response is served (FR-6.2).
+	Webhooks []Webhook
+	// UsesCallNumber is set when a template reads request.callNumber, so the call counter
+	// runs even for a mapping without callResponses (FR-4.3).
+	UsesCallNumber bool
 
 	// raw is the mapping as received, with the id fields kept in step with ID.
 	raw map[string]json.RawMessage
@@ -84,16 +89,22 @@ func DecodeStubMapping(data []byte) (StubMapping, error) {
 	if err != nil {
 		return StubMapping{}, err
 	}
+	hooks, err := decodeWebhooks(raw)
+	if err != nil {
+		return StubMapping{}, err
+	}
 	m := StubMapping{
-		ID:            f.ID,
-		Name:          f.Name,
-		Priority:      DefaultPriority,
-		Persistent:    f.Persistent,
-		Request:       *f.Request,
-		Response:      *f.Response,
-		CallResponses: rules,
-		Metadata:      f.Metadata,
-		raw:           raw,
+		ID:             f.ID,
+		Name:           f.Name,
+		Priority:       DefaultPriority,
+		Persistent:     f.Persistent,
+		Request:        *f.Request,
+		Response:       *f.Response,
+		CallResponses:  rules,
+		Metadata:       f.Metadata,
+		Webhooks:       hooks,
+		UsesCallNumber: bytes.Contains(raw["response"], []byte("callNumber")) || bytes.Contains(raw["callResponses"], []byte("callNumber")),
+		raw:            raw,
 	}
 	if m.ID == "" {
 		m.ID = f.UUID

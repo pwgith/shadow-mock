@@ -215,11 +215,12 @@ func responseCases() []tc {
 		{want: "c009000203", call: get("/wm/files/terms")},
 		{want: "c009000204", call: get("/wm/files/export.csv")},
 		{want: "c009000205", call: get("/wm/files/missing"), status: 500}, // the file does not exist
-		// 10 templating: matched and answered with the right status; rendering is P3
+		// 10 templating: matched and answered with the right status; the unit and acceptance tests check the rendered text
 		{want: "c010000101", call: get("/wm/template/echo/a/b?status=OPEN")},
 		{want: "c010000102", call: get("/wm/template/customers/1/orders/2")},
 		{want: "c010000103", call: post("/wm/template/raw", "raw")},
 		{want: "c010000104", call: get("/wm/template/parameters")},
+		{want: "c010000105", call: get("/wm/template/claims/42")},
 		{want: "c010000106", call: post("/wm/template/orders", `{ "customer": "Ada" }`, jsonCT, appJS)},
 		{want: "c010000107", call: get("/wm/template/literal")}, // not templated: served as written
 		{want: "c010000201", call: get("/wm/template/dates")},
@@ -278,7 +279,6 @@ var wiremockUnsupported = map[string]string{
 	"c006000103": "XML body matchers are P3", "c006000104": "XML body matchers are P3",
 	"c006000105": "XPath body matchers are P3", "c006000106": "XPath body matchers are P3",
 	"c006000107": "XPath body matchers are P3",
-	"c010000105": "a templated bodyFileName is rendered in P3",
 	"c013000101": "proxying is P3", "c013000103": "proxying is P3",
 	"c013000104": "proxying is P3", "c013000105": "proxying is P3",
 }

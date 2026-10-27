@@ -11,6 +11,7 @@ Feature: Snapshot recording from the journal
       """
     And I send a "GET" request to "/claims/2"
 
+  @p3-proxy
   Scenario: Snapshot creates mappings from proxied traffic
     When I call admin "POST" "/recordings/snapshot" with:
       """json

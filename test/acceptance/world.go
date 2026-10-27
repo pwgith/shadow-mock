@@ -124,6 +124,9 @@ type world struct {
 	history []*reply
 
 	// state for individual steps
+	receivers      map[string]*receiver
+	sessionNumbers map[string][]int
+
 	createdSession map[string]any
 	marks          map[string]time.Time
 	sessionCounts  map[string]int
@@ -203,6 +206,7 @@ func (w *world) stop() error {
 
 // close ends the scenario and removes its files.
 func (w *world) close() error {
+	w.closeReceivers()
 	err := w.stop()
 	return errors.Join(err, os.RemoveAll(w.root))
 }

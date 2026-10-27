@@ -1,5 +1,5 @@
 // Package respond renders response definitions: body sources, headers, delays, gzip and
-// faults (DESIGN.md §9, FR-3.1–FR-3.5a). Templating and proxying arrive in P3.
+// faults, and templating (DESIGN.md §9, FR-3.1–FR-3.5a, FR-3.4). Proxying arrives in P3.
 package respond
 
 import (
@@ -16,6 +16,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/clock"
 	"github.com/pwgith/shadow-mock/internal/model"
+	"github.com/pwgith/shadow-mock/internal/respond/template"
 	"github.com/pwgith/shadow-mock/internal/store"
 )
 
@@ -33,6 +34,10 @@ type Renderer struct {
 	Clock clock.Clock
 	// Gzip enables compression for clients that accept it (WireMock's default).
 	Gzip bool
+	// Templating renders every response as a template, not only those that ask for it.
+	Templating bool
+	// Templates renders response text; NewRenderer sets it.
+	Templates *template.Engine
 
 	mu       sync.RWMutex
 	settings Settings
@@ -40,7 +45,7 @@ type Renderer struct {
 
 // NewRenderer returns a renderer.
 func NewRenderer(files store.FileRepository, c clock.Clock, gzip bool) *Renderer {
-	return &Renderer{Files: files, Clock: c, Gzip: gzip}
+	return &Renderer{Files: files, Clock: c, Gzip: gzip, Templates: template.New(c)}
 }
 
 // Settings returns the global settings.
@@ -74,9 +79,13 @@ var ErrProxyNotImplemented = errors.New("proxying is not implemented yet")
 
 // Render builds the response for def. files lists the scopes to look up bodyFileName in,
 // most specific first, so a session's files override global ones.
-func (r *Renderer) Render(ctx context.Context, def *model.ResponseDefinition, files []store.Scope) (*Response, error) {
+func (r *Renderer) Render(ctx context.Context, def *model.ResponseDefinition, files []store.Scope, in *Input) (*Response, error) {
 	if def.ProxyBaseURL != "" {
 		return nil, apierr.New(http.StatusNotImplemented, apierr.NotSupported, "%v (proxyBaseUrl %s).", ErrProxyNotImplemented, def.ProxyBaseURL)
+	}
+	var data map[string]any
+	if r.templated(def, in) {
+		data = Data(in, def.TransformerParameters)
 	}
 	out := &Response{
 		Status:       def.StatusOrDefault(),
@@ -91,7 +100,12 @@ func (r *Renderer) Render(ctx context.Context, def *model.ResponseDefinition, fi
 			out.Header.Add(k, v)
 		}
 	}
-	body, err := r.body(ctx, def, files)
+	if data != nil {
+		if err := r.renderHeaders(out.Header, data); err != nil {
+			return nil, templateError(err)
+		}
+	}
+	body, err := r.body(ctx, def, files, data)
 	if err != nil {
 		return nil, err
 	}
@@ -102,12 +116,23 @@ func (r *Renderer) Render(ctx context.Context, def *model.ResponseDefinition, fi
 	return out, nil
 }
 
-func (r *Renderer) body(ctx context.Context, def *model.ResponseDefinition, files []store.Scope) ([]byte, error) {
+// body builds the response body. A non-nil data means the text is rendered as a template.
+func (r *Renderer) body(ctx context.Context, def *model.ResponseDefinition, files []store.Scope, data map[string]any) ([]byte, error) {
+	render := func(s string) ([]byte, error) {
+		if data == nil {
+			return []byte(s), nil
+		}
+		out, err := r.Templates.Render(s, data)
+		if err != nil {
+			return nil, templateError(err)
+		}
+		return []byte(out), nil
+	}
 	switch {
 	case def.Body != nil:
-		return []byte(*def.Body), nil
+		return render(*def.Body)
 	case len(def.JSONBody) > 0:
-		return def.JSONBody, nil
+		return render(string(def.JSONBody))
 	case def.Base64Body != "":
 		b, err := base64.StdEncoding.DecodeString(def.Base64Body)
 		if err != nil {
@@ -115,19 +140,41 @@ func (r *Renderer) body(ctx context.Context, def *model.ResponseDefinition, file
 		}
 		return b, nil
 	case def.BodyFileName != "":
-		for _, s := range files {
-			b, err := r.Files.Read(ctx, s, def.BodyFileName)
-			if err == nil {
-				return b, nil
+		name := def.BodyFileName
+		if data != nil {
+			n, err := r.Templates.Render(name, data)
+			if err != nil {
+				return nil, templateError(err)
 			}
-			if !errors.Is(err, store.ErrNotFound) {
-				return nil, fmt.Errorf("read body file %s: %w", def.BodyFileName, err)
-			}
+			name = n
 		}
-		return nil, apierr.New(http.StatusInternalServerError, apierr.NotFound, "Body file %s was not found.", def.BodyFileName)
+		b, err := r.readFile(ctx, files, name)
+		if err != nil {
+			return nil, err
+		}
+		return render(string(b))
 	default:
 		return nil, nil
 	}
+}
+
+// readFile reads a body file from the first scope that has it.
+func (r *Renderer) readFile(ctx context.Context, files []store.Scope, name string) ([]byte, error) {
+	for _, s := range files {
+		b, err := r.Files.Read(ctx, s, name)
+		if err == nil {
+			return b, nil
+		}
+		if !errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("read body file %s: %w", name, err)
+		}
+	}
+	return nil, apierr.New(http.StatusInternalServerError, apierr.NotFound, "Body file %s was not found.", name)
+}
+
+// templateError reports a template that does not parse or render as a 500.
+func templateError(err error) error {
+	return apierr.New(http.StatusInternalServerError, "template_error", "The response template failed: %v.", err)
 }
 
 // delay combines the response's own delays with the global settings (FR-3.2).
@@ -140,6 +187,11 @@ func (r *Renderer) delay(def *model.ResponseDefinition) time.Duration {
 		ms += sample(s.DelayDistribution)
 	}
 	return time.Duration(ms) * time.Millisecond
+}
+
+// SampleDelay draws a delay from a distribution.
+func SampleDelay(d *model.DelayDistribution) time.Duration {
+	return time.Duration(sample(d)) * time.Millisecond
 }
 
 // sample draws a delay in milliseconds. math/rand is fine here: delays are not secrets.

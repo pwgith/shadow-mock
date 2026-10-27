@@ -134,17 +134,21 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 	stub := &res.Stub.Mapping
 	def := &stub.Response
 	sv.entry.Stub, sv.entry.StubScope, sv.entry.Layer = stub, res.Stub.Scope, string(res.Layer.Kind)
-	if stub.HasCallResponses() {
+	var callNumber int64
+	if stub.HasCallResponses() || stub.UsesCallNumber {
 		n, err := s.Counters.Next(ctx, counter.Key{RequestScope: stack.RequestScope(), StubScope: res.Stub.Scope, StubID: stub.ID}, s.Clock.Now().UTC())
 		if err != nil {
 			s.fail(w, sv, req, fmt.Errorf("call counter: %w", err))
 			return
 		}
-		sv.entry.CallNumber = n
-		def = stub.ResponseFor(n)
+		sv.entry.CallNumber, callNumber = n, n
+		if stub.HasCallResponses() {
+			def = stub.ResponseFor(n)
+		}
 	}
 	sv.entry.Definition = def
-	out, err := s.Renderer.Render(ctx, def, fileScopes(stack))
+	in := &respond.Input{Request: req, PathParams: res.Stub.Matcher.PathParams(req), CallNumber: callNumber}
+	out, err := s.Renderer.Render(ctx, def, fileScopes(stack), in)
 	if err != nil {
 		s.fail(w, sv, req, err)
 		return
@@ -156,6 +160,9 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 	sv.entry.AddedDelay = out.Delay.Milliseconds()
 	if err := s.Renderer.Write(ctx, w, r, out, func() { s.finish(sv) }); err != nil {
 		s.Logger.DebugContext(ctx, "response not completed", "error", err.Error())
+	}
+	if s.Webhooks != nil {
+		s.Webhooks.Fire(stub.Webhooks, in, def.TransformerParameters, out)
 	}
 }
 
@@ -226,12 +233,13 @@ func (s *Service) finish(sv *served) {
 }
 
 // Render exposes rendering for dry runs.
-func (s *Service) render(ctx context.Context, res engine.Result, stack engine.Stack, n int64) (*respond.Response, error) {
+func (s *Service) render(ctx context.Context, res engine.Result, stack engine.Stack, req *match.Request, n int64) (*respond.Response, error) {
 	def := &res.Stub.Mapping.Response
 	if res.Stub.Mapping.HasCallResponses() {
 		def = res.Stub.Mapping.ResponseFor(n)
 	}
-	return s.Renderer.Render(ctx, def, fileScopes(stack))
+	in := &respond.Input{Request: req, PathParams: res.Stub.Matcher.PathParams(req), CallNumber: n}
+	return s.Renderer.Render(ctx, def, fileScopes(stack), in)
 }
 
 // layerLabel names a layer in the X-Shadow-Mock-Matched header: its session id, or "global".

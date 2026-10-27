@@ -21,6 +21,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/stats"
 	"github.com/pwgith/shadow-mock/internal/store"
 	"github.com/pwgith/shadow-mock/internal/tenant"
+	"github.com/pwgith/shadow-mock/internal/webhook"
 )
 
 // Config holds the service options that are not owned by a component.
@@ -53,6 +54,8 @@ type Service struct {
 	Counters counter.Counters
 	Journal  *journal.Memory
 	Renderer *respond.Renderer
+	// Webhooks sends the calls mappings make after serving; nil disables them.
+	Webhooks *webhook.Dispatcher
 	Stats    *stats.Tracker
 	Clock    clock.Clock
 	Logger   *slog.Logger
