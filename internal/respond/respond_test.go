@@ -56,9 +56,9 @@ func TestRenderBodies(t *testing.T) {
 	}{
 		{"nothing defined is an empty 200", `{}`, 200, "", nil},
 		{"a text body", `{"status":201,"body":"hello"}`, 201, "hello", nil},
-		{"jsonBody gets a JSON content type", `{"jsonBody":{"a":1}}`, 200, `{"a":1}`, map[string][]string{"Content-Type": {"application/json"}}},
+		{"jsonBody sets no content type, as in WireMock", `{"jsonBody":{"a":1}}`, 200, `{"a":1}`, nil},
 		{
-			"an explicit content type wins over the default", `{"jsonBody":{"a":1},"headers":{"Content-Type":"application/vnd.api+json"}}`, 200, `{"a":1}`,
+			"a content type given in the stub is sent as written", `{"jsonBody":{"a":1},"headers":{"Content-Type":"application/vnd.api+json"}}`, 200, `{"a":1}`,
 			map[string][]string{"Content-Type": {"application/vnd.api+json"}},
 		},
 		{"base64Body is decoded", `{"base64Body":"aGVsbG8="}`, 200, "hello", nil},
@@ -418,4 +418,42 @@ func cancelledContext(t *testing.T) (ctx context.Context, cancel context.CancelF
 	ctx, cancel = context.WithCancel(t.Context())
 	cancel()
 	return ctx, cancel
+}
+
+// A stub that gives no Content-Type gets none, as in WireMock. Go would otherwise guess one from
+// the body, and a client that checks the header would see a difference.
+func TestWriteDoesNotGuessAContentType(t *testing.T) {
+	t.Parallel()
+	r, _, _ := newRenderer(t, false)
+	for _, tt := range []struct {
+		name, body string
+		header     http.Header
+		want       string
+	}{
+		{"a text body", "hello", nil, ""},
+		{"a JSON body", `{"a":1}`, nil, ""},
+		{"an HTML-looking body", "<html><body>hi</body></html>", nil, ""},
+		{"an empty body", "", nil, ""},
+		{"a Content-Type in the stub is sent as written", "hello", http.Header{"Content-Type": {"text/csv"}}, "text/csv"},
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			resp := &respond.Response{Status: 200, Body: []byte(tt.body), Header: tt.header}
+			if err := r.Write(req.Context(), w, req, resp, nil); err != nil {
+				t.Error(err)
+			}
+		}))
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, http.NoBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		srv.Close()
+		if got := res.Header.Get("Content-Type"); got != tt.want {
+			t.Errorf("%s: Content-Type = %q, want %q", tt.name, got, tt.want)
+		}
+	}
 }

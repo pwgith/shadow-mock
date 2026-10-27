@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Starts real WireMock servers to compare Shadow Mock against.
+#
+#   scripts/wiremock-reference.sh start   downloads WireMock (once), then starts two servers:
+#                                           :18080  root = a copy of corpus/wiremock
+#                                           :18081  no stubs, for the client suite
+#   scripts/wiremock-reference.sh stop    stops them
+#
+# Then, from the repository root:
+#
+#   SHADOWMOCK_WIREMOCK_URL=http://localhost:18080 go test ./test/conformance -run TestDifferentialAgainstRealWireMock
+#   BASE_URL=http://localhost:18081 node --test test/client/compat.test.mjs
+#
+# Needs Java 11 or later and curl. The jar is checked against the SHA-1 Maven Central publishes
+# and is kept outside the repository (WIREMOCK_HOME, default a temp directory).
+set -euo pipefail
+
+VERSION="${WIREMOCK_VERSION:-3.13.2}"
+SHA1="${WIREMOCK_SHA1:-8bfbad28c85f7b4927694491f2c8030c898c72a9}" # of wiremock-standalone 3.13.2
+HOME_DIR="${WIREMOCK_HOME:-${TMPDIR:-/tmp}/shadowmock-wiremock}"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+JAR="$HOME_DIR/wiremock-standalone-$VERSION.jar"
+URL="https://repo1.maven.org/maven2/org/wiremock/wiremock-standalone/$VERSION/wiremock-standalone-$VERSION.jar"
+
+sha1_of() { if command -v sha1sum >/dev/null; then sha1sum "$1" | cut -d' ' -f1; else shasum -a 1 "$1" | cut -d' ' -f1; fi; }
+
+fetch() {
+  mkdir -p "$HOME_DIR"
+  if [[ -f "$JAR" && "$(sha1_of "$JAR")" == "$SHA1" ]]; then return; fi
+  echo "downloading WireMock $VERSION"
+  curl -fsSL -o "$JAR" "$URL"
+  if [[ "$(sha1_of "$JAR")" != "$SHA1" ]]; then
+    echo "the downloaded jar does not match the expected SHA-1; refusing to run it" >&2
+    rm -f "$JAR"
+    exit 1
+  fi
+}
+
+launch() { # name port root
+  local name="$1" port="$2" root="$3"
+  java -jar "$JAR" --port "$port" --root-dir "$root" >"$HOME_DIR/$name.log" 2>&1 &
+  echo $! >"$HOME_DIR/$name.pid"
+  for _ in $(seq 1 60); do
+    if curl -fs "http://localhost:$port/__admin/version" >/dev/null 2>&1; then
+      echo "$name is up on :$port (WireMock $VERSION)"
+      return
+    fi
+    sleep 1
+  done
+  echo "$name did not start; its log:" >&2
+  cat "$HOME_DIR/$name.log" >&2
+  exit 1
+}
+
+start() {
+  fetch
+  stop
+  rm -rf "$HOME_DIR/corpus-root" "$HOME_DIR/empty-root"
+  cp -r "$REPO/corpus/wiremock" "$HOME_DIR/corpus-root"
+  mkdir -p "$HOME_DIR/empty-root"
+  launch corpus 18080 "$HOME_DIR/corpus-root"
+  launch empty 18081 "$HOME_DIR/empty-root"
+}
+
+stop() {
+  local f
+  for f in "$HOME_DIR"/corpus.pid "$HOME_DIR"/empty.pid; do
+    [[ -f "$f" ]] || continue
+    kill "$(cat "$f")" 2>/dev/null || true
+    rm -f "$f"
+  done
+}
+
+case "${1:-}" in
+  start) start ;;
+  stop) stop ;;
+  *) echo "usage: $0 start|stop" >&2; exit 2 ;;
+esac

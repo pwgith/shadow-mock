@@ -764,7 +764,7 @@ None of these changes touch `engine`, `match`, `detect` or `admin` handler code.
 ## 14. Testing strategy
 
 * **Unit tests:** each matcher, the template helpers, the detector stages and ambiguity policies, call-rule parsing and selection (`ResponseFor`), rejection of scenario fields, and the stack resolution rules (layer beats priority, override by ID, masks).
-* **Conformance suite** (`test/conformance`): WireMock's documented mapping examples, each run as request → expected response. Optionally a differential mode that runs the same corpus against a real WireMock container.
+* **Conformance suite** (`test/conformance`): WireMock's documented mapping examples, each run as request → expected response. The differential test (`differential_test.go`) replays the same corpus against a real WireMock (3.13.2) and compares replies and journals; `test/client` holds a Node suite that must pass on both servers. Both run in the `wiremock-reference` CI job, and every tolerated difference is listed in [COMPATIBILITY.md](COMPATIBILITY.md).
 * **Concurrency tests:** many parallel key-based shadow mocks calling the same stub with `callResponses`. Assert each session sees gap-free call numbers starting at 1, under `-race`.
 * **Benchmarks:** `Resolve` with 5k mappings, and `Detect` with 1 KiB, 100 KiB and 1 MiB bodies against 10, 1k and 10k active sessions (checks NFR-2.1 and NFR-2.2).
 * **Fuzzing:** `go test -fuzz` on mapping JSON decoding, the body scanner and template parsing.

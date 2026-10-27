@@ -1,13 +1,14 @@
 @nfr @wiremock @P3 @NFR-1.1 @NFR-1.2
 Feature: WireMock compatibility
 
-  # Needs the WireMock reference container and client libraries, which the in-process harness lacks;
-  # the corpus conformance test and the live contract suite cover this ground in CI.
+  # Automated, outside the in-process harness: the wiremock-reference CI job replays the corpus against
+  # a real WireMock (test/conformance/differential_test.go) and runs the client suite on both servers
+  # (test/client/compat.test.mjs). Known differences are in docs/COMPATIBILITY.md.
   @wip
   Scenario: The WireMock documentation corpus behaves identically
     Given the conformance corpus of mapping examples from the WireMock documentation
     When each example's requests are replayed against Shadow Mock and against the WireMock reference container
-    Then status, headers and bodies are identical for every example not listed in "conformance/known-differences.md"
+    Then status, headers and bodies are identical for every example not listed in "docs/COMPATIBILITY.md"
 
   # Needs the WireMock reference container and client libraries, which the in-process harness lacks;
   # the corpus conformance test and the live contract suite cover this ground in CI.

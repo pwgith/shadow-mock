@@ -48,6 +48,18 @@ func (m multiValue) String() string {
 	return template.Mark(fmt.Sprint(m[0]))
 }
 
+// Plain implements the engine's hook for JSON output: one value is written alone, several as a list.
+func (m multiValue) Plain() any {
+	out := make([]any, len(m))
+	for i, x := range m {
+		out[i] = fmt.Sprint(x)
+	}
+	if len(out) == 1 {
+		return out[0]
+	}
+	return out
+}
+
 // pathValue is request.path: it prints as the path and, for a urlPathTemplate, also exposes
 // the path parameters as fields. The path is held under the empty key.
 type pathValue map[string]any
@@ -55,13 +67,14 @@ type pathValue map[string]any
 // String implements fmt.Stringer.
 func (p pathValue) String() string { return template.Mark(fmt.Sprint(p[""])) }
 
-// values returns the first value alone, or all of them when there are several.
+// values returns the values of a header, query parameter or cookie. One value prints as itself and
+// can still be reached as .first, .last or .[0], as in WireMock.
 func values(vs []string) any {
 	switch len(vs) {
 	case 0:
 		return raymond.SafeString("")
 	case 1:
-		return raymond.SafeString(vs[0])
+		return multiValue{raymond.SafeString(vs[0])}
 	default:
 		out := make(multiValue, len(vs))
 		for i, v := range vs {
@@ -90,7 +103,7 @@ func RequestModel(in *Input) map[string]any {
 	for k, vs := range r.Query {
 		query[k] = values(vs)
 	}
-	headers := make(map[string]any, 2*len(r.Header))
+	headers := make(template.Headers, 2*len(r.Header))
 	for k, vs := range r.Header {
 		v := values(vs)
 		headers[k] = v

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -42,6 +43,10 @@ func plain(v any) any {
 		return plainMap(t)
 	case jsonObject:
 		return plainMap(t)
+	case Headers:
+		return plainHeaders(t)
+	case interface{ Plain() any }:
+		return t.Plain()
 	default:
 		return v
 	}
@@ -237,4 +242,19 @@ func marshal(v any) ([]byte, error) {
 		return nil, err //nolint:wrapcheck // the callers wrap it
 	}
 	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+}
+
+// Headers is the request headers as a template sees them: each name is present as sent and, so a
+// template can write request.headers.x-tenant or request.headers.X-Tenant, in lower case as well.
+// JSON output lists each header once, under the name it was sent with.
+type Headers map[string]any
+
+func plainHeaders(h Headers) map[string]any {
+	out := make(map[string]any, len(h))
+	for k, v := range h {
+		if http.CanonicalHeaderKey(k) == k {
+			out[k] = plain(v)
+		}
+	}
+	return out
 }

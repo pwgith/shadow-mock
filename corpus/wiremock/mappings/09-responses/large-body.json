@@ -1,0 +1,22 @@
+{
+  "mappings": [
+    {
+      "id": "c0090003-0009-4000-8000-000000000001",
+      "name": "A response body of about 140 KB, read back whole from the journal",
+      "metadata": { "corpus": "responses", "feature": "large-body" },
+      "request": { "method": "GET", "urlPath": "/wm/responses/large" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "bodyFileName": "large/items.json"
+      }
+    },
+    {
+      "id": "c0090003-0009-4000-8000-000000000002",
+      "name": "A request body of about 100 KB, read back whole from the journal",
+      "metadata": { "corpus": "responses", "feature": "large-body" },
+      "request": { "method": "POST", "urlPath": "/wm/responses/large-upload" },
+      "response": { "status": 201, "body": "received" }
+    }
+  ]
+}

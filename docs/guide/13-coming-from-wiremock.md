@@ -1,6 +1,8 @@
 # 13. Coming from WireMock
 
-Shadow Mock aims to be a drop-in replacement for WireMock 3.x standalone.
+Shadow Mock aims to be a drop-in replacement for WireMock 3.x standalone. Every pull request replays
+the corpus against a real WireMock and compares the replies and request journals. The full list of
+differences is in [COMPATIBILITY.md](../COMPATIBILITY.md).
 
 ## What works unchanged
 

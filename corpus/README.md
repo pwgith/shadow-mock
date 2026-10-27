@@ -18,7 +18,7 @@ corpus/
 │   │   ├── 03-request-attributes/    headers (incl. multi-value), query (hasExactly, includes, absent),
 │   │   │                             cookies, formParameters, basic auth, host, port, scheme
 │   │   ├── 04-value-matchers/        string operators, and/or/not, date-time (absolute, relative,
-│   │   │                             actualFormat, truncation), number matchers
+│   │   │                             actualFormat, truncation)
 │   │   ├── 05-body-json/             equalToJson (+flags, string form, json-unit placeholders),
 │   │   │                             matchesJsonPath (presence, filters, sub-matchers), matchesJsonSchema
 │   │   ├── 06-body-xml/              equalToXml (+placeholders, delimiters, exempted comparisons),
@@ -48,7 +48,8 @@ corpus/
 │   │   ├── 01-call-count-responses/  retry, polling, every selector form, rule order, rate limit, flaky,
 │   │   │                             {{request.callNumber}}, rich rule responses, counter admin target
 │   │   ├── 02-gzip/                  compressed by default, gzipDisabled, small and pre-encoded bodies
-│   │   └── 03-session-baseline/      global mappings the session examples override, mask or fall through to
+│   │   ├── 03-session-baseline/      global mappings the session examples override, mask or fall through to
+│   │   └── 04-number-matchers/       equalToNumber, greaterThanNumber and the others, and a numeric sub-matcher in matchesJsonPath: Shadow Mock extensions that WireMock does not have
 │   ├── __files/                      large/ (12 KB JSON for gzip), session/ (file a session overrides)
 │   ├── mapping-sets/                 named set "declined-payments" for seedFrom
 │   ├── sessions/                     admin API payloads:

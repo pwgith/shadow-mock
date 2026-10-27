@@ -5,18 +5,28 @@ import (
 	"strings"
 )
 
-// WireMock templates use two forms raymond does not parse: numeric path segments
-// (request.query.tag.0, where Handlebars needs .[0]) and helpers that assign a variable when
-// given a trailing quoted name ({{parseJson body 'order'}}, then order.id). rewrite turns
-// both into plain Handlebars before parsing.
+// WireMock templates use forms raymond does not parse: numeric path segments
+// (request.query.tag.0, where Handlebars needs .[0]), helpers that assign a variable when
+// given a trailing quoted name ({{parseJson body 'order'}}, then order.id), and the block form of
+// the matches helper. rewrite turns them into plain Handlebars before parsing.
 
 // argument is one helper argument: a string literal, a subexpression or a path.
 const argument = `'[^']*'|"[^"]*"|\([^()]*\)|[^\s'"(){}]+`
 
 var (
-	mustache   = regexp.MustCompile(`\{\{\{?(?:'[^']*'|"[^"]*"|[^{}'"])*\}?\}\}`)
+	// mustache matches a tag and any run of braces right after it, which is literal text.
+	mustache = regexp.MustCompile(`\{\{\{?(?:'[^']*'|"[^"]*"|[^{}'"])*\}\}+`)
+	tagCore  = regexp.MustCompile(`^\{\{(?:'[^']*'|"[^"]*"|[^{}'"])*\}\}`)
+	raw3Core = regexp.MustCompile(`^\{{3}(?:'[^']*'|"[^"]*"|[^{}'"])*\}{3}`)
+
 	quoted     = regexp.MustCompile(`'[^']*'|"[^"]*"`)
 	numericSeg = regexp.MustCompile(`([A-Za-z_\]])\.(\d+)\b`)
+
+	// {{#matches text regex}}…{{/matches}} is a block form of the matches helper; it becomes an if.
+	matchesOpen = regexp.MustCompile(`^\{\{#matches\s+(.+?)\s*\}\}$`)
+
+	// {{formData body 'name' urlDecode=true}} assigns the fields of a url-encoded form.
+	assignForm = regexp.MustCompile(`^\{\{\s*formData\s+(` + argument + `)\s+'(\w+)'(?:\s+urlDecode=(true|false))?\s*\}\}$`)
 
 	assignParse = regexp.MustCompile(`^\{\{\s*parseJson\s+(` + argument + `)\s+'(\w+)'\s*\}\}$`)
 	assignRegex = regexp.MustCompile(`^\{\{\s*regexExtract\s+(` + argument + `)\s+(` + argument + `)\s+'(\w+)'\s*\}\}$`)
@@ -26,15 +36,37 @@ var (
 func rewrite(src string) (string, bool) {
 	assigns := false
 	out := mustache.ReplaceAllStringFunc(src, func(m string) string {
+		// {{x}}} is the tag {{x}} followed by a literal brace, as in {"a": {{x}}}. raymond reads three
+		// braces as the end of an unescaped tag and fails, so each literal brace becomes a tag of its own.
+		core := tagCore
+		if strings.HasPrefix(m, "{{{") {
+			core = raw3Core
+		}
+		tail := ""
+		if c := core.FindString(m); c != "" {
+			tail = strings.Repeat("{{closeBrace}}", len(m)-len(c))
+			m = c
+		}
 		switch {
+		case matchesOpen.MatchString(m):
+			return matchesOpen.ReplaceAllString(m, "{{#if (matches $1)}}") + tail
+		case m == "{{/matches}}":
+			return "{{/if}}" + tail
+		case assignForm.MatchString(m):
+			assigns = true
+			decode := "false"
+			if sub := assignForm.FindStringSubmatch(m); sub[3] == "true" {
+				decode = "true"
+			}
+			return assignForm.ReplaceAllString(m, "{{assign '$2' (formFields $1 "+decode+")}}") + tail
 		case assignParse.MatchString(m):
 			assigns = true
-			return assignParse.ReplaceAllString(m, "{{assign '$2' (parseJson $1)}}")
+			return assignParse.ReplaceAllString(m, "{{assign '$2' (parseJson $1)}}") + tail
 		case assignRegex.MatchString(m):
 			assigns = true
-			return assignRegex.ReplaceAllString(m, "{{assign '$3' (regexGroups $1 $2)}}")
+			return assignRegex.ReplaceAllString(m, "{{assign '$3' (regexGroups $1 $2)}}") + tail
 		}
-		return indexSegments(m)
+		return indexSegments(m) + tail
 	})
 	return out, assigns
 }

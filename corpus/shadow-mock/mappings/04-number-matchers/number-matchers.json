@@ -1,0 +1,135 @@
+{
+  "mappings": [
+    {
+      "id": "5d040001-0004-4000-8000-000000000001",
+      "name": "equalToNumber",
+      "metadata": {
+        "corpus": "number-matchers",
+        "feature": "number"
+      },
+      "request": {
+        "urlPath": "/wm/numbers/equal",
+        "queryParameters": {
+          "qty": {
+            "equalToNumber": 5
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "qty is 5 (5, 5.0 and 5.00 all match)"
+      }
+    },
+    {
+      "id": "5d040001-0004-4000-8000-000000000002",
+      "name": "greaterThanNumber",
+      "metadata": {
+        "corpus": "number-matchers",
+        "feature": "number"
+      },
+      "request": {
+        "urlPath": "/wm/numbers/large-order",
+        "queryParameters": {
+          "amount": {
+            "greaterThanNumber": 1000
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "needs approval"
+      }
+    },
+    {
+      "id": "5d040001-0004-4000-8000-000000000003",
+      "name": "greaterThanEqualNumber",
+      "metadata": {
+        "corpus": "number-matchers",
+        "feature": "number"
+      },
+      "request": {
+        "urlPath": "/wm/numbers/adult",
+        "headers": {
+          "X-Age": {
+            "greaterThanEqualNumber": 18
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "adult"
+      }
+    },
+    {
+      "id": "5d040001-0004-4000-8000-000000000004",
+      "name": "lessThanNumber",
+      "metadata": {
+        "corpus": "number-matchers",
+        "feature": "number"
+      },
+      "request": {
+        "urlPath": "/wm/numbers/low-stock",
+        "queryParameters": {
+          "stock": {
+            "lessThanNumber": 10
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "low stock"
+      }
+    },
+    {
+      "id": "5d040001-0004-4000-8000-000000000005",
+      "name": "lessThanEqualNumber combined with greaterThanNumber",
+      "metadata": {
+        "corpus": "number-matchers",
+        "feature": "number"
+      },
+      "request": {
+        "urlPath": "/wm/numbers/band",
+        "queryParameters": {
+          "score": {
+            "and": [
+              {
+                "greaterThanNumber": 50
+              },
+              {
+                "lessThanEqualNumber": 75
+              }
+            ]
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "score band 51-75"
+      }
+    },
+    {
+      "id": "5d040002-0004-4000-8000-000000000001",
+      "name": "matchesJsonPath with numeric sub-matcher",
+      "metadata": {
+        "corpus": "number-matchers",
+        "feature": "jsonpath-number"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/jsonpath/amount",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": {
+              "expression": "$.amount",
+              "greaterThanNumber": 1000
+            }
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "large amount"
+      }
+    }
+  ]
+}

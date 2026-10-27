@@ -201,3 +201,28 @@ func TestGzipResponses(t *testing.T) {
 		}
 	})
 }
+
+// WireMock has no number matchers, so they live in the Shadow Mock tree and are not part of the
+// WireMock corpus that is replayed against a real WireMock.
+func numberMatcherCases() []tc {
+	j := func(path, body string) call { return post(path, body, jsonCT, appJS) }
+	return []tc{
+		{want: "5d04000101", call: get("/wm/numbers/equal?qty=5.00")},
+		{want: "5d04000102", call: get("/wm/numbers/large-order?amount=1500")},
+		{want: "5d04000103", call: get("/wm/numbers/adult", "X-Age", "18")},
+		{want: "5d04000104", call: get("/wm/numbers/low-stock?stock=3")},
+		{want: "5d04000105", call: get("/wm/numbers/band?score=60")},
+		{call: get("/wm/numbers/band?score=50")},
+		{want: "5d04000201", call: j("/wm/jsonpath/amount", `{ "amount": 1500.75 }`)},
+		{call: j("/wm/jsonpath/amount", `{ "amount": 900 }`)},
+	}
+}
+
+func TestNumberMatchers(t *testing.T) {
+	e := start(t, "shadow-mock")
+	ms := loadMappings(t, "shadow-mock")
+	for _, c := range numberMatcherCases() {
+		name := c.call.method + " " + c.call.target
+		t.Run(name, func(t *testing.T) { runCase(t, e.with(t), ms, c) })
+	}
+}

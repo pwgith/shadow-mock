@@ -48,6 +48,10 @@ func NewRequest(r *http.Request, body []byte, path string) *Request {
 		scheme = "https"
 	}
 	host, port := splitHostPort(r.Host, scheme)
+	header := r.Header.Clone()
+	if header.Get("Host") == "" && r.Host != "" {
+		header.Set("Host", r.Host) // Go moves it out of Header; WireMock keeps it there
+	}
 	return &Request{
 		Method:   r.Method,
 		Scheme:   scheme,
@@ -56,7 +60,7 @@ func NewRequest(r *http.Request, body []byte, path string) *Request {
 		Path:     path,
 		RawQuery: r.URL.RawQuery,
 		Query:    r.URL.Query(),
-		Header:   r.Header.Clone(),
+		Header:   header,
 		Cookies:  cookies(r.Header),
 		Body:     body,
 		ClientIP: clientIP(r.RemoteAddr),

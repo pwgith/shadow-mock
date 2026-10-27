@@ -40,7 +40,13 @@ type loggedRequest struct {
 	Cookies          map[string]any        `json:"cookies"`
 	QueryParams      map[string]queryParam `json:"queryParams"`
 	Body             string                `json:"body"`
-	BodyAsBase64     string                `json:"bodyAsBase64,omitempty"`
+	BodyAsBase64     string                `json:"bodyAsBase64"`
+	Protocol         string                `json:"protocol"`
+	Scheme           string                `json:"scheme"`
+	Host             string                `json:"host"`
+	Port             int                   `json:"port"`
+	FormParams       map[string]queryParam `json:"formParams"`
+	BrowserProxy     bool                  `json:"browserProxyRequest"`
 	LoggedDate       int64                 `json:"loggedDate,omitempty"`
 	LoggedDateString string                `json:"loggedDateString,omitempty"`
 }
@@ -72,7 +78,13 @@ func requestView(r *match.Request, e *journal.Entry) loggedRequest {
 	for k, vs := range r.Query {
 		v.QueryParams[k] = queryParam{Key: k, Values: vs}
 	}
-	v.Body, v.BodyAsBase64 = bodyFields(r.Body)
+	v.Body = bodyText(r.Body)
+	v.BodyAsBase64 = base64.StdEncoding.EncodeToString(r.Body)
+	v.Protocol, v.Scheme, v.Host, v.Port = "HTTP/1.1", r.Scheme, r.Host, r.Port
+	v.FormParams = map[string]queryParam{}
+	for k, vs := range r.Form() {
+		v.FormParams[k] = queryParam{Key: k, Values: vs}
+	}
 	if e != nil {
 		v.ID, v.AbsoluteURL = e.ID, e.AbsoluteURL
 		v.LoggedDate = e.LoggedAt.UnixMilli()
@@ -81,19 +93,20 @@ func requestView(r *match.Request, e *journal.Entry) loggedRequest {
 	return v
 }
 
-// bodyFields returns the body as text, plus base64 when it is not valid UTF-8.
-func bodyFields(b []byte) (string, string) {
+// bodyText returns the body as text, or nothing when it is not valid UTF-8; the base64 field holds
+// such a body exactly.
+func bodyText(b []byte) string {
 	if utf8.Valid(b) {
-		return string(b), ""
+		return string(b)
 	}
-	return "", base64.StdEncoding.EncodeToString(b)
+	return ""
 }
 
 type responseView struct {
 	Status       int            `json:"status"`
 	Headers      map[string]any `json:"headers,omitempty"`
-	Body         string         `json:"body,omitempty"`
-	BodyAsBase64 string         `json:"bodyAsBase64,omitempty"`
+	Body         string         `json:"body"`
+	BodyAsBase64 string         `json:"bodyAsBase64"`
 }
 
 type timingView struct {
@@ -161,7 +174,8 @@ func eventView(e *journal.Entry) serveEvent {
 		Timing:     timingView{AddedDelay: e.AddedDelay, ProcessTime: e.ProcessTime, ServeTime: e.ProcessTime, TotalTime: e.ProcessTime + e.AddedDelay},
 		ShadowMock: shadowView{Tenant: string(e.Tenant), Layer: layerOf(e), CallNumber: e.CallNumber},
 	}
-	v.Response.Body, v.Response.BodyAsBase64 = bodyFields(e.Response.Body)
+	v.Response.Body = bodyText(e.Response.Body)
+	v.Response.BodyAsBase64 = base64.StdEncoding.EncodeToString(e.Response.Body)
 	if e.SessionID != "" {
 		id := e.SessionID
 		v.ShadowMock.SessionID = &id

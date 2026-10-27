@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -56,18 +57,26 @@ func (e *Engine) helpers() map[string]any {
 		"array": func(items ...any) any { return items },
 		"math":  mathHelper,
 		// Comparison, for use in subexpressions such as (eq a b).
-		"eq":       func(a, b any, _ *raymond.Options) any { return compare(a, b) == 0 },
-		"neq":      func(a, b any, _ *raymond.Options) any { return compare(a, b) != 0 },
-		"gt":       func(a, b any, _ *raymond.Options) any { return compare(a, b) > 0 },
-		"gte":      func(a, b any, _ *raymond.Options) any { return compare(a, b) >= 0 },
-		"lt":       func(a, b any, _ *raymond.Options) any { return compare(a, b) < 0 },
-		"lte":      func(a, b any, _ *raymond.Options) any { return compare(a, b) <= 0 },
-		"contains": func(a, b any, _ *raymond.Options) any { return strings.Contains(text(a), text(b)) },
-		"and":      func(items ...any) any { return all(items, true) },
-		"or":       func(items ...any) any { return all(items, false) },
-		"not":      func(v any, _ *raymond.Options) any { return !truthy(v) },
+		"eq":        func(a, b any, _ *raymond.Options) any { return compare(a, b) == 0 },
+		"neq":       func(a, b any, _ *raymond.Options) any { return compare(a, b) != 0 },
+		"gt":        func(a, b any, _ *raymond.Options) any { return compare(a, b) > 0 },
+		"gte":       func(a, b any, _ *raymond.Options) any { return compare(a, b) >= 0 },
+		"lt":        func(a, b any, _ *raymond.Options) any { return compare(a, b) < 0 },
+		"lte":       func(a, b any, _ *raymond.Options) any { return compare(a, b) <= 0 },
+		"contains":  func(a, b any, _ *raymond.Options) any { return strings.Contains(text(a), text(b)) },
+		"and":       func(items ...any) any { return all(items, true) },
+		"or":        func(items ...any) any { return all(items, false) },
+		"not":       func(v any, _ *raymond.Options) any { return !truthy(v) },
+		"matches":   matchesHelper,
+		"val":       val,
+		"arrayAdd":  arrayAdd,
+		"arrayJoin": arrayJoin,
+		"range":     rangeHelper,
+		// closeBrace writes the literal brace that follows a tag, as in {"a": {{x}}}; see rewrite.
+		"closeBrace": func(_ *raymond.Options) any { return safe("}") },
 	}
 	maps.Copy(h, jsonHelpers())
+	maps.Copy(h, moreHelpers())
 	return h
 }
 
@@ -411,7 +420,7 @@ func mathHelper(a, op, b any, _ *raymond.Options) any {
 }
 
 // jsonPath evaluates a JSONPath over JSON text or an already parsed value.
-func jsonPath(doc, expr any, _ *raymond.Options) any {
+func jsonPath(doc, expr any, o *raymond.Options) any {
 	x, err := parsePath(expr)
 	if err != nil {
 		fail("jsonPath: invalid expression %q: %v", text(expr), err)
@@ -419,7 +428,7 @@ func jsonPath(doc, expr any, _ *raymond.Options) any {
 	res := x.Get(document(doc))
 	switch len(res) {
 	case 0:
-		return safe("")
+		return safe(o.HashStr("default")) // {{jsonPath body '$.a' default='x'}}
 	case 1:
 		return wrap(res[0])
 	default:
@@ -459,4 +468,69 @@ func xPath(doc, expr any, _ *raymond.Options) any {
 		return safe("")
 	}
 	return safe(nodes[0].InnerText())
+}
+
+// matchesHelper implements (matches text regex): true when the whole text matches. The block form
+// {{#matches text regex}} is rewritten to an if around this.
+func matchesHelper(s, pattern any, _ *raymond.Options) any {
+	re, err := regexp.Compile("^(?:" + text(pattern) + ")$")
+	if err != nil {
+		fail("matches: %v", err)
+	}
+	return re.MatchString(text(s))
+}
+
+// val implements {{val value or=fallback}}: the value, or the fallback when it is missing or empty.
+// default= is accepted as well.
+func val(v any, o *raymond.Options) any {
+	if text(v) != "" {
+		return v
+	}
+	if fallback := o.HashProp("or"); fallback != nil {
+		return fallback
+	}
+	return safe(o.HashStr("default"))
+}
+
+// arrayAdd implements (arrayAdd list item position=start): a new list with the item added at the
+// end, or at the start.
+func arrayAdd(list, item any, o *raymond.Options) any {
+	in := asList(list)
+	if o.HashStr("position") == "start" {
+		return append([]any{item}, in...)
+	}
+	return append(slices.Clone(in), item)
+}
+
+// arrayJoin implements {{arrayJoin ',' list}}.
+func arrayJoin(sep, list any, _ *raymond.Options) any {
+	in := asList(list)
+	parts := make([]string, len(in))
+	for i, x := range in {
+		parts[i] = text(x)
+	}
+	return safe(strings.Join(parts, text(sep)))
+}
+
+// rangeHelper implements (range start end): the whole numbers from start to end, both included.
+func rangeHelper(from, to any, _ *raymond.Options) any {
+	a, ok1 := number(from)
+	b, ok2 := number(to)
+	if !ok1 || !ok2 || b < a || b-a > 100000 {
+		fail("range: %v to %v is not a usable range", from, to)
+	}
+	out := make([]any, 0, int(b-a)+1)
+	for i := a; i <= b; i++ {
+		out = append(out, i)
+	}
+	return out
+}
+
+// asList returns a template value as a list, or nil when it is not one.
+func asList(v any) []any {
+	l, ok := plain(document(v)).([]any)
+	if !ok {
+		return nil
+	}
+	return l
 }

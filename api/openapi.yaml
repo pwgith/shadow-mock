@@ -1901,7 +1901,13 @@ components:
         cookies: { type: object, additionalProperties: true }
         queryParams: { type: object, additionalProperties: true }
         body: { type: string }
-        bodyAsBase64: { type: string, contentEncoding: base64 }
+        bodyAsBase64: { type: string, contentEncoding: base64, description: The body as sent, base64 encoded. Always present, as in WireMock. }
+        protocol: { type: string, examples: [HTTP/1.1] }
+        scheme: { type: string, examples: [http] }
+        host: { type: string, description: The host the client used, without the port. }
+        port: { type: integer }
+        formParams: { type: object, additionalProperties: true, description: The fields of a url-encoded form body. }
+        browserProxyRequest: { type: boolean }
         loggedDate: { type: integer, format: int64, description: Epoch milliseconds. }
         loggedDateString: { type: string, format: date-time }
     ServeEvent:

@@ -111,9 +111,6 @@ func (r *Renderer) Render(ctx context.Context, def *model.ResponseDefinition, fi
 		return nil, err
 	}
 	out.Body = body
-	if len(def.JSONBody) > 0 && out.Header.Get("Content-Type") == "" {
-		out.Header.Set("Content-Type", "application/json")
-	}
 	return out, nil
 }
 

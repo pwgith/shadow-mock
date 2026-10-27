@@ -54,7 +54,7 @@
       "request": { "method": "GET", "urlPath": "/wm/template/logic" },
       "response": {
         "status": 200,
-        "body": "{{#if (contains request.query.plan 'gold')}}GOLD{{else}}STANDARD{{/if}} | {{#matches request.query.code '[0-9]+'}}numeric{{else}}not numeric{{/matches}} | {{#eq request.query.plan 'gold'}}eq-gold{{/eq}} | {{val request.query.missing or='default-value'}} | {{arrayJoin ',' (arrayAdd (array 'b' 'c') 'a' position='start')}} | {{#each (range 1 4) as |i|}}[{{i}}]{{/each}}",
+        "body": "{{#if (contains request.query.plan 'gold')}}GOLD{{else}}STANDARD{{/if}} | {{#matches request.query.code '[0-9]+'}}numeric{{else}}not numeric{{/matches}} | {{#if (eq request.query.plan.first 'gold')}}eq-gold{{/if}} | {{val request.query.missing or='default-value'}} | {{arrayJoin ',' (arrayAdd (array 'b' 'c') 'a' position='start')}} | {{#each (range 1 4) as |i|}}[{{i}}]{{/each}}",
         "transformers": ["response-template"]
       }
     },
