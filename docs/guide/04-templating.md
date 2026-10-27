@@ -103,6 +103,28 @@ Handlebars built-ins `if`, `unless` and `each`.
 {{math request.callNumber '*' 10}}
 ```
 
+## Partials and block parameters
+
+A template can define a reusable piece of itself with `{{#*inline "name"}}…{{/inline}}` and use it
+with `{{> name}}`. Pass a value to give the partial its own context, which it reads as `this`:
+
+```
+{{#*inline "item"}}{ "brand": {{toJson this.brand}} }{{/inline}}
+{{#with (parseJson request.body) as |req|}}
+{ "items": [ {{#each req.items as |it|}}{{> item it}}{{#unless @last}},{{/unless}}{{/each}} ] }
+{{/with}}
+```
+
+Definitions can appear anywhere in the template and produce no output themselves. A partial can use
+another partial. `as |name|` after `each` or `with` names the current value. `{{else}}` after an
+`each` runs when there is nothing to loop over, and `@last` is true on the final pass.
+
+`toJson` writes a value as JSON without escaping `<`, `>` or `&`, so `{{toJson name}}` gives
+`"Ada & <Bob>"`.
+
+Defaults are a common pattern in templates: `{{#if (neq this.age null)}}{{toJson this.age}}{{else}}5{{/if}}`
+uses the request's `age` when there is one, and `5` when there is not.
+
 ## An example
 
 ```json

@@ -51,3 +51,26 @@ func indexSegments(m string) string {
 	b.WriteString(numericSeg.ReplaceAllString(m[last:], "$1.[$2]"))
 	return b.String()
 }
+
+// inlineDef matches {{#*inline "name"}}…{{/inline}}, Handlebars' way of defining a partial in the
+// template that uses it. WireMock's engine supports it and raymond does not, so the definitions
+// are taken out of the source and registered as ordinary partials.
+var inlineDef = regexp.MustCompile(`(?s)\{\{~?#\*inline\s+(?:"([^"]+)"|'([^']+)')\s*~?\}\}(.*?)\{\{~?/inline~?\}\}`)
+
+type partial struct{ name, body string }
+
+// extractInline returns src without its inline partial definitions, and the definitions in the
+// order they were written.
+func extractInline(src string) (string, []partial) {
+	var found []partial
+	main := inlineDef.ReplaceAllStringFunc(src, func(m string) string {
+		sub := inlineDef.FindStringSubmatch(m)
+		name := sub[1]
+		if name == "" {
+			name = sub[2]
+		}
+		found = append(found, partial{name: name, body: sub[3]})
+		return ""
+	})
+	return main, found
+}

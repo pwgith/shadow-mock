@@ -179,3 +179,25 @@ Feature: Template helpers
       """
     When I send a "GET" request to "/h"
     Then the response body is "123-order"
+
+  Scenario: Inline partials and block parameters in a template file
+    Given the file "__files/echo/response.json":
+      """
+      {{#*inline "item"}}{ "brand": {{#if (neq this.brand null)}}{{toJson this.brand}}{{else}}"Sony"{{/if}} }{{/inline}}
+      {{#with (parseJson request.body) as |req|}}
+      { "claim": {{toJson req.claim_id}}, "items": [ {{#each req.items as |it|}}{{> item it}}{{#unless @last}},{{/unless}}{{else}}{{> item req}}{{/each}} ] }
+      {{/with}}
+      """
+    And the global mapping:
+      """json
+      { "request": { "method": "POST", "urlPath": "/echo" },
+        "response": { "status": 200, "bodyFileName": "echo/response.json", "transformers": ["response-template"] } }
+      """
+    When I send a "POST" request to "/echo" with body:
+      """json
+      { "claim_id": "C1 & <C2>", "items": [ { "brand": "Apple" }, {} ] }
+      """
+    Then the response status is 200
+    And the response JSON at "$.claim" is "C1 & <C2>"
+    And the response JSON at "$.items[0].brand" is "Apple"
+    And the response JSON at "$.items[1].brand" is "Sony"
