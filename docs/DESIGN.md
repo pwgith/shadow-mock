@@ -672,7 +672,7 @@ storage:
   global:   { driver: fs, watch: true }
   sessions: { driver: memory }
   journal:
-    hot:  { driver: memory, maxEntries: 10000, maxBodyBytes: 65536 }  # SaaS: redis, maxEntries 1000 per scope (plan-dependent)
+    hot:  { driver: memory, maxEntries: 10000, maxBytes: 536870912 }  # standalone keeps bodies whole and drops the oldest entries past the budget. SaaS: redis, maxEntries 1000 per scope (plan-dependent), maxBodyBytes 65536
     warm: { driver: none }   # SaaS: postgres, rowBatchMs: 250, rowBatchSize: 500, inlineMaxBytes: 4096,
                              #       bodyObjectFlushMs: 5000, bodyObjectMaxBytes: 8388608
   counters: { driver: memory }    # SaaS: redis

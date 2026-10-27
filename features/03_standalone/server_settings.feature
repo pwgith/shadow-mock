@@ -134,3 +134,26 @@ Feature: Server settings that change behaviour
     Then the response status is 200
     When I call admin "GET" "/requests"
     Then the response JSON at "$.requests[0].request.body" matches "^x{100}$"
+
+  Scenario: The journal keeps a large response whole by default
+    Given Shadow Mock is running
+    And the global mapping:
+      """json
+      { "request": { "urlPath": "/big" }, "response": { "status": 200, "body": "${text:200000}END" } }
+      """
+    When I send a "GET" request to "/big"
+    And I call admin "GET" "/requests"
+    Then the response JSON at "$.requests[0].response.body" matches "END$"
+
+  Scenario: storage.journal.hot.maxBytes drops the oldest entries to stay within a memory budget
+    Given Shadow Mock is running with configuration:
+      """yaml
+      storage: { journal: { hot: { maxBytes: 30000 } } }
+      """
+    And the global mapping:
+      """json
+      { "request": { "urlPath": "/page" }, "response": { "status": 200, "body": "${text:10000}" } }
+      """
+    When I send 6 "GET" requests to "/page"
+    And I call admin "GET" "/requests"
+    Then the response JSON at "$.requests" has 2 items

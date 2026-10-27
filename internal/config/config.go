@@ -55,9 +55,10 @@ type GlobalStorage struct {
 
 // HotJournal sizes the hot journal (DESIGN.md §5.2).
 type HotJournal struct {
-	Driver       string `yaml:"driver"`     // memory (standalone) | redis (SaaS)
-	MaxEntries   int    `yaml:"maxEntries"` // 0 disables the journal
-	MaxBodyBytes int    `yaml:"maxBodyBytes"`
+	Driver       string `yaml:"driver"`       // memory (standalone) | redis (SaaS)
+	MaxEntries   int    `yaml:"maxEntries"`   // 0 disables the journal
+	MaxBodyBytes int    `yaml:"maxBodyBytes"` // 0 keeps request and response bodies whole
+	MaxBytes     int64  `yaml:"maxBytes"`     // memory budget for the whole journal; the oldest entries go first
 }
 
 // Journal configures the journal tiers.
@@ -201,7 +202,7 @@ func Default() Config {
 		Storage: Storage{
 			Global:   GlobalStorage{Driver: "fs", Watch: true},
 			Sessions: Driver{Driver: "memory"},
-			Journal:  Journal{Hot: HotJournal{Driver: "memory", MaxEntries: 10000, MaxBodyBytes: 65536}, Warm: Driver{Driver: "none"}},
+			Journal:  Journal{Hot: HotJournal{Driver: "memory", MaxEntries: 10000, MaxBytes: 512 << 20}, Warm: Driver{Driver: "none"}},
 			Counters: Driver{Driver: "memory"},
 			Blobs:    Blobs{Driver: "fs", Dir: "./blobs"},
 		},
@@ -364,6 +365,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("adminPrefix must start with / and not end with one, not %q", c.AdminPrefix)
 	case c.Sessions.URLBased.PathPrefix != "/d":
 		return errors.New("sessions.urlBased.pathPrefix other than /d is not supported yet")
+	case c.Storage.Journal.Hot.MaxBodyBytes < 0 || c.Storage.Journal.Hot.MaxBytes < 0:
+		return errors.New("storage.journal.hot.maxBodyBytes and maxBytes must not be negative")
 	case c.Storage.Journal.Hot.MaxEntries < 0:
 		return errors.New("storage.journal.hot.maxEntries must not be negative")
 	}

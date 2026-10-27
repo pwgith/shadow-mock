@@ -125,6 +125,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	a.closers = append(a.closers, func() error { hooks.Close(); return nil })
 	jrnl := journal.NewMemory(cfg.Storage.Journal.Hot.MaxEntries)
 	jrnl.LimitBodies(cfg.Storage.Journal.Hot.MaxBodyBytes)
+	jrnl.LimitSize(cfg.Storage.Journal.Hot.MaxBytes)
 	svc := &mock.Service{
 		Mappings: mappings,
 		Files:    files,
