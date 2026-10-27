@@ -70,6 +70,7 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | Area | WireMock | Shadow Mock | Why |
 |---|---|---|---|
 | A call to a helper that does not exist | The response is a 500 | The same: a `template_error` 500 | Shadow Mock's template engine used to print nothing, which hid typos |
+| Admin tokens (`auth.driver: token`) | No login | Optional bearer tokens with viewer, editor and admin roles; required by `mode: server` | Standalone with no tokens is unchanged. A WireMock client that cannot send an `Authorization` header cannot talk to a server that has tokens |
 | Admin changes sent from another web site | Allowed | Refused with 403 when the request has an `Origin` header for another host or a cross-site fetch header | Stops a web page driving an admin API that has no login. Command-line and library clients are not affected |
 | XML nested more than 1000 levels | Handled | Not matched, or refused by the `xPath` helper | A body of the maximum size could otherwise stop the server |
 | Memory used by the journal | Grows with the journal | Held to `storage.journal.hot.maxBytes` (512 MiB by default); the oldest entries go first | A journal of N entries could otherwise hold N times the largest body |

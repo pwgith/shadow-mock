@@ -21,6 +21,70 @@ Then:
 
 The same with flags: `--listen-mock :8080 --listen-admin :9090`.
 
+## Put the admin API behind tokens
+
+By default the admin API has no login: whoever can reach it can read every request in the journal,
+change any mock and stop the server. On a shared server, turn on tokens:
+
+```yaml
+mode: server
+auth:
+  driver: token
+  tokens:
+    - { name: ops,  role: admin,  tokenEnv: SHADOWMOCK_OPS_TOKEN }
+    - { name: ci,   role: editor, tokenEnv: SHADOWMOCK_CI_TOKEN }
+    - { name: dash, role: viewer, tokenSha256: "<the 64 hex characters of the token's SHA-256>" }
+```
+
+Clients send the token as `Authorization: Bearer <token>`:
+
+```bash
+curl -H "Authorization: Bearer $SHADOWMOCK_CI_TOKEN" https://mocks.example.com:9090/__admin/sessions/key-based -d {}
+```
+
+| Role | May |
+|---|---|
+| `viewer` | Read mappings, the journal, sessions and counters, and the metrics |
+| `editor` | Also create and change sessions, and their mappings, files and recordings |
+| `admin` | Also change the global mappings, files and settings, reset, and stop the server |
+
+Give a token in one of three forms, never more than one:
+
+| Form | Use it when |
+|---|---|
+| `tokenEnv: NAME` | The secret comes from an environment variable or a secret store (best for containers) |
+| `tokenSha256: "…"` | You want only a hash in the file. Make it with `printf %s "$TOKEN" | sha256sum` |
+| `token: "…"` | The secret is in the file. The server warns about this at startup |
+
+Make a token from a random source, at least 16 characters, with `openssl rand -base64 32`.
+At least one token must have the `admin` role. Only the hash of each token is kept in memory, and
+a call is compared with every token in constant time.
+
+What needs a token and what does not:
+
+| | Token needed |
+|---|---|
+| `/__admin/…` | Yes |
+| `/__metrics` | Yes, a viewer token. Give Prometheus `authorization: { credentials: <token> }` |
+| Mock traffic, including `/d/<id>/…` and session keys | No |
+| `/__health`, `/__ready`, `/__admin/health` | No |
+
+`mode: server` refuses to start without `auth.driver: token`, so a server in that mode is never
+open by accident. A configuration that lists tokens but leaves `auth.driver` at `noop` also refuses
+to start, because it would look protected and not be.
+
+### Guarding against web pages
+
+A web page you visit can send requests to a server that is only reachable from your network.
+Three settings narrow that:
+
+- **`admin.allowedHosts`**: the names clients use to reach the server, such as
+  `["mocks.example.com"]`. A request with any other `Host` is refused, which defeats DNS rebinding.
+  Without a list the server logs a warning at startup.
+- **`admin.allowedOrigins`**: web pages that may make admin changes from a browser, for example a
+  dashboard at `https://dashboard.example.com`. A page not on the list is refused.
+- **`tenancy.local.allowlistAdmin: true`**: applies `ipAllowlist` to the admin API too.
+
 ## Restrict who can send mock traffic
 
 Allow only your own networks:
@@ -53,6 +117,7 @@ If the global mocks come from files that a team maintains, stop the admin API fr
 ```yaml
 admin:
   globalWrites: deny
+  allowedHosts: [mocks.example.com]
 ```
 
 Session calls still work, so tests can create their own shadow mocks.
@@ -132,11 +197,18 @@ JSON logs suit log collectors. Session keys are shown in shortened form.
 ## A starting configuration
 
 ```yaml
+mode: server
+auth:
+  driver: token
+  tokens:
+    - { name: ops, role: admin, tokenEnv: SHADOWMOCK_OPS_TOKEN }
+    - { name: ci, role: editor, tokenEnv: SHADOWMOCK_CI_TOKEN }
 listen:
   mock: ":8080"
   admin: ":9090"
 admin:
   globalWrites: deny
+  allowedHosts: [mocks.example.com]
 storage:
   sessions:
     driver: fs

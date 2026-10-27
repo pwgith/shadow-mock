@@ -40,7 +40,7 @@ Unknown keys in the file are an error, so typos fail at startup instead of being
 Defaults are shown. A file only needs the settings you want to change.
 
 ```yaml
-mode: standalone              # standalone | server
+mode: standalone              # standalone | server. server needs auth.driver: token (below)
 root: .                       # holds mappings/ and __files/
 adminPrefix: /__admin         # where the admin API lives
 
@@ -50,6 +50,12 @@ listen:
 
 admin:
   globalWrites: allow         # allow | deny
+  allowedHosts: []            # Host names the admin API and metrics answer to; empty allows any
+  allowedOrigins: []          # web pages that may make admin changes from a browser; empty allows none
+
+auth:
+  driver: noop                # noop | token. token puts the admin API behind bearer tokens
+  tokens: []                  # name, role (viewer, editor, admin) and one of token, tokenEnv, tokenSha256
 
 storage:
   global:
@@ -103,6 +109,7 @@ sessions:
 tenancy:
   local:
     ipAllowlist: []           # CIDRs allowed to send mock traffic; empty allows everyone
+    allowlistAdmin: false     # apply the allowlist to the admin API as well
 
 server:
   publicBaseUrl: ""           # used to build baseUrl in responses

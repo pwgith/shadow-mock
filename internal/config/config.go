@@ -5,6 +5,7 @@ package config
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"flag"
 	"fmt"
@@ -40,6 +41,12 @@ type Listen struct {
 // Admin controls the admin API.
 type Admin struct {
 	GlobalWrites string `yaml:"globalWrites"` // allow | deny
+	// AllowedHosts, when not empty, limits the Host header the admin API and the metrics answer to,
+	// so a web page cannot reach them through DNS rebinding. Names only, without a port.
+	AllowedHosts []string `yaml:"allowedHosts"`
+	// AllowedOrigins lists web pages (scheme://host[:port]) that may make changes through a browser,
+	// such as a management page served from another address. Empty allows none.
+	AllowedOrigins []string `yaml:"allowedOrigins"`
 }
 
 // Driver selects a backend.
@@ -90,13 +97,31 @@ type Respond struct {
 
 // Auth selects the authenticator.
 type Auth struct {
-	Driver  string           `yaml:"driver"` // noop | jwt (SaaS)
+	Driver  string           `yaml:"driver"` // noop | token | jwt (SaaS)
 	Issuers []map[string]any `yaml:"issuers"`
+	// Tokens are the admin tokens when driver is token.
+	Tokens []AdminToken `yaml:"tokens"`
+}
+
+// AdminToken is one admin token. Give exactly one of Token, TokenEnv or TokenSHA256; the last keeps
+// the secret out of the file, holding only its hash.
+type AdminToken struct {
+	Name        string `yaml:"name"`
+	Role        string `yaml:"role"`                  // viewer | editor | admin
+	Token       string `yaml:"token,omitempty"`       // the secret, at least 16 characters
+	TokenEnv    string `yaml:"tokenEnv,omitempty"`    // the name of an environment variable holding it
+	TokenSHA256 string `yaml:"tokenSha256,omitempty"` // the hex SHA-256 of it
+
+	// Hash is the SHA-256 of the secret, worked out by Validate.
+	Hash   [sha256.Size]byte `yaml:"-"`
+	secret string            // the value of TokenEnv, read by ResolveSecrets
 }
 
 // Local is the standalone org.
 type Local struct {
 	IPAllowlist []string `yaml:"ipAllowlist"`
+	// AllowlistAdmin applies the allowlist to the admin API as well as to mock traffic.
+	AllowlistAdmin bool `yaml:"allowlistAdmin"`
 }
 
 // Tenancy configures orgs.
@@ -287,6 +312,9 @@ func Load(path string, lookup func(string) (string, bool)) (Config, error) {
 		if err := applyEnv(&cfg, lookup); err != nil {
 			return Config{}, err
 		}
+		if err := ResolveSecrets(&cfg, lookup); err != nil {
+			return Config{}, err
+		}
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
@@ -350,10 +378,11 @@ func (c *Config) Validate() error {
 		oneOf("storage.journal.warm.driver", c.Storage.Journal.Warm.Driver, "none"),
 		oneOf("storage.counters.driver", c.Storage.Counters.Driver, "memory"),
 		oneOf("storage.blobs.driver", c.Storage.Blobs.Driver, "fs", "memory"),
-		oneOf("auth.driver", c.Auth.Driver, "noop"),
+		oneOf("auth.driver", c.Auth.Driver, "noop", "token"),
 		oneOf("tenancy.directory", c.Tenancy.Directory, "static"),
 		oneOf("respond.gzip", c.Respond.Gzip, "auto", "off"),
 		oneOf("sessions.detect.ambiguity", c.Sessions.Detect.Ambiguity, "first", "reject", "global"),
+		c.validateAuth(),
 	}
 	if err := errors.Join(checks...); err != nil {
 		return err

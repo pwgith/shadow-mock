@@ -60,6 +60,7 @@ servers:
 
 security:
   - clerkJWT: []
+  - adminToken: []
   - {}
 
 tags:
@@ -1406,6 +1407,14 @@ paths:
 
 components:
   securitySchemes:
+    adminToken:
+      type: http
+      scheme: bearer
+      description: |
+        Central server (`auth.driver: token`). A token from `auth.tokens`, sent as
+        `Authorization: Bearer <token>`. Its role (viewer, editor or admin) decides what it may do.
+        Mock traffic and the health endpoints need no token. Not used when the server runs without
+        admin tokens.
     clerkJWT:
       type: http
       scheme: bearer

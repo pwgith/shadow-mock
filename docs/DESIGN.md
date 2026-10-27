@@ -600,7 +600,7 @@ The full contract is in [api/openapi.yaml](../api/openapi.yaml) (OpenAPI 3.1): e
              → WireMock-compatible handler (same code for every scope)
 ```
 
-Because WireMock handlers are written once against a `Scope`, every WireMock endpoint works per session for free. The org-match check is in the shared admin middleware, so no handler can skip it. In standalone mode `NoopAuthenticator` returns org `local`, which always matches.
+Because WireMock handlers are written once against a `Scope`, every WireMock endpoint works per session for free. The org-match check is in the shared admin middleware, so no handler can skip it. In standalone mode `NoopAuthenticator` returns org `local`, which always matches. The central server uses `TokenAuthenticator` (`auth.driver: token`): bearer tokens from configuration, each with a role, held only as SHA-256 hashes and compared in constant time against every stored token. The same Authorizer runs, so the roles carry over to the hosted service unchanged. `mode: server` refuses to start without it, and the metrics endpoint requires a viewer token when it is on. Mock traffic and the health endpoints are never authenticated.
 
 **Auth summary:** everything under `/<org-handle>/__admin/` requires a JWT whose org matches the path. All other traffic under `/<org-handle>/` (mock calls, any HTTP method) requires no JWT and is limited only by the IP allowlist and quotas.
 

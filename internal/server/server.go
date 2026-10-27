@@ -3,13 +3,16 @@
 package server
 
 import (
+	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/pwgith/shadow-mock/internal/admin"
 	"github.com/pwgith/shadow-mock/internal/apierr"
+	"github.com/pwgith/shadow-mock/internal/auth"
 	"github.com/pwgith/shadow-mock/internal/mock"
 	"github.com/pwgith/shadow-mock/internal/stats"
 	"github.com/pwgith/shadow-mock/internal/tenant"
@@ -34,6 +37,12 @@ type Router struct {
 	ServeMock  bool
 	// Metrics writes Prometheus metrics; nil hides /__metrics.
 	Metrics http.Handler
+	// MetricsAuth, when set, requires a viewer token to read the metrics.
+	MetricsAuth auth.Authenticator
+	// AdminHosts, when not empty, limits the Host header the admin API and the metrics answer to.
+	AdminHosts []string
+	// AdminOrigins are web pages allowed to make admin changes from a browser.
+	AdminOrigins []string
 }
 
 var _ http.Handler = (*Router)(nil)
@@ -51,6 +60,9 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/__metrics":
 		if rt.Metrics == nil {
 			apierr.New(http.StatusNotFound, apierr.NotFound, "Metrics are not exposed here.").Write(w)
+			return
+		}
+		if !rt.hostAllowed(w, r) || !rt.metricsAllowed(w, r) {
 			return
 		}
 		rt.Metrics.ServeHTTP(w, r)
@@ -79,8 +91,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e.Write(w)
 		return
 	}
-	if isAdmin && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions && crossSite(r) {
-		apierr.New(http.StatusForbidden, apierr.Forbidden, "The admin API does not accept changes sent from a web page on another site.").Write(w)
+	if isAdmin && !rt.adminGate(w, r) {
 		return
 	}
 	ctx := tenant.With(r.Context(), org.ID)
@@ -186,16 +197,69 @@ func (rt *Router) adminPath(rest string) (string, bool) {
 // and Sec-Fetch-Site to such requests, and scripts cannot remove them, so a web page cannot
 // use a visitor's browser to call an admin API that has no login. Command-line and library
 // clients send neither header and are not affected.
-func crossSite(r *http.Request) bool {
+func crossSite(r *http.Request, allowed []string) bool {
+	origin := r.Header.Get("Origin")
+	if origin != "" && slices.ContainsFunc(allowed, func(o string) bool { return strings.EqualFold(strings.TrimRight(o, "/"), origin) }) {
+		return false
+	}
 	switch r.Header.Get("Sec-Fetch-Site") {
 	case "", "same-origin", "none":
 	default:
 		return true
 	}
-	origin := r.Header.Get("Origin")
 	if origin == "" {
 		return false
 	}
 	u, err := url.Parse(origin)
 	return err != nil || !strings.EqualFold(u.Host, r.Host)
+}
+
+// hostAllowed refuses a request whose Host header is not one of AdminHosts. A web page reaches a
+// server on a private address through DNS rebinding, which changes what a name points to but not
+// the name the browser sends, so the name is what is checked.
+func (rt *Router) hostAllowed(w http.ResponseWriter, r *http.Request) bool {
+	if len(rt.AdminHosts) == 0 {
+		return true
+	}
+	host := r.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	if slices.ContainsFunc(rt.AdminHosts, func(a string) bool { return strings.EqualFold(a, host) }) {
+		return true
+	}
+	apierr.New(http.StatusForbidden, apierr.Forbidden, "The admin API does not answer to the host name %q.", host).Write(w)
+	return false
+}
+
+// metricsAllowed requires a viewer token for the metrics when the admin API has tokens.
+func (rt *Router) metricsAllowed(w http.ResponseWriter, r *http.Request) bool {
+	if rt.MetricsAuth == nil {
+		return true
+	}
+	p, err := rt.MetricsAuth.Authenticate(r)
+	if err != nil {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="shadowmock"`)
+		apierr.WriteError(w, err)
+		return false
+	}
+	if !p.Has(auth.Viewer) {
+		apierr.New(http.StatusForbidden, apierr.Forbidden, "The metrics need a token with the viewer role.").Write(w)
+		return false
+	}
+	return true
+}
+
+// adminGate applies the checks that guard the admin API against web pages: the Host header, and for
+// changes the page that sent them. It writes the refusal and returns false when one fails.
+func (rt *Router) adminGate(w http.ResponseWriter, r *http.Request) bool {
+	if !rt.hostAllowed(w, r) {
+		return false
+	}
+	change := r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions
+	if change && crossSite(r, rt.AdminOrigins) {
+		apierr.New(http.StatusForbidden, apierr.Forbidden, "The admin API does not accept changes sent from a web page on another site.").Write(w)
+		return false
+	}
+	return true
 }

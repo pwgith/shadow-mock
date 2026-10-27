@@ -99,13 +99,16 @@ func TestEnvironment(t *testing.T) {
 	c, err := config.Load("", env(
 		"SHADOWMOCK_LISTEN_MOCK", ":7001", "SHADOWMOCK_ROOT", "/data", "SHADOWMOCK_LOG_LEVEL", "debug",
 		"SHADOWMOCK_PUBLIC_BASE_URL", "https://mock.example", "SHADOWMOCK_JOURNAL_MAX_ENTRIES", "42",
-		"SHADOWMOCK_LISTEN_ADMIN", ":7002", "SHADOWMOCK_LOG_FORMAT", "json", "SHADOWMOCK_MODE", "server"))
+		"SHADOWMOCK_LISTEN_ADMIN", ":7002", "SHADOWMOCK_LOG_FORMAT", "json", "SHADOWMOCK_MODE", "standalone"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if c.Listen.Mock != ":7001" || c.Listen.Admin != ":7002" || c.Root != "/data" || c.Log.Level != "debug" || c.Log.Format != "json" ||
-		c.Server.PublicBaseURL != "https://mock.example" || c.Storage.Journal.Hot.MaxEntries != 42 || c.Mode != "server" {
+		c.Server.PublicBaseURL != "https://mock.example" || c.Storage.Journal.Hot.MaxEntries != 42 || c.Mode != "standalone" {
 		t.Errorf("config = %+v", c)
+	}
+	if _, err := config.Load("", env("SHADOWMOCK_MODE", "server")); err == nil {
+		t.Error("server mode needs admin tokens, which the environment cannot give")
 	}
 	if _, err := config.Load("", env("SHADOWMOCK_JOURNAL_MAX_ENTRIES", "many")); err == nil {
 		t.Error("a non-numeric journal size should fail")

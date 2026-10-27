@@ -20,7 +20,11 @@ var (
 // initMetrics registers the steps that read the Prometheus metrics.
 func (w *world) initMetrics(sc *godog.ScenarioContext) {
 	sc.Step(`^I scrape "([^"]*)"$`, func(path string) error {
-		rep, err := w.send(newRequest("GET", path))
+		req := newRequest("GET", path)
+		if w.adminToken != "" {
+			req.header.Set("Authorization", "Bearer "+w.adminToken)
+		}
+		rep, err := w.send(req)
 		if err != nil {
 			return err
 		}

@@ -81,6 +81,10 @@ func basePath(ctx context.Context) string {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p, err := h.authn.Authenticate(r)
 	if err != nil {
+		var ae *apierr.Error
+		if errors.As(err, &ae) && ae.Status == http.StatusUnauthorized {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="shadowmock"`)
+		}
 		apierr.WriteError(w, err)
 		return
 	}
