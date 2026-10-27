@@ -5,37 +5,37 @@ import (
 	"testing"
 )
 
-// claimsTemplate is a response template written for WireMock: inline partials, a partial called
-// with a context, block parameters, a null literal and defaults for every field.
-const claimsTemplate = `{{#*inline "item"}}
+// ordersTemplate is a response template of the kind written for WireMock: inline partials, a
+// partial called with a context, block parameters, a null literal and a default for every field.
+const ordersTemplate = `{{#*inline "parcel"}}
 {
-  "identifier": "cc:Sn3wL0ssItemAbc123XyZ",
+  "id": "parcel-0001",
   "number": 2,
-  "age": {{#if (neq this.age null)}}{{toJson this.age}}{{else}}5{{/if}},
-  "brand": {{#if (neq this.brand null)}}{{toJson this.brand}}{{else}}"Sony"{{/if}},
-  "repaired_replaced": {{#if (neq this.repaired_replaced null)}}{{toJson this.repaired_replaced}}{{else}}false{{/if}},
-  "loss_estimate": {
-    "amount": {{#if (neq this.loss_estimate.amount null)}}{{toJson this.loss_estimate.amount}}{{else}}123.00{{/if}},
-    "currency": {{#if (neq this.loss_estimate.currency null)}}{{toJson this.loss_estimate.currency}}{{else}}"NZD"{{/if}}
+  "weight_kg": {{#if (neq this.weight_kg null)}}{{toJson this.weight_kg}}{{else}}5{{/if}},
+  "colour": {{#if (neq this.colour null)}}{{toJson this.colour}}{{else}}"Blue"{{/if}},
+  "fragile": {{#if (neq this.fragile null)}}{{toJson this.fragile}}{{else}}false{{/if}},
+  "value": {
+    "amount": {{#if (neq this.value.amount null)}}{{toJson this.value.amount}}{{else}}123.00{{/if}},
+    "currency": {{#if (neq this.value.currency null)}}{{toJson this.value.currency}}{{else}}"EUR"{{/if}}
   },
-  "note": {{#if (neq this.note null)}}{{toJson this.note}}{{else}}"Headphones Test"{{/if}}
+  "note": {{#if (neq this.note null)}}{{toJson this.note}}{{else}}"Packing test"{{/if}}
 }
 {{/inline}}
-{{#*inline "incident"}}
+{{#*inline "shipment"}}
 {
-  "incident_id": {{#if (neq this.incident_id null)}}{{toJson this.incident_id}}{{else}}"cc:Sj76J3X41Nj3hyUR-TSDH"{{/if}},
-  "loss_party": {{#if (neq this.loss_party null)}}{{toJson this.loss_party}}{{else}}"insured"{{/if}},
-  "type": "PropertyContentsIncident",
-  "loss_items": [
-    {{#each this.loss_items as |loss|}}{{> item loss}}{{#unless @last}},{{/unless}}{{else}}{{> item this}}{{/each}}
+  "shipment_id": {{#if (neq this.shipment_id null)}}{{toJson this.shipment_id}}{{else}}"shipment-0001"{{/if}},
+  "carrier": {{#if (neq this.carrier null)}}{{toJson this.carrier}}{{else}}"freight"{{/if}},
+  "type": "StandardShipment",
+  "parcels": [
+    {{#each this.parcels as |p|}}{{> parcel p}}{{#unless @last}},{{/unless}}{{else}}{{> parcel this}}{{/each}}
   ]
 }
 {{/inline}}
 {{#with (parseJson request.body) as |req|}}
 {
-  "claim_id": {{#if (neq req.claim_id null)}}{{toJson req.claim_id}}{{else}}"C5328711"{{/if}},
-  "incidents": [
-    {{#each req.incidents as |inc|}}{{> incident inc}}{{#unless @last}},{{/unless}}{{else}}{{> incident req}}{{/each}}
+  "order_id": {{#if (neq req.order_id null)}}{{toJson req.order_id}}{{else}}"O1000001"{{/if}},
+  "shipments": [
+    {{#each req.shipments as |ship|}}{{> shipment ship}}{{#unless @last}},{{/unless}}{{else}}{{> shipment req}}{{/each}}
   ]
 }
 {{/with}}`
@@ -43,18 +43,18 @@ const claimsTemplate = `{{#*inline "item"}}
 func TestInlinePartialsRenderAWireMockTemplate(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
-		name, body, claim, brand, party string
-		items                           int
+		name, body, order, colour, carrier string
+		parcels                            int
 	}{
-		{"every field given", `{"claim_id":"C1","incidents":[{"incident_id":"i1","loss_party":"third party","loss_items":[{"brand":"Apple & Co","age":3,"loss_estimate":{"amount":50.5,"currency":"USD"}},{"note":"<b>"}]}]}`, "C1", "Apple & Co", "third party", 2},
-		{"defaults fill what is missing", `{"incidents":[{"loss_items":[{}]}]}`, "C5328711", "Sony", "insured", 1},
-		{"no incidents uses the default incident", `{"claim_id":"C9"}`, "C9", "Sony", "insured", 1},
+		{"every field given", `{"order_id":"O1","shipments":[{"shipment_id":"s1","carrier":"air","parcels":[{"colour":"Red & Gold","weight_kg":3,"value":{"amount":50.5,"currency":"USD"}},{"note":"<b>"}]}]}`, "O1", "Red & Gold", "air", 2},
+		{"defaults fill what is missing", `{"shipments":[{"parcels":[{}]}]}`, "O1000001", "Blue", "freight", 1},
+		{"no shipments uses the default shipment", `{"order_id":"O9"}`, "O9", "Blue", "freight", 1},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			d := data()
 			d["request"] = map[string]any{"body": tt.body}
-			out, err := engine().Render(claimsTemplate, d)
+			out, err := engine().Render(ordersTemplate, d)
 			if err != nil {
 				t.Fatalf("render: %v", err)
 			}
@@ -62,21 +62,21 @@ func TestInlinePartialsRenderAWireMockTemplate(t *testing.T) {
 			if err := json.Unmarshal([]byte(out), &v); err != nil {
 				t.Fatalf("the output is not valid JSON: %v\n%s", err, out)
 			}
-			incidents, _ := v["incidents"].([]any)
-			if len(incidents) == 0 {
-				t.Fatalf("no incidents in %s", out)
+			shipments, _ := v["shipments"].([]any)
+			if len(shipments) == 0 {
+				t.Fatalf("no shipments in %s", out)
 			}
-			first, _ := incidents[0].(map[string]any)
-			items, _ := first["loss_items"].([]any)
-			firstItem := map[string]any{}
-			if len(items) > 0 {
-				firstItem, _ = items[0].(map[string]any)
+			first, _ := shipments[0].(map[string]any)
+			parcels, _ := first["parcels"].([]any)
+			firstParcel := map[string]any{}
+			if len(parcels) > 0 {
+				firstParcel, _ = parcels[0].(map[string]any)
 			}
-			if v["claim_id"] != tt.claim || first["loss_party"] != tt.party {
-				t.Errorf("claim %v, loss party %v; want %q and %q", v["claim_id"], first["loss_party"], tt.claim, tt.party)
+			if v["order_id"] != tt.order || first["carrier"] != tt.carrier {
+				t.Errorf("order %v, carrier %v; want %q and %q", v["order_id"], first["carrier"], tt.order, tt.carrier)
 			}
-			if len(items) != tt.items || firstItem["brand"] != tt.brand {
-				t.Errorf("loss items %v; want %d, the first with brand %q", items, tt.items, tt.brand)
+			if len(parcels) != tt.parcels || firstParcel["colour"] != tt.colour {
+				t.Errorf("parcels %v; want %d, the first with colour %q", parcels, tt.parcels, tt.colour)
 			}
 		})
 	}

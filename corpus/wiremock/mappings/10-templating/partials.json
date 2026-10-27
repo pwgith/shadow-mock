@@ -1,0 +1,16 @@
+{
+  "mappings": [
+    {
+      "id": "c0100004-0010-4000-8000-000000000001",
+      "name": "Inline partials, block parameters and per-field defaults in a template file (shipments)",
+      "metadata": { "corpus": "templating", "feature": "partials" },
+      "request": { "method": "POST", "urlPath": "/wm/template/shipments" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "bodyFileName": "templates/shipments.json",
+        "transformers": ["response-template"]
+      }
+    }
+  ]
+}

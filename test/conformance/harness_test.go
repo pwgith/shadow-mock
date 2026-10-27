@@ -318,3 +318,25 @@ func (e *env) expectBody(name string, def map[string]any, got []byte) {
 		}
 	}
 }
+
+// expectRendered checks the body of a templated response against the text the case expects. Both
+// are compared as JSON when they parse as JSON, so layout does not matter.
+func (e *env) expectRendered(name, want string, got []byte) {
+	e.t.Helper()
+	var w, g any
+	if json.Unmarshal([]byte(want), &w) == nil {
+		if err := json.Unmarshal(got, &g); err != nil {
+			e.t.Errorf("%s: the rendered body is not JSON: %v\n%s", name, err, got)
+			return
+		}
+		if !reflect.DeepEqual(w, g) {
+			wb, _ := json.MarshalIndent(w, "", "  ")
+			gb, _ := json.MarshalIndent(g, "", "  ")
+			e.t.Errorf("%s: the rendered body differs\nwant:\n%s\ngot:\n%s", name, wb, gb)
+		}
+		return
+	}
+	if strings.TrimSpace(string(got)) != strings.TrimSpace(want) {
+		e.t.Errorf("%s: the rendered body is %q, want %q", name, got, want)
+	}
+}

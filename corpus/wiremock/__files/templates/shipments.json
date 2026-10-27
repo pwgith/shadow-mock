@@ -1,0 +1,45 @@
+{{#*inline "parcel"}}
+{
+  "id": "parcel-0001",
+  "number": 2,
+  "weight_kg": {{#if (neq this.weight_kg null)}}{{toJson this.weight_kg}}{{else}}5{{/if}},
+  "colour": {{#if (neq this.colour null)}}{{toJson this.colour}}{{else}}"Blue"{{/if}},
+  "size": {{#if (neq this.size null)}}{{toJson this.size}}{{else}}"M"{{/if}},
+  "category": {{#if (neq this.category null)}}{{toJson this.category}}{{else}}"Household"{{/if}},
+  "label": {{#if (neq this.label null)}}{{toJson this.label}}{{else}}"Books"{{/if}},
+  "kind": {{#if (neq this.kind null)}}{{toJson this.kind}}{{else}}"Standard_Parcel"{{/if}},
+  "packed_on": {{#if (neq this.packed_on null)}}{{toJson this.packed_on}}{{else}}"2025-04-25"{{/if}},
+  "fragile": {{#if (neq this.fragile null)}}{{toJson this.fragile}}{{else}}false{{/if}},
+  "mode": "standard",
+  "state": "new",
+  "value": {
+    "amount": {{#if (neq this.value.amount null)}}{{toJson this.value.amount}}{{else}}123.00{{/if}},
+    "currency": {{#if (neq this.value.currency null)}}{{toJson this.value.currency}}{{else}}"EUR"{{/if}}
+  },
+  "limit": {
+    "amount": {{#if (neq this.limit.amount null)}}{{toJson this.limit.amount}}{{else}}1000.00{{/if}},
+    "currency": {{#if (neq this.limit.currency null)}}{{toJson this.limit.currency}}{{else}}"EUR"{{/if}}
+  },
+  "note": {{#if (neq this.note null)}}{{toJson this.note}}{{else}}"Packing test"{{/if}},
+  "tag": {{#if (neq this.tag null)}}{{toJson this.tag}}{{else}}"Surface"{{/if}}
+}
+{{/inline}}
+{{#*inline "shipment"}}
+{
+  "shipment_id": {{#if (neq this.shipment_id null)}}{{toJson this.shipment_id}}{{else}}"shipment-0001"{{/if}},
+  "shipment_code": {{#if (neq this.shipment_code null)}}{{toJson this.shipment_code}}{{else}}"General_Shipment"{{/if}},
+  "carrier": {{#if (neq this.carrier null)}}{{toJson this.carrier}}{{else}}"freight"{{/if}},
+  "type": "StandardShipment",
+  "parcels": [
+    {{#each this.parcels as |p|}}{{> parcel p}}{{#unless @last}},{{/unless}}{{else}}{{> parcel this}}{{/each}}
+  ]
+}
+{{/inline}}
+{{#with (parseJson request.body) as |req|}}
+{
+  "order_id": {{#if (neq req.order_id null)}}{{toJson req.order_id}}{{else}}"O1000001"{{/if}},
+  "shipments": [
+    {{#each req.shipments as |ship|}}{{> shipment ship}}{{#unless @last}},{{/unless}}{{else}}{{> shipment req}}{{/each}}
+  ]
+}
+{{/with}}
