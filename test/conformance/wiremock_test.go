@@ -279,8 +279,8 @@ var wiremockUnsupported = map[string]string{
 	"c006000103": "XML body matchers are P3", "c006000104": "XML body matchers are P3",
 	"c006000105": "XPath body matchers are P3", "c006000106": "XPath body matchers are P3",
 	"c006000107": "XPath body matchers are P3",
-	"c013000101": "proxying is P3", "c013000103": "proxying is P3",
-	"c013000104": "proxying is P3", "c013000105": "proxying is P3",
+	"c013000101": "proxies to an upstream on 8089; the acceptance suite covers proxying", "c013000103": "proxies to an upstream on 8089; the acceptance suite covers proxying",
+	"c013000104": "proxies to an upstream on 8089; the acceptance suite covers proxying", "c013000105": "proxies to a templated host; the acceptance suite covers proxying",
 }
 
 // wiremockShadowed lists mappings that are never served because another wins for every

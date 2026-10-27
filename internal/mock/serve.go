@@ -16,6 +16,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/ids"
 	"github.com/pwgith/shadow-mock/internal/journal"
 	"github.com/pwgith/shadow-mock/internal/match"
+	"github.com/pwgith/shadow-mock/internal/model"
 	"github.com/pwgith/shadow-mock/internal/respond"
 	"github.com/pwgith/shadow-mock/internal/session"
 	"github.com/pwgith/shadow-mock/internal/stats"
@@ -68,6 +69,10 @@ func (s *Service) ServeMock(w http.ResponseWriter, r *http.Request, tr Traffic) 
 	}
 	res := engine.Resolve(req, stack)
 	if res.Stub == nil {
+		if rec := s.recordingFor(stack); rec != nil {
+			s.forward(ctx, w, r, req, &model.ResponseDefinition{ProxyBaseURL: rec.Spec.TargetBaseURL}, nil, rec, sv)
+			return
+		}
 		s.unmatched(w, req, stack, sv)
 		return
 	}
@@ -148,6 +153,10 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 	}
 	sv.entry.Definition = def
 	in := &respond.Input{Request: req, PathParams: res.Stub.Matcher.PathParams(req), CallNumber: callNumber}
+	if def.ProxyBaseURL != "" {
+		s.forward(ctx, w, r, req, def, in, nil, sv)
+		return
+	}
 	out, err := s.Renderer.Render(ctx, def, fileScopes(stack), in)
 	if err != nil {
 		s.fail(w, sv, req, err)

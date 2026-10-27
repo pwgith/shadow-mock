@@ -60,7 +60,6 @@ Feature: WireMock scenarios are not supported
       | PUT    | /scenarios/flow/state         |
 
   @P3
-  @p3-proxy
   Scenario: Recording offers call-count responses instead of scenarios
     Given the upstream stub server "jobs" returns "PENDING" then "COMPLETE" for "GET /jobs/1"
     And a URL-based shadow mock "U1"

@@ -23,6 +23,8 @@ import (
 	"github.com/pwgith/shadow-mock/internal/journal"
 	"github.com/pwgith/shadow-mock/internal/match"
 	"github.com/pwgith/shadow-mock/internal/mock"
+	"github.com/pwgith/shadow-mock/internal/proxy"
+	"github.com/pwgith/shadow-mock/internal/record"
 	"github.com/pwgith/shadow-mock/internal/respond"
 	"github.com/pwgith/shadow-mock/internal/server"
 	"github.com/pwgith/shadow-mock/internal/session"
@@ -103,7 +105,8 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	detector.SetSource(registry.All)
 	renderer := respond.NewRenderer(files, o.Clock, cfg.Respond.Gzip != "off")
 	renderer.Templating = cfg.Templating.Global
-	hooks := webhook.New(egress.New(egress.Options{BlockPrivate: cfg.Egress.BlockPrivate}), renderer.Templates, o.Clock, o.Logger)
+	client := egress.New(egress.Options{BlockPrivate: cfg.Egress.BlockPrivate})
+	hooks := webhook.New(client, renderer.Templates, o.Clock, o.Logger)
 	a.closers = append(a.closers, func() error { hooks.Close(); return nil })
 	svc := &mock.Service{
 		Mappings: mappings,
@@ -115,6 +118,8 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Journal:  journal.NewMemory(cfg.Storage.Journal.Hot.MaxEntries),
 		Renderer: renderer,
 		Webhooks: hooks,
+		Proxy:    proxy.New(client),
+		Recorder: record.NewRecorder(),
 		Stats:    stats.New(),
 		Clock:    o.Clock,
 		Logger:   o.Logger,

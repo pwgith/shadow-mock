@@ -16,6 +16,8 @@ import (
 	"github.com/pwgith/shadow-mock/internal/detect"
 	"github.com/pwgith/shadow-mock/internal/engine"
 	"github.com/pwgith/shadow-mock/internal/journal"
+	"github.com/pwgith/shadow-mock/internal/proxy"
+	"github.com/pwgith/shadow-mock/internal/record"
 	"github.com/pwgith/shadow-mock/internal/respond"
 	"github.com/pwgith/shadow-mock/internal/session"
 	"github.com/pwgith/shadow-mock/internal/stats"
@@ -56,6 +58,9 @@ type Service struct {
 	Renderer *respond.Renderer
 	// Webhooks sends the calls mappings make after serving; nil disables them.
 	Webhooks *webhook.Dispatcher
+	// Proxy forwards requests to upstream servers; Recorder holds the running recordings.
+	Proxy    *proxy.Forwarder
+	Recorder *record.Recorder
 	Stats    *stats.Tracker
 	Clock    clock.Clock
 	Logger   *slog.Logger

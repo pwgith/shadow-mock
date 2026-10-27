@@ -125,6 +125,7 @@ type world struct {
 
 	// state for individual steps
 	receivers      map[string]*receiver
+	upstreams      map[string]*upstream
 	sessionNumbers map[string][]int
 
 	createdSession map[string]any
@@ -207,6 +208,7 @@ func (w *world) stop() error {
 // close ends the scenario and removes its files.
 func (w *world) close() error {
 	w.closeReceivers()
+	w.closeUpstreams()
 	err := w.stop()
 	return errors.Join(err, os.RemoveAll(w.root))
 }

@@ -1,0 +1,215 @@
+package record_test
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+
+	"github.com/pwgith/shadow-mock/internal/match"
+	"github.com/pwgith/shadow-mock/internal/model"
+	"github.com/pwgith/shadow-mock/internal/record"
+	"github.com/pwgith/shadow-mock/internal/store"
+	"github.com/pwgith/shadow-mock/internal/tenant"
+)
+
+func exchange(t *testing.T, method, target, reqBody string, status int, respHeader http.Header, respBody string, reqHeaders ...string) record.Exchange {
+	t.Helper()
+	r := httptest.NewRequestWithContext(t.Context(), method, "http://mock"+target, strings.NewReader(reqBody))
+	for i := 0; i+1 < len(reqHeaders); i += 2 {
+		r.Header.Set(reqHeaders[i], reqHeaders[i+1])
+	}
+	return record.Exchange{Request: match.NewRequest(r, []byte(reqBody), r.URL.EscapedPath()), Status: status, Header: respHeader, Body: []byte(respBody)}
+}
+
+func jsonHeader() http.Header {
+	return http.Header{"Content-Type": {"application/json"}, "Content-Length": {"9"}, "Date": {"x"}, "X-Keep": {"1"}}
+}
+
+func TestBuildBodiesAndHeaders(t *testing.T) {
+	t.Parallel()
+	ms, err := record.Build(&record.Spec{}, []record.Exchange{
+		exchange(t, http.MethodGet, "/json?a=1", "", 200, jsonHeader(), `{"id":2}`),
+		exchange(t, http.MethodGet, "/text", "", 200, http.Header{"Content-Type": {"text/plain"}}, "hello"),
+		exchange(t, http.MethodGet, "/bin", "", 200, http.Header{"Content-Type": {"image/png"}}, "\x89PNG\x00"),
+		exchange(t, http.MethodGet, "/empty", "", 204, nil, ""),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ms) != 4 {
+		t.Fatalf("got %d mappings, want 4", len(ms))
+	}
+	want := []string{
+		`"jsonBody":{"id":2}`,
+		`"body":"hello"`,
+		`"base64Body":"iVBORwA="`,
+		`"status":204`,
+	}
+	for i, m := range ms {
+		b, _ := m.MarshalJSON()
+		if !strings.Contains(string(b), want[i]) {
+			t.Errorf("mapping %d = %s, want it to contain %s", i, b, want[i])
+		}
+		if m.ID == "" {
+			t.Errorf("mapping %d has no id", i)
+		}
+	}
+	first, _ := ms[0].MarshalJSON()
+	for _, s := range []string{`"url":"/json?a=1"`, `"method":"GET"`, `"X-Keep":"1"`} {
+		if !strings.Contains(string(first), s) {
+			t.Errorf("first mapping %s lacks %s", first, s)
+		}
+	}
+	for _, s := range []string{"Content-Length", "Date"} {
+		if strings.Contains(string(first), s) {
+			t.Errorf("first mapping records the transfer header %s: %s", s, first)
+		}
+	}
+}
+
+func TestBuildCapturesHeadersAndBodies(t *testing.T) {
+	t.Parallel()
+	spec := &record.Spec{
+		CaptureHeaders:     map[string]record.CaptureHeader{"Accept": {CaseInsensitive: true}, "X-Absent": {}},
+		RequestBodyPattern: &record.BodyPattern{Matcher: "auto", IgnoreArrayOrder: true},
+	}
+	ms, err := record.Build(spec, []record.Exchange{
+		exchange(t, http.MethodPost, "/j", `{"a":[1,2]}`, 200, nil, "", "Accept", "text/plain", "Content-Type", "application/json"),
+		exchange(t, http.MethodPost, "/x", `<a/>`, 200, nil, "", "Content-Type", "text/xml"),
+		exchange(t, http.MethodPost, "/t", `raw`, 200, nil, ""),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, 0, len(ms))
+	for _, m := range ms {
+		b, _ := m.MarshalJSON()
+		got = append(got, string(b))
+	}
+	for i, want := range []string{
+		`"bodyPatterns":[{"equalToJson":"{\"a\":[1,2]}","ignoreArrayOrder":true,"ignoreExtraElements":false}]`,
+		`"bodyPatterns":[{"equalToXml":"`,
+		`"bodyPatterns":[{"equalTo":"raw"}]`,
+	} {
+		if !strings.Contains(got[i], want) {
+			t.Errorf("mapping %d = %s, want it to contain %s", i, got[i], want)
+		}
+	}
+	if !strings.Contains(got[0], `"Accept":{"caseInsensitive":true,"equalTo":"text/plain"}`) || strings.Contains(got[0], "X-Absent") {
+		t.Errorf("captured headers wrong: %s", got[0])
+	}
+	// Without a requestBodyPattern the body is not part of the request pattern.
+	plain, err := record.Build(&record.Spec{}, []record.Exchange{exchange(t, http.MethodPost, "/p", "data", 200, nil, "")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := plain[0].MarshalJSON(); strings.Contains(string(b), "bodyPatterns") {
+		t.Errorf("mapping = %s, want no body pattern", b)
+	}
+}
+
+func TestBuildRepeats(t *testing.T) {
+	t.Parallel()
+	repeats := []record.Exchange{
+		exchange(t, http.MethodGet, "/jobs/1", "", 202, nil, "PENDING"),
+		exchange(t, http.MethodGet, "/other", "", 200, nil, "o"),
+		exchange(t, http.MethodGet, "/jobs/1", "", 200, nil, "COMPLETE"),
+	}
+	once, err := record.Build(&record.Spec{}, repeats)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(once) != 2 || once[0].HasCallResponses() || once[0].Response.Status != 202 {
+		t.Errorf("without repeats: %d mappings, first = %+v; want 2 with the first response kept", len(once), once[0].Response)
+	}
+	many, err := record.Build(&record.Spec{RepeatsAsCallResponses: true}, repeats)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(many) != 2 || !many[0].HasCallResponses() {
+		t.Fatalf("with repeats: %d mappings", len(many))
+	}
+	if got := []int{many[0].ResponseFor(1).StatusOrDefault(), many[0].ResponseFor(2).StatusOrDefault(), many[0].ResponseFor(9).StatusOrDefault()}; !cmp.Equal(got, []int{202, 200, 200}) {
+		t.Errorf("responses for calls 1, 2 and 9 = %v, want [202 200 200]", got)
+	}
+	if many[1].HasCallResponses() {
+		t.Error("a request seen once got call responses")
+	}
+}
+
+func TestRecorderLifecycle(t *testing.T) {
+	t.Parallel()
+	r := record.NewRecorder()
+	global := store.Global(tenant.Local)
+	sess := store.Scope{Tenant: tenant.Local, SessionID: "ses_1"}
+	if got := r.Status(global); got != record.StatusNever {
+		t.Errorf("initial status = %s", got)
+	}
+	if err := r.Start(global, record.Spec{}, nil); err == nil {
+		t.Error("a recording without a target started")
+	}
+	spec := record.Spec{TargetBaseURL: "http://up"}
+	if err := r.Start(global, spec, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Start(global, spec, nil); err == nil {
+		t.Error("a second recording started in the same scope")
+	}
+	if got := r.Status(global); got != record.StatusRecording {
+		t.Errorf("status = %s", got)
+	}
+	if r.Find([]store.Scope{sess}) != nil {
+		t.Error("a session found the global recording")
+	}
+	if err := r.Start(sess, spec, nil); err != nil {
+		t.Fatal(err)
+	}
+	// The most specific scope wins.
+	if a := r.Find([]store.Scope{sess, global}); a == nil || a != r.Find([]store.Scope{sess}) {
+		t.Error("Find did not prefer the session's recording")
+	}
+	a := r.Stop(global)
+	if a == nil || r.Status(global) != record.StatusStopped || r.Stop(global) != nil {
+		t.Errorf("stop: %v, status %s", a, r.Status(global))
+	}
+	r.Forget(sess)
+	if r.Status(sess) != record.StatusNever || r.Find([]store.Scope{sess}) != nil {
+		t.Error("Forget left the session's recording behind")
+	}
+}
+
+func TestActiveFilterAndExchanges(t *testing.T) {
+	t.Parallel()
+	r := record.NewRecorder()
+	sc := store.Global(tenant.Local)
+	var p model.RequestPattern
+	if err := p.UnmarshalJSON([]byte(`{"urlPathPattern":"/claims/.*"}`)); err != nil {
+		t.Fatal(err)
+	}
+	m, err := match.Compile(&p, match.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Start(sc, record.Spec{TargetBaseURL: "http://up"}, m); err != nil {
+		t.Fatal(err)
+	}
+	a := r.Find([]store.Scope{sc})
+	in, out := exchange(t, http.MethodGet, "/claims/1", "", 200, nil, ""), exchange(t, http.MethodGet, "/other", "", 200, nil, "")
+	if !a.Accepts(in.Request) || a.Accepts(out.Request) {
+		t.Error("the filter did not separate /claims/1 from /other")
+	}
+	a.Add(in)
+	if got := a.Exchanges(); len(got) != 1 {
+		t.Errorf("Exchanges = %d, want 1", len(got))
+	}
+	if !(&record.Spec{}).PersistOrDefault() {
+		t.Error("persist should default to true")
+	}
+	off := false
+	if (&record.Spec{Persist: &off}).PersistOrDefault() {
+		t.Error("persist=false was ignored")
+	}
+}

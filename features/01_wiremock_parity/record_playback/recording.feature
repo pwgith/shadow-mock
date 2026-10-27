@@ -9,7 +9,6 @@ Feature: Record and playback into the global session
     Given Shadow Mock is running
     And the upstream stub server "claims" returns 200 with JSON '{"id":1}' for "GET /claims/1"
 
-  @p3-proxy
   Scenario: Start, check status and stop a recording
     When I call admin "POST" "/recordings/start" with:
       """json
@@ -23,14 +22,12 @@ Feature: Record and playback into the global session
     And the response JSON at "$.mappings[0].request.url" is "/claims/1"
     And admin "GET" "/recordings/status" returns status "Stopped"
 
-  @p3-proxy
   Scenario: Recorded mappings play back without the upstream
     Given I record "GET /claims/1" from "${upstream.claims}"
     And the upstream stub server "claims" is stopped
     When I send a "GET" request to "/claims/1"
     Then the response JSON at "$.id" is 1
 
-  @p3-proxy
   Scenario: Recording with a filter and request-body capture
     When I call admin "POST" "/recordings/start" with:
       """json
@@ -44,7 +41,6 @@ Feature: Record and playback into the global session
     When I call admin "POST" "/recordings/stop"
     Then the response JSON at "$.mappings" has 1 items
 
-  @p3-proxy
   Scenario: Repeated identical requests become call-count responses when requested
     Given the upstream stub server "claims" returns 202 then 200 for "GET /claims/1"
     When I call admin "POST" "/recordings/start" with:
