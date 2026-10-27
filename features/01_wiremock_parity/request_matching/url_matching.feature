@@ -29,13 +29,29 @@ Feature: URL matching
       | matcher    | value              | requested          | status |
       | urlPattern | /claims/[0-9]+     | /claims/42         | 200    |
       | urlPattern | /claims/[0-9]+     | /claims/abc        | 404    |
-      | urlPattern | /claims\\?page=\\d | /claims?page=2     | 200    |
+      | urlPattern | /claims\\\\?page=\\\\d | /claims?page=2     | 200    |
 
     Examples: urlPathPattern: regex over the path only
       | matcher        | value          | requested          | status |
       | urlPathPattern | /claims/[0-9]+ | /claims/42?x=1     | 200    |
       | urlPathPattern | /claims/[0-9]+ | /claims/42/notes   | 404    |
 
+  Scenario: urlPathTemplate matches the path and its parameter matchers
+    Given the global mapping:
+      """json
+      { "request": { "urlPathTemplate": "/claims/{claimId}/notes/{noteId}",
+                     "pathParameters": { "claimId": { "matches": "[0-9]+" } } },
+        "response": { "status": 200 } }
+      """
+    When I send a "GET" request to "/claims/42/notes/7"
+    Then the response status is 200
+    When I send a "GET" request to "/claims/abc/notes/7"
+    Then the response status is 404
+    When I send a "GET" request to "/claims/42"
+    Then the response status is 404
+
+  # Needs response templating ({{request.path.*}}).
+  @P3
   Scenario: urlPathTemplate matches and exposes path parameters
     Given the global mapping:
       """json

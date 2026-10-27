@@ -284,7 +284,9 @@ linters:
 
     godot:
       scope: declarations
-      capital: true
+      # Doc comments start with the identifier they describe, which is lower case when
+      # unexported (Go Code Review Comments), so capitalisation is not enforced.
+      capital: false
 
     gocritic:
       enabled-tags:
@@ -293,6 +295,7 @@ linters:
         - performance
       disabled-checks:
         - hugeParam        # request and mapping structs are passed by value deliberately in tests
+        - rangeValCopy     # mapping lists are ranged by value on admin and load paths only; the request path uses *CompiledStub
         - paramTypeCombine
         - unnamedResult
         - whyNoLint        # nolintlint covers this
@@ -372,6 +375,18 @@ linters:
           - dupl
           - gochecknoglobals
           - forbidigo
+      # Step tables are long flat lists of closures, and assertion messages mix several values,
+      # so the complexity and error-wrapping rules do not fit the harness.
+      - path: test/acceptance/
+        linters:
+          - gocognit
+          - errorlint
+          - perfsprint
+          - gosec
+      # Route tables register one endpoint per line and look alike by design.
+      - path: internal/admin/routes\.go
+        linters:
+          - dupl
       # The clock package is the one place allowed to read real time.
       - path: internal/clock/
         linters:
@@ -387,7 +402,7 @@ linters:
         linters:
           - forbidigo
           - sloglint
-        text: (only cmd/shadowmock may exit|global logger)
+        text: (only cmd/shadowmock may exit|global logger|default logger)
       # External formats (JWT claims, OAuth) use snake_case JSON.
       - path: internal/auth/claims\.go
         linters:

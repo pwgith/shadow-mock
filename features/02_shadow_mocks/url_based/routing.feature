@@ -24,6 +24,8 @@ Feature: Routing through the URL insert
     When I send a "GET" request to "/search?q=x" via "U1"
     Then the response status is 200
 
+  # Needs response templating.
+  @P3
   Scenario: Templating sees the stripped path
     Given the mapping in "U1":
       """json

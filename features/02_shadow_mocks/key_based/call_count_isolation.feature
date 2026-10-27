@@ -82,6 +82,8 @@ Feature: Call-count isolation between sessions
     Then the store holds no call counters for "S1"
 
   @nfr
+  # Needs response templating ({{request.callNumber}}).
+  @P3
   Scenario: Concurrent sessions each get gap-free call numbers
     Given the global mapping:
       """json

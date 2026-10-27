@@ -1,0 +1,208 @@
+package acceptance
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/ohler55/ojg/jp"
+)
+
+// reply is a response the scenario received.
+type reply struct {
+	status     int
+	statusText string
+	header     http.Header
+	body       []byte
+	elapsed    time.Duration
+}
+
+// request describes one request a step sends.
+type request struct {
+	method string
+	target string
+	header http.Header
+	host   string
+	body   []byte
+	basic  [2]string
+	cookie [][2]string
+}
+
+func newRequest(method, target string) *request {
+	return &request{method: method, target: target, header: http.Header{}}
+}
+
+// resolve turns a step's target into a URL on the running engine. Absolute URLs for
+// localhost:8080, the standalone default, are redirected to the in-process server.
+func (w *world) resolve(target string) (string, error) {
+	target = w.sub(target)
+	switch {
+	case strings.HasPrefix(target, "/"):
+		return w.srv.URL + target, nil
+	case strings.HasPrefix(target, "http://localhost:8080"):
+		return w.srv.URL + strings.TrimPrefix(target, "http://localhost:8080"), nil
+	case strings.HasPrefix(target, w.srv.URL):
+		return target, nil
+	default:
+		return "", fmt.Errorf("cannot send a request to %q: this harness reaches only the engine under test", target)
+	}
+}
+
+// send sends r to the engine and records the reply as the scenario's last response.
+func (w *world) send(r *request) (*reply, error) {
+	if err := w.ensure(); err != nil {
+		return nil, err
+	}
+	target, err := w.resolve(r.target)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(context.Background(), r.method, target, bytes.NewReader(r.body))
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	for k, vs := range r.header {
+		for _, v := range vs {
+			req.Header.Add(k, w.sub(v))
+		}
+	}
+	if r.host != "" {
+		req.Host = w.sub(r.host)
+	}
+	if r.basic != [2]string{} {
+		req.SetBasicAuth(r.basic[0], r.basic[1])
+	}
+	for _, c := range r.cookie {
+		req.AddCookie(&http.Cookie{Name: c[0], Value: w.sub(c[1])})
+	}
+	start := time.Now()
+	resp, err := w.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %w", r.method, target, err)
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response of %s %s: %w", r.method, target, err)
+	}
+	rep := &reply{
+		status: resp.StatusCode, statusText: strings.TrimPrefix(resp.Status, fmt.Sprintf("%d ", resp.StatusCode)),
+		header: resp.Header, body: b, elapsed: time.Since(start),
+	}
+	w.last = rep
+	w.history = append(w.history, rep)
+	return rep, nil
+}
+
+// adminCall sends an admin request (relative to the configured admin prefix).
+func (w *world) adminCall(method, path, body string, header http.Header) (*reply, error) {
+	if err := w.ensure(); err != nil {
+		return nil, err
+	}
+	r := newRequest(method, w.adminPrefix()+w.sub(path))
+	if body != "" {
+		r.body = []byte(w.sub(body))
+		if strings.Contains(path, "/files/") {
+			r.header.Set("Content-Type", "application/octet-stream")
+		} else {
+			r.header.Set("Content-Type", "application/json")
+		}
+	}
+	for k, vs := range header {
+		for _, v := range vs {
+			r.header.Add(k, v)
+		}
+	}
+	return w.send(r)
+}
+
+// mustAdmin sends an admin request and fails unless the status is one of want.
+func (w *world) mustAdmin(method, path, body string, want ...int) (*reply, error) {
+	rep, err := w.adminCall(method, path, body, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range want {
+		if rep.status == s {
+			return rep, nil
+		}
+	}
+	return rep, fmt.Errorf("%s %s = %d, want %v; body: %s", method, path, rep.status, want, truncate(rep.body))
+}
+
+func truncate(b []byte) string {
+	const limit = 600
+	if len(b) > limit {
+		return string(b[:limit]) + "…"
+	}
+	return string(b)
+}
+
+var dashSegment = regexp.MustCompile(`\.([A-Za-z0-9_]*-[A-Za-z0-9_-]*)`)
+
+// jsonAt evaluates a JSONPath expression against a JSON document.
+func jsonAt(doc []byte, path string) ([]any, error) {
+	var v any
+	if err := json.Unmarshal(doc, &v); err != nil {
+		return nil, fmt.Errorf("the body is not JSON: %w (%s)", err, truncate(doc))
+	}
+	// Header names such as X-Test contain a dash, which the path parser needs bracketed.
+	path = dashSegment.ReplaceAllString(path, `['$1']`)
+	x, err := jp.ParseString(path)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JSONPath %q: %w", path, err)
+	}
+	return x.Get(v), nil
+}
+
+// jsonOne returns the single value at path.
+func (w *world) jsonOne(path string) (any, bool, error) {
+	if w.last == nil {
+		return nil, false, fmt.Errorf("no response yet")
+	}
+	res, err := jsonAt(w.last.body, w.sub(path))
+	if err != nil {
+		return nil, false, err
+	}
+	if len(res) == 0 {
+		return nil, false, nil
+	}
+	return res[0], true, nil
+}
+
+// text renders a JSON value as the text a step compares against.
+func text(v any) string {
+	switch t := v.(type) {
+	case string:
+		return t
+	case float64:
+		if t == float64(int64(t)) {
+			return fmt.Sprintf("%d", int64(t))
+		}
+		return fmt.Sprintf("%v", t)
+	case nil:
+		return "null"
+	case bool:
+		return fmt.Sprintf("%v", t)
+	default:
+		b, _ := json.Marshal(t) //nolint:errcheck // values come from a parsed document
+		return string(b)
+	}
+}
+
+func queryEscape(s string) string { return url.QueryEscape(s) }
+
+func jsonBytes(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	return b
+}

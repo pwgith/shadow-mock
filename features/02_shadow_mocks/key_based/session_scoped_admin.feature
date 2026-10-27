@@ -42,6 +42,8 @@ Feature: Session-scoped admin API
     When I call admin "GET" "/mappings" with header "X-Shadow-Mock-Key" set to "${S1.id}"
     Then the response is the mapping list of "S1"
 
+  # Needs a WireMock Java client in the harness (NFR-1.2 conformance run).
+  @wip
   Scenario: A WireMock client pointed at the session base URL manages only the session
     Given a WireMock Java client configured with base URL "{admin base}/sessions/${S1.id}"
     When the client calls stubFor(get("/client").willReturn(ok("from-client")))

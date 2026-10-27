@@ -29,6 +29,8 @@ Feature: Basic auth, host, port and scheme matching
     Then the response status is 200
 
   @standalone
+  # Needs a TLS listener on 8443 in the harness.
+  @wip
   Scenario: Port and scheme matching
     Given Shadow Mock is listening on http port 8080 and https port 8443
     And the global mapping:

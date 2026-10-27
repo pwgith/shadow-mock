@@ -1,12 +1,14 @@
 package contract_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -51,8 +53,9 @@ func TestLiveContract(t *testing.T) {
 		client:    &http.Client{Transport: tr, Timeout: 30 * time.Second, CheckRedirect: noRedirects},
 		transport: tr,
 		token:     os.Getenv(envToken),
-		fixtures:  map[string]string{"{fileId}": "contract-fixture.json"},
-		created:   map[contract.Fixture]bool{},
+		// {runId} keeps match tokens unique, so reruns against a shared engine never collide.
+		fixtures: map[string]string{"{fileId}": "contract-fixture.json", "{runId}": strconv.FormatInt(time.Now().UnixNano(), 36)},
+		created:  map[contract.Fixture]bool{},
 	}
 	t.Cleanup(func() {
 		for i := len(run.cleanup) - 1; i >= 0; i-- {
@@ -86,9 +89,10 @@ func (r *liveRun) do(t *testing.T, method, path, contentType, body string, heade
 	t.Helper()
 	var rdr io.Reader
 	if body != "" {
-		rdr = strings.NewReader(body)
+		rdr = strings.NewReader(r.fill(body))
 	}
-	req, err := http.NewRequestWithContext(t.Context(), method, r.base.String()+r.fill(path), rdr)
+	// WithoutCancel: cleanups run after t.Context() is cancelled, and still need to send requests.
+	req, err := http.NewRequestWithContext(context.WithoutCancel(t.Context()), method, r.base.String()+r.fill(path), rdr)
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
@@ -119,6 +123,11 @@ func (r *liveRun) do(t *testing.T, method, path, contentType, body string, heade
 func (r *liveRun) check(t *testing.T, c contract.Case) {
 	t.Helper()
 	status, body := r.do(t, c.Method, c.Path, c.ContentType, c.Body, c.Header)
+	if status == http.StatusCreated && strings.HasPrefix(c.Path, "/__admin/sessions/") {
+		// Sessions created by a case are deleted at the end of the run, like fixtures.
+		id := idFrom(t, status, body)
+		r.cleanup = append(r.cleanup, func() { r.do(r.t, http.MethodDelete, "/__admin/sessions/"+id, "", "", nil) })
+	}
 	if !slices.Contains(c.WantStatus, status) {
 		t.Errorf("status = %d, want one of %v; body: %s", status, c.WantStatus, truncate(body))
 	}
@@ -131,6 +140,9 @@ func (r *liveRun) check(t *testing.T, c contract.Case) {
 		}
 	}
 	for _, v := range r.transport.TakeViolations() {
+		if c.InvalidRequest && strings.Contains(v, "): request body") {
+			continue
+		}
 		t.Errorf("contract violation: %s", v)
 	}
 }
@@ -143,7 +155,7 @@ func (r *liveRun) ensure(t *testing.T, f contract.Fixture) {
 	}
 	switch f {
 	case contract.FixtureKeyBasedSession:
-		id := r.createSession(t, "key-based", `{"name":"contract-fixture","ttlSeconds":900,"tokens":["CONTRACT-FIXTURE-TOKEN"]}`)
+		id := r.createSession(t, "key-based", `{"name":"contract-fixture","ttlSeconds":900,"tokens":["CONTRACT-FIXTURE-{runId}"]}`)
 		r.fixtures["{sessionId}"] = id
 	case contract.FixtureURLBasedSession:
 		id := r.createSession(t, "url-based", `{"name":"contract-fixture","ttlSeconds":900}`)

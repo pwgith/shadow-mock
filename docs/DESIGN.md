@@ -489,7 +489,7 @@ type Index struct {
 
 * **Library.** Use `github.com/petar-dambovaliev/aho-corasick` (a port of the Rust `aho-corasick` crate, with DFA and leftmost-longest support), wrapped behind the `Automaton` interface so it can be swapped for an in-house implementation if needed.
 * **Per-tenant automaton.** Keys are matched only within the tenant resolved for the traffic (FR-9.6). Standalone has one automaton.
-* **Rebuild.** Session create, delete, token change or expiry marks the tenant dirty. A builder goroutine debounces (default 25 ms, max 100 ms per NFR-2.4), builds a new `tenantIndex` and swaps it atomically. Build cost is O(total pattern length), which takes milliseconds even for 10k sessions.
+* **Rebuild.** Session create, delete, token change or expiry marks the index stale. The next lookup rebuilds it once, copy-on-write, and swaps it in atomically, so a burst of changes costs one rebuild and a session is detectable the moment its create call returns (inside the 100 ms of NFR-2.4). Build cost is O(total pattern length), which takes milliseconds even for 10k sessions. A debounced background builder (25 ms) replaces this when the first lookup after a large change becomes a latency problem.
 * **Fast negative.** If a tenant has no active sessions, stages 1 to 5 are skipped entirely (`ac == nil`).
 * **Ambiguity** (FR-7.10). Collect all distinct `owners` across matches in the stage, then apply the policy (`first` by lowest `Start`, or `reject`, or `global`).
 * **False-positive guard.** Tokens have a minimum length. Keys carry the `smk_` prefix and 26 random characters, so a false positive on a key is effectively impossible.

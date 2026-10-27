@@ -11,9 +11,10 @@ type Case struct {
 	// OperationID is the operation this case exercises. Every operation in the spec must
 	// have at least one case (see TestEveryOperationHasALiveCase).
 	OperationID string
-	// Method and Path are sent relative to the engine base URL. Path may contain
-	// placeholders filled from fixtures: {sessionId}, {urlMockId}, {stubMappingId},
-	// {sessionStubMappingId} and {fileId}.
+	// Method and Path are sent relative to the engine base URL. Path, Body and Header values
+	// may contain placeholders filled from fixtures: {sessionId}, {urlMockId},
+	// {stubMappingId}, {sessionStubMappingId} and {fileId}, plus {runId}, which is unique per
+	// run so match tokens never collide with an earlier run's.
 	Method string
 	Path   string
 	// Body is sent as-is with ContentType (default application/json).
@@ -26,6 +27,9 @@ type Case struct {
 	WantStatus []int
 	// WantError, if set, is the `error` code the body must carry.
 	WantError string
+	// InvalidRequest marks a case that sends a body the contract forbids, to check that the
+	// engine rejects it. Request-side violations are expected; response checks still apply.
+	InvalidRequest bool
 	// Needs lists fixtures that must exist before the case runs.
 	Needs []Fixture
 }
@@ -70,7 +74,7 @@ var Cases = []Case{
 	// ── Mappings (global scope) ──
 	{Name: "list mappings", OperationID: "listMappings", Method: http.MethodGet, Path: "/__admin/mappings?limit=10&offset=0", WantStatus: statuses(200)},
 	{Name: "create mapping (global write)", OperationID: "createMapping", Method: http.MethodPost, Path: "/__admin/mappings", Body: simpleMapping, WantStatus: statuses(201, 403)},
-	{Name: "create mapping rejects scenario fields", OperationID: "createMapping", Method: http.MethodPost, Path: "/__admin/mappings", Body: scenarioMapping, Header: map[string]string{"X-Shadow-Mock-Key": "{sessionId}"}, WantStatus: statuses(422), WantError: "scenarios_not_supported", Needs: []Fixture{FixtureKeyBasedSession}},
+	{Name: "create mapping rejects scenario fields", OperationID: "createMapping", Method: http.MethodPost, Path: "/__admin/mappings", Body: scenarioMapping, Header: map[string]string{"X-Shadow-Mock-Key": "{sessionId}"}, InvalidRequest: true, WantStatus: statuses(422), WantError: "scenarios_not_supported", Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "create mapping rejects an invalid mapping", OperationID: "createMapping", Method: http.MethodPost, Path: "/__admin/mappings", Body: `{"request":{"url":"/a","urlPath":"/a"},"response":{"status":200}}`, Header: map[string]string{"X-Shadow-Mock-Key": "{sessionId}"}, WantStatus: statuses(422), Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "delete all mappings (global write)", OperationID: "deleteAllMappings", Method: http.MethodDelete, Path: "/__admin/mappings", Header: map[string]string{"X-Shadow-Mock-Key": "{sessionId}"}, WantStatus: statuses(200), Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "get mapping", OperationID: "getMapping", Method: http.MethodGet, Path: "/__admin/mappings/{stubMappingId}", WantStatus: statuses(200), Needs: []Fixture{FixtureGlobalMapping}},
@@ -110,7 +114,7 @@ var Cases = []Case{
 	{Name: "list counters", OperationID: "listCounters", Method: http.MethodGet, Path: "/__admin/counters", WantStatus: statuses(200)},
 	{Name: "reset counters", OperationID: "resetCounters", Method: http.MethodPost, Path: "/__admin/counters/reset", Header: map[string]string{"X-Shadow-Mock-Key": "{sessionId}"}, WantStatus: statuses(200), Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "set a counter", OperationID: "setCounter", Method: http.MethodPut, Path: "/__admin/counters/{stubMappingId}", Body: `{"count":9}`, WantStatus: statuses(200), Needs: []Fixture{FixtureGlobalMapping}},
-	{Name: "set a counter to a negative value", OperationID: "setCounter", Method: http.MethodPut, Path: "/__admin/counters/{stubMappingId}", Body: `{"count":-1}`, WantStatus: statuses(422), Needs: []Fixture{FixtureGlobalMapping}},
+	{Name: "set a counter to a negative value", OperationID: "setCounter", Method: http.MethodPut, Path: "/__admin/counters/{stubMappingId}", Body: `{"count":-1}`, InvalidRequest: true, WantStatus: statuses(422), Needs: []Fixture{FixtureGlobalMapping}},
 	{Name: "reset one counter", OperationID: "resetCounter", Method: http.MethodDelete, Path: "/__admin/counters/{stubMappingId}", WantStatus: statuses(200), Needs: []Fixture{FixtureGlobalMapping}},
 	{Name: "scenarios are not supported", OperationID: "scenariosNotSupported", Method: http.MethodGet, Path: "/__admin/scenarios", WantStatus: statuses(404), WantError: "not_supported"},
 
@@ -129,15 +133,15 @@ var Cases = []Case{
 
 	// ── Sessions ──
 	{Name: "list sessions", OperationID: "listSessions", Method: http.MethodGet, Path: "/__admin/sessions?kind=key-based", WantStatus: statuses(200)},
-	{Name: "create key-based session", OperationID: "createKeyBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/key-based", Body: `{"name":"contract","ttlSeconds":600,"tokens":["CONTRACT-TOKEN-1"]}`, WantStatus: statuses(201)},
-	{Name: "create key-based session with too long a TTL", OperationID: "createKeyBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/key-based", Body: `{"ttlSeconds":86401}`, WantStatus: statuses(422), WantError: "ttl_exceeds_maximum"},
-	{Name: "create key-based session with a short token", OperationID: "createKeyBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/key-based", Body: `{"tokens":["AB12"]}`, WantStatus: statuses(422), WantError: "token_too_short"},
-	{Name: "create key-based session with a token in use", OperationID: "createKeyBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/key-based", Body: `{"tokens":["CONTRACT-FIXTURE-TOKEN"]}`, WantStatus: statuses(409), WantError: "token_in_use", Needs: []Fixture{FixtureKeyBasedSession}},
+	{Name: "create key-based session", OperationID: "createKeyBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/key-based", Body: `{"name":"contract","ttlSeconds":600,"tokens":["CONTRACT-TOKEN-1-{runId}"]}`, WantStatus: statuses(201)},
+	{Name: "create key-based session with too long a TTL", OperationID: "createKeyBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/key-based", Body: `{"ttlSeconds":86401}`, InvalidRequest: true, WantStatus: statuses(422), WantError: "ttl_exceeds_maximum"},
+	{Name: "create key-based session with a short token", OperationID: "createKeyBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/key-based", Body: `{"tokens":["AB12"]}`, InvalidRequest: true, WantStatus: statuses(422), WantError: "token_too_short"},
+	{Name: "create key-based session with a token in use", OperationID: "createKeyBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/key-based", Body: `{"tokens":["CONTRACT-FIXTURE-{runId}"]}`, WantStatus: statuses(409), WantError: "token_in_use", Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "create URL-based session", OperationID: "createURLBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/url-based", Body: `{"name":"contract-ci","ttlSeconds":3600}`, WantStatus: statuses(201)},
-	{Name: "create URL-based session with too long a TTL", OperationID: "createURLBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/url-based", Body: `{"ttlSeconds":2592001}`, WantStatus: statuses(422)},
+	{Name: "create URL-based session with too long a TTL", OperationID: "createURLBasedSession", Method: http.MethodPost, Path: "/__admin/sessions/url-based", Body: `{"ttlSeconds":2592001}`, InvalidRequest: true, WantStatus: statuses(422)},
 	{Name: "get session", OperationID: "getSession", Method: http.MethodGet, Path: "/__admin/sessions/{sessionId}", WantStatus: statuses(200), Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "get unknown session", OperationID: "getSession", Method: http.MethodGet, Path: "/__admin/sessions/" + unknownSessionID, WantStatus: statuses(404)},
-	{Name: "patch session", OperationID: "updateSession", Method: http.MethodPatch, Path: "/__admin/sessions/{sessionId}", Body: `{"ttlSeconds":1200,"addTokens":["CONTRACT-TOKEN-2"]}`, WantStatus: statuses(200), Needs: []Fixture{FixtureKeyBasedSession}},
+	{Name: "patch session", OperationID: "updateSession", Method: http.MethodPatch, Path: "/__admin/sessions/{sessionId}", Body: `{"ttlSeconds":1200,"addTokens":["CONTRACT-TOKEN-2-{runId}"]}`, WantStatus: statuses(200), Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "keepalive", OperationID: "keepSessionAlive", Method: http.MethodPost, Path: "/__admin/sessions/{sessionId}/keepalive", WantStatus: statuses(200), Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "delete unknown session", OperationID: "deleteSession", Method: http.MethodDelete, Path: "/__admin/sessions/" + unknownSessionID, WantStatus: statuses(404)},
 
@@ -145,7 +149,7 @@ var Cases = []Case{
 	{Name: "list session mappings", OperationID: "listSessionMappings", Method: http.MethodGet, Path: "/__admin/sessions/{sessionId}/mappings", WantStatus: statuses(200), Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "create session mapping with call counts", OperationID: "createSessionMapping", Method: http.MethodPost, Path: "/__admin/sessions/{sessionId}/mappings", Body: callCountMapping, WantStatus: statuses(201), Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "create session mapping with an invalid call rule", OperationID: "createSessionMapping", Method: http.MethodPost, Path: "/__admin/sessions/{sessionId}/mappings", Body: `{"request":{"urlPath":"/x"},"response":{"status":200},"callResponses":[{"calls":"4-2","response":{"status":500}}]}`, WantStatus: statuses(422), Needs: []Fixture{FixtureKeyBasedSession}},
-	{Name: "create session mapping with scenario fields", OperationID: "createSessionMapping", Method: http.MethodPost, Path: "/__admin/sessions/{sessionId}/mappings", Body: scenarioMapping, WantStatus: statuses(422), WantError: "scenarios_not_supported", Needs: []Fixture{FixtureKeyBasedSession}},
+	{Name: "create session mapping with scenario fields", OperationID: "createSessionMapping", Method: http.MethodPost, Path: "/__admin/sessions/{sessionId}/mappings", Body: scenarioMapping, InvalidRequest: true, WantStatus: statuses(422), WantError: "scenarios_not_supported", Needs: []Fixture{FixtureKeyBasedSession}},
 	{Name: "get session mapping", OperationID: "getSessionMapping", Method: http.MethodGet, Path: "/__admin/sessions/{sessionId}/mappings/{sessionStubMappingId}", WantStatus: statuses(200), Needs: []Fixture{FixtureSessionMapping}},
 	{Name: "replace session mapping", OperationID: "replaceSessionMapping", Method: http.MethodPut, Path: "/__admin/sessions/{sessionId}/mappings/{sessionStubMappingId}", Body: simpleMapping, WantStatus: statuses(200), Needs: []Fixture{FixtureSessionMapping}},
 	{Name: "delete unknown session mapping", OperationID: "deleteSessionMapping", Method: http.MethodDelete, Path: "/__admin/sessions/{sessionId}/mappings/" + unknownMappingID, WantStatus: statuses(404), Needs: []Fixture{FixtureKeyBasedSession}},
