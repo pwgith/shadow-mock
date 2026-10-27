@@ -2,7 +2,7 @@
 
 ## Install
 
-Download the binary for your system from the project's releases page, or build it with Go 1.26
+Download the binary for your system from the project's releases page (use the newest `v` release; `edge` is the latest build of `main`), or build it with Go 1.26
 or later:
 
 ```bash

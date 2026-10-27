@@ -24,7 +24,7 @@ import (
 )
 
 // version is set at build time with -ldflags "-X main.version=…".
-var version = "0.1.0-dev"
+var version = "0.0.0-dev"
 
 // maxDelay bounds the write timeout; mock delays longer than this are cut off.
 const maxDelay = 5 * time.Minute

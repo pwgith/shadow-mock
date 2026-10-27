@@ -3,7 +3,8 @@
 # SHA256SUMS. The engine is pure Go (no cgo), so one machine builds every target.
 #
 # Usage: scripts/build-release.sh [--list] [VERSION]
-#   VERSION  defaults to `git describe --tags --always --dirty`
+#   VERSION  a semantic version without the leading v (0.2.0, 0.2.0-rc.1, 0.2.0-edge.abc12345);
+#            defaults to `git describe --tags --always --dirty` with any leading v removed
 #   output   dist/shadowmock_<version>_<os>_<arch>.tar.gz (.zip for Windows) and dist/SHA256SUMS
 set -euo pipefail
 
@@ -25,6 +26,7 @@ fi
 
 cd "$(dirname "$0")/.."
 VERSION="${1:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}"
+VERSION="${VERSION#v}"
 DIST=dist
 rm -rf "$DIST"
 mkdir -p "$DIST"

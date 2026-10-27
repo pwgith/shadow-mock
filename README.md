@@ -34,7 +34,7 @@ error. Use `callResponses` instead.
 
 ## Install
 
-Download a binary from the releases page, or build from source with Go 1.26 or later:
+Download a binary from the [releases page](https://github.com/pwgith/shadow-mock/releases) (versions follow [semantic versioning](docs/RELEASING.md); the `edge` pre-release is the newest build of `main`), or build from source with Go 1.26 or later:
 
 ```bash
 go build -o shadowmock ./cmd/shadowmock
