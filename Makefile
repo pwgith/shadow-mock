@@ -36,7 +36,7 @@ bench:
 corpus:
 	node scripts/check-corpus.js
 
-# Cross-compiles every supported OS and CPU into dist/ (what the release-binaries workflow runs).
+# Cross-compiles every supported OS and CPU into dist/ (what the release-binaries workflow publishes).
 release:
 	bash scripts/build-release.sh
 
