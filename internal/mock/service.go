@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/clock"
@@ -65,6 +66,8 @@ type Service struct {
 	Clock    clock.Clock
 	Logger   *slog.Logger
 	Config   Config
+
+	inflight sync.Map // path -> *atomic.Int64
 }
 
 // errNotFound is a 404 with the not_found code.

@@ -340,9 +340,9 @@ func TestWriteDribble(t *testing.T) {
 	if rec.Body.String() != "0123456789ABCDEFGHIJ" || !rec.Flushed {
 		t.Errorf("body %q, flushed %v", rec.Body, rec.Flushed)
 	}
-	// Four chunks, with a pause of 100ms between each pair.
-	if got := clk.Now().Sub(start); got != 300*time.Millisecond {
-		t.Errorf("the dribble took %v of fake time, want 300ms", got)
+	// Four chunks, each after a pause of 100ms.
+	if got := clk.Now().Sub(start); got != 400*time.Millisecond {
+		t.Errorf("the dribble took %v of fake time, want 400ms", got)
 	}
 	if rec.Header().Get("Content-Length") != "" {
 		t.Error("a dribbled body is sent chunked, without a Content-Length")

@@ -95,7 +95,7 @@ func (r *Renderer) dribble(ctx context.Context, w http.ResponseWriter, status in
 	pause := time.Duration(d.TotalDuration) * time.Millisecond / time.Duration(n)
 	flusher, canFlush := w.(http.Flusher)
 	for i := 0; i < len(body); i += max(size, 1) {
-		if i > 0 && !r.Clock.Sleep(ctx, pause) {
+		if !r.Clock.Sleep(ctx, pause) { // every chunk waits, so the body takes the whole duration
 			return fmt.Errorf("dribble: %w", ctx.Err())
 		}
 		end := min(i+max(size, 1), len(body))

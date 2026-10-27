@@ -29,6 +29,9 @@ func (w *world) initAssert(sc *godog.ScenarioContext) {
 }
 
 func (w *world) needLast() (*reply, error) {
+	if w.sendErr != nil {
+		return nil, fmt.Errorf("the request failed on the wire: %w", w.sendErr)
+	}
 	if w.last == nil {
 		return nil, fmt.Errorf("no response has been received yet")
 	}

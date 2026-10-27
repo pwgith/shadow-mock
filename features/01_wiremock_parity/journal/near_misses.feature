@@ -13,7 +13,6 @@ Feature: Near misses
       { "name": "far", "request": { "method": "POST", "urlPath": "/payments" }, "response": { "status": 200 } }
       """
 
-  @p3-harness
   Scenario: Near misses for a request
     When I call admin "POST" "/near-misses/request" with:
       """json
