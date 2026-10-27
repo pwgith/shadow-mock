@@ -167,6 +167,8 @@ Other structure rules:
 * Fuzz tests (`FuzzXxx`) for every parser: mapping JSON, body scanner, template parser, CIDR input.
 * Coverage targets are at least 85 % for `engine`, `match`, `detect` and `counter`, and at least 70 % overall (`scripts/lint.sh` reports, and CI enforces).
 * **Acceptance specs:** the Gherkin features in `features/` run with godog. Step definitions live in `test/acceptance/steps_*.go` and reuse the vocabulary in `features/README.md`. A behaviour change updates the relevant `.feature` file in the same pull request.
+* **Corpus conformance:** `test/conformance` loads the mapping corpus in `corpus/` into an engine and replays requests against it. Each case names the mapping that must serve the request, and the expected response is read from that mapping file, so the corpus is the single source of truth. Every corpus mapping must have a case or an entry explaining why not, so a new corpus file cannot be added untested.
+* **API contract:** `test/contract` checks `api/openapi.yaml` offline in every test run. `make contract-live` also builds the engine, starts it, calls every operation and checks each request and response against the spec; CI runs it in the `contract` job.
 
 ## 17. Dependencies
 
@@ -193,6 +195,7 @@ Blanket `//nolint` or file-wide suppressions are rejected (`nolintlint`). Projec
 make fmt      # gofumpt + goimports
 make lint     # golangci-lint + scripts/lint.sh (file names, TODOs, go mod tidy, govulncheck)
 make test     # go test -race ./... with coverage
+make contract-live  # build and start the engine, then check every API operation against api/openapi.yaml
 make release  # cross-compile every supported OS and CPU into dist/
 ```
 

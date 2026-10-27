@@ -36,6 +36,7 @@ type Traffic struct {
 
 // served is what one mock request produced, for the journal and stats.
 type served struct {
+	done  bool // the journal entry and stats are recorded once
 	entry *journal.Entry
 	start time.Time
 	stage string
@@ -153,7 +154,7 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 	}
 	sv.entry.Response = journal.Response{Status: out.Status, Header: out.Header.Clone(), Body: out.Body}
 	sv.entry.AddedDelay = out.Delay.Milliseconds()
-	if err := s.Renderer.Write(ctx, w, r, out); err != nil {
+	if err := s.Renderer.Write(ctx, w, r, out, func() { s.finish(sv) }); err != nil {
 		s.Logger.DebugContext(ctx, "response not completed", "error", err.Error())
 	}
 }
@@ -181,9 +182,10 @@ func (s *Service) unmatched(w http.ResponseWriter, req *match.Request, stack eng
 	}
 	body := []byte(b.String())
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	sv.entry.Response = journal.Response{Status: http.StatusNotFound, Header: w.Header().Clone(), Body: body}
+	s.finish(sv) // recorded before the client can see the response (FR-5.5)
 	w.WriteHeader(http.StatusNotFound)
 	_, _ = w.Write(body)
-	sv.entry.Response = journal.Response{Status: http.StatusNotFound, Header: w.Header().Clone(), Body: body}
 }
 
 // fail sends an engine error on a mock path and records it.
@@ -196,11 +198,18 @@ func (s *Service) fail(w http.ResponseWriter, sv *served, req *match.Request, er
 		s.Logger.Error("mock request failed", "error", err.Error())
 		ae = apierr.New(http.StatusInternalServerError, "internal_error", "The engine could not serve this request.")
 	}
+	sv.entry.Response = journal.Response{
+		Status: ae.Status, Header: http.Header{"Content-Type": {"application/json"}}, Body: []byte(ae.Message),
+	}
+	s.finish(sv) // recorded before the client can see the response (FR-5.5)
 	ae.Write(w)
-	sv.entry.Response = journal.Response{Status: ae.Status, Header: w.Header().Clone(), Body: []byte(ae.Message)}
 }
 
 func (s *Service) finish(sv *served) {
+	if sv.done {
+		return
+	}
+	sv.done = true
 	e := sv.entry
 	e.ProcessTime = s.Clock.Now().Sub(sv.start).Milliseconds()
 	if e.Request != nil {

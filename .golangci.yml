@@ -358,8 +358,12 @@ linters:
       - std-error-handling   # deferred Close/Flush and print helpers, as is standard practice
     rules:
       # Tests may use fixtures, panics, long table-driven functions and real time in benchmarks.
+      # They also discard errors from calls whose failure the next assertion reports (a list that
+      # cannot be read is an empty list), and group many cases in one function.
       - path: _test\.go
         linters:
+          - errcheck
+          - gocognit
           - dupl
           - funlen
           - gochecknoglobals
