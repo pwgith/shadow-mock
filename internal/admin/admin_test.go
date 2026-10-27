@@ -555,7 +555,7 @@ func TestGlobalWritesReservedForTheManagementApp(t *testing.T) {
 	a.want(200, "GET", "/mappings", "")
 	id := a.want(201, "POST", "/sessions/key-based", `{}`)["id"].(string)
 	a.want(201, "POST", "/sessions/"+id+"/mappings", mapping(idA, "/a", "x"))
-	a.want(200, "POST", "/sessions/"+id+"/recordings/start", `{}`)
+	a.want(200, "POST", "/sessions/"+id+"/recordings/start", `{"targetBaseUrl":"http://localhost:8089"}`)
 	a.want(200, "DELETE", "/requests", "")
 }
 

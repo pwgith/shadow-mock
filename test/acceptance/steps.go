@@ -23,6 +23,8 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 		w.initAssert(sc)
 		w.initWebhook(sc)
 		w.initConcurrent(sc)
+		w.initUpstream(sc)
+		w.initRecordingAsserts(sc)
 		return ctx, nil
 	})
 	sc.After(func(ctx context.Context, s *godog.Scenario, _ error) (context.Context, error) {

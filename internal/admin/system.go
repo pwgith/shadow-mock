@@ -2,11 +2,11 @@ package admin
 
 import (
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/model"
+	"github.com/pwgith/shadow-mock/internal/record"
 	"github.com/pwgith/shadow-mock/internal/respond"
 	"github.com/pwgith/shadow-mock/internal/session"
 	"github.com/pwgith/shadow-mock/internal/stats"
@@ -103,12 +103,6 @@ func (h *Handler) usage(_ http.ResponseWriter, _ *http.Request, _ store.Scope) e
 
 // recordings tracks recording state per scope. Capturing traffic needs proxying, which
 // arrives in P3, so a recording currently produces no mappings.
-type recordings struct {
-	mu     sync.Mutex
-	status map[store.Scope]string
-}
-
-func newRecordings() *recordings { return &recordings{status: map[store.Scope]string{}} }
 
 type recordingStatus struct {
 	Status string `json:"status"`
@@ -119,40 +113,36 @@ type snapshotResult struct {
 }
 
 func (h *Handler) startRecording(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
-	var spec struct {
-		TargetBaseURL string `json:"targetBaseUrl"`
-	}
+	var spec record.Spec
 	if err := h.decode(r, &spec); err != nil {
 		return err
 	}
-	h.recordings.mu.Lock()
-	defer h.recordings.mu.Unlock()
-	if h.recordings.status[sc] == "Recording" {
-		return apierr.New(http.StatusConflict, apierr.RecordingInProgress, "A recording is already running in this scope.")
+	if err := h.svc.StartRecording(sc, spec); err != nil {
+		return err
 	}
-	h.recordings.status[sc] = "Recording"
 	return ok(w)
 }
 
-func (h *Handler) stopRecording(w http.ResponseWriter, _ *http.Request, sc store.Scope) error {
-	h.recordings.mu.Lock()
-	if h.recordings.status[sc] == "Recording" {
-		h.recordings.status[sc] = "Stopped"
+func (h *Handler) stopRecording(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
+	ms, err := h.svc.StopRecording(r.Context(), sc)
+	if err != nil {
+		return err
 	}
-	h.recordings.mu.Unlock()
-	return writeJSON(w, http.StatusOK, snapshotResult{Mappings: []model.StubMapping{}})
+	return writeJSON(w, http.StatusOK, snapshotResult{Mappings: ms})
 }
 
 func (h *Handler) recordingStatus(w http.ResponseWriter, _ *http.Request, sc store.Scope) error {
-	h.recordings.mu.Lock()
-	st := h.recordings.status[sc]
-	h.recordings.mu.Unlock()
-	if st == "" {
-		st = "NeverStarted"
-	}
-	return writeJSON(w, http.StatusOK, recordingStatus{Status: st})
+	return writeJSON(w, http.StatusOK, recordingStatus{Status: h.svc.RecordingStatus(sc)})
 }
 
-func (h *Handler) snapshot(w http.ResponseWriter, _ *http.Request, _ store.Scope) error {
-	return writeJSON(w, http.StatusOK, snapshotResult{Mappings: []model.StubMapping{}})
+func (h *Handler) snapshot(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
+	var spec record.Spec
+	if err := h.decode(r, &spec); err != nil {
+		return err
+	}
+	ms, err := h.svc.Snapshot(r.Context(), sc, spec)
+	if err != nil {
+		return err
+	}
+	return writeJSON(w, http.StatusOK, snapshotResult{Mappings: ms})
 }

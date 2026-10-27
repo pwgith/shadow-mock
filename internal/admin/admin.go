@@ -39,21 +39,20 @@ type Config struct {
 
 // Handler is the admin API.
 type Handler struct {
-	svc        *mock.Service
-	authn      auth.Authenticator
-	authz      auth.Authorizer
-	cfg        Config
-	logger     *slog.Logger
-	startedAt  time.Time
-	recordings *recordings
-	mux        *http.ServeMux
+	svc       *mock.Service
+	authn     auth.Authenticator
+	authz     auth.Authorizer
+	cfg       Config
+	logger    *slog.Logger
+	startedAt time.Time
+	mux       *http.ServeMux
 }
 
 // New builds the admin API.
 func New(svc *mock.Service, authn auth.Authenticator, authz auth.Authorizer, cfg Config, logger *slog.Logger) *Handler {
 	h := &Handler{
 		svc: svc, authn: authn, authz: authz, cfg: cfg, logger: logger,
-		startedAt: svc.Clock.Now(), recordings: newRecordings(), mux: http.NewServeMux(),
+		startedAt: svc.Clock.Now(), mux: http.NewServeMux(),
 	}
 	h.routes()
 	return h

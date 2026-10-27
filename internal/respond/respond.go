@@ -1,5 +1,5 @@
 // Package respond renders response definitions: body sources, headers, delays, gzip and
-// faults, and templating (DESIGN.md §9, FR-3.1–FR-3.5a, FR-3.4). Proxying arrives in P3.
+// faults, and templating (DESIGN.md §9, FR-3.1–FR-3.5a, FR-3.4). Proxying lives in internal/proxy.
 package respond
 
 import (
@@ -74,14 +74,15 @@ type Response struct {
 	GzipDisabled bool
 }
 
-// ErrProxyNotImplemented is returned for proxy responses until P3.
-var ErrProxyNotImplemented = errors.New("proxying is not implemented yet")
+// ErrProxyInDryRun is returned when a proxy response is rendered without a request to
+// forward, as in a dry run.
+var ErrProxyInDryRun = errors.New("a dry run does not call the upstream server")
 
 // Render builds the response for def. files lists the scopes to look up bodyFileName in,
 // most specific first, so a session's files override global ones.
 func (r *Renderer) Render(ctx context.Context, def *model.ResponseDefinition, files []store.Scope, in *Input) (*Response, error) {
 	if def.ProxyBaseURL != "" {
-		return nil, apierr.New(http.StatusNotImplemented, apierr.NotSupported, "%v (proxyBaseUrl %s).", ErrProxyNotImplemented, def.ProxyBaseURL)
+		return nil, apierr.New(http.StatusNotImplemented, apierr.NotSupported, "%v (proxyBaseUrl %s).", ErrProxyInDryRun, def.ProxyBaseURL)
 	}
 	var data map[string]any
 	if r.templated(def, in) {
@@ -213,4 +214,30 @@ func sample(d *model.DelayDistribution) int64 {
 	default:
 		return 0
 	}
+}
+
+// FromUpstream wraps a response received from a proxied server. The mapping's delays and
+// gzip setting still apply to it (FR-3.5).
+func (r *Renderer) FromUpstream(def *model.ResponseDefinition, status int, header http.Header, body []byte) *Response {
+	return &Response{
+		Status:       status,
+		Header:       header,
+		Body:         body,
+		Delay:        r.delay(def),
+		Dribble:      def.ChunkedDribbleDelay,
+		GzipDisabled: def.GzipDisabled,
+	}
+}
+
+// RenderText renders s as a template when def is templated, as WireMock does for a proxy
+// target. Otherwise s is returned as it is.
+func (r *Renderer) RenderText(def *model.ResponseDefinition, in *Input, s string) (string, error) {
+	if !r.templated(def, in) {
+		return s, nil
+	}
+	out, err := r.Templates.Render(s, Data(in, def.TransformerParameters))
+	if err != nil {
+		return "", templateError(err)
+	}
+	return out, nil
 }

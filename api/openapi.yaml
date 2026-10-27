@@ -1573,6 +1573,8 @@ components:
         # mock traffic only
         - ambiguous_session
         - egress_blocked
+        - bad_gateway
+        - template_error
     Error:
       type: object
       required: [error, message]

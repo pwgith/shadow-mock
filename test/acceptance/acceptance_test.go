@@ -19,7 +19,6 @@ var phases = []string{"@P0", "@P1", "@P2", "@P3"}
 var excluded = []string{
 	"@saas", "@multi-instance", "@perf", "@P4", "@P5", "@wip",
 	// P3 scenarios whose engine work or harness steps are still to come, one tag per piece.
-	"@p3-proxy",
 	"@p3-matchers",
 	"@p3-harness",
 }
