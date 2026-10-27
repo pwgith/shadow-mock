@@ -22,6 +22,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/engine"
 	"github.com/pwgith/shadow-mock/internal/journal"
 	"github.com/pwgith/shadow-mock/internal/match"
+	"github.com/pwgith/shadow-mock/internal/metrics"
 	"github.com/pwgith/shadow-mock/internal/mock"
 	"github.com/pwgith/shadow-mock/internal/proxy"
 	"github.com/pwgith/shadow-mock/internal/record"
@@ -53,6 +54,7 @@ type App struct {
 	cfg       config.Config
 	svc       *mock.Service
 	mockRoute *server.Router
+	metrics   *metrics.Metrics
 	adminOnly *server.Router // set when admin has its own listener
 	globalFS  *fs.Mappings
 	sessions  *fs.SessionStore
@@ -113,6 +115,9 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Ambiguity: detect.Policy(d.Ambiguity),
 	})
 	detector.SetSource(registry.All)
+	mx := metrics.New(func() int { return len(registry.All()) })
+	detector.Observe(o.Clock.Now, mx.Rebuilt)
+	a.metrics = mx
 	renderer := respond.NewRenderer(files, o.Clock, cfg.Respond.Gzip != "off")
 	renderer.Templating = cfg.Templating.Global
 	client := egress.New(egress.Options{BlockPrivate: cfg.Egress.BlockPrivate})
@@ -133,6 +138,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Proxy:    proxy.New(client),
 		Recorder: record.NewRecorder(),
 		Stats:    stats.New(),
+		Metrics:  mx,
 		Clock:    o.Clock,
 		Logger:   o.Logger,
 		Config: mock.Config{
@@ -167,7 +173,7 @@ func (a *App) routers(cfg config.Config, o Options) error {
 		ClientIP:    server.ClientIP{Header: cfg.Server.ClientIP.Header, TrustedHops: cfg.Server.ClientIP.TrustedHops, TrustedProxies: proxies},
 		ServeMock:   true,
 		ServeAdmin:  cfg.Listen.Admin == "",
-		Metrics:     server.WriteMetrics(a.svc),
+		Metrics:     a.metrics.Handler(),
 	}
 	a.mockRoute = &route
 	if cfg.Listen.Admin != "" {

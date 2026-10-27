@@ -238,6 +238,9 @@ func (s *Service) finish(sv *served) {
 	if e.Request != nil {
 		path = e.Request.Path
 	}
+	if s.Metrics != nil && e.Request != nil {
+		s.Metrics.Request(string(e.Tenant), e.Request.Method, e.Response.Status, e.Layer, sv.stage)
+	}
 	s.Stats.Record(stats.Event{
 		At: s.Clock.Now(), Tenant: e.Tenant, Layer: e.Layer, Path: path,
 		Latency: s.Clock.Now().Sub(sv.start), Stage: sv.stage,

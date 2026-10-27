@@ -130,7 +130,8 @@ type world struct {
 	receivers      map[string]*receiver
 	upstreams      map[string]*upstream
 	matchers       []extension.RequestMatcher
-	sendErr        error // the last request failed on the wire
+	sendErr        error  // the last request failed on the wire
+	scrape         string // the last metrics scrape
 	sessionNumbers map[string][]int
 
 	createdSession map[string]any

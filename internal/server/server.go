@@ -3,7 +3,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -34,7 +33,7 @@ type Router struct {
 	ServeAdmin bool
 	ServeMock  bool
 	// Metrics writes Prometheus metrics; nil hides /__metrics.
-	Metrics func(w http.ResponseWriter)
+	Metrics http.Handler
 }
 
 var _ http.Handler = (*Router)(nil)
@@ -54,7 +53,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			apierr.New(http.StatusNotFound, apierr.NotFound, "Metrics are not exposed here.").Write(w)
 			return
 		}
-		rt.Metrics(w)
+		rt.Metrics.ServeHTTP(w, r)
 		return
 	}
 	org, prefix, rest, ok := rt.org(path)
@@ -167,17 +166,6 @@ func New(addr string, h http.Handler, maxDelay time.Duration) *http.Server {
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      maxDelay + 60*time.Second,
 		IdleTimeout:       120 * time.Second,
-	}
-}
-
-// WriteMetrics writes a minimal Prometheus exposition. Full metrics arrive in P4.
-func WriteMetrics(svc *mock.Service) func(w http.ResponseWriter) {
-	return func(w http.ResponseWriter) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-		w.WriteHeader(http.StatusOK)
-		sessions := len(svc.Sessions.All())
-		fmt.Fprintf(w, "# HELP shadowmock_active_sessions Active key-based and URL-based shadow mocks.\n")
-		fmt.Fprintf(w, "# TYPE shadowmock_active_sessions gauge\nshadowmock_active_sessions %d\n", sessions)
 	}
 }
 

@@ -26,6 +26,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 		w.initUpstream(sc)
 		w.initMatchers(sc)
 		w.initBehaviour(sc)
+		w.initMetrics(sc)
 		w.initRecordingAsserts(sc)
 		return ctx, nil
 	})

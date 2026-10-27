@@ -63,9 +63,11 @@ type Service struct {
 	Proxy    *proxy.Forwarder
 	Recorder *record.Recorder
 	Stats    *stats.Tracker
-	Clock    clock.Clock
-	Logger   *slog.Logger
-	Config   Config
+	// Metrics receives one call per served request; nil disables it.
+	Metrics Observer
+	Clock   clock.Clock
+	Logger  *slog.Logger
+	Config  Config
 
 	inflight sync.Map // path -> *atomic.Int64
 }
@@ -156,4 +158,9 @@ func (s *Service) RequireSession(sc store.Scope) (session.Session, error) {
 		return session.Session{}, errNotFound("No active session %s.", sc.SessionID)
 	}
 	return sess, nil
+}
+
+// Observer receives the outcome of every served mock request.
+type Observer interface {
+	Request(org, method string, status int, layer, stage string)
 }

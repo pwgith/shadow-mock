@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
 
@@ -113,6 +114,9 @@ type Index struct {
 	changes atomic.Uint64
 	built   atomic.Uint64
 	mu      sync.Mutex // serialises rebuilds
+
+	observe func(patterns int, took time.Duration)
+	now     func() time.Time
 }
 
 // New returns an empty index.
@@ -150,6 +154,11 @@ func (ix *Index) refresh() {
 // Rebuild replaces the index with one built from the active key-based sessions. It is
 // copy-on-write, so in-flight requests keep using the previous index (NFR-2.4).
 func (ix *Index) Rebuild(sessions []session.Session) {
+	var began time.Time
+	if ix.observe != nil {
+		began = ix.now()
+	}
+	total := 0
 	type entry struct{ pattern, owner string }
 	byGroup := map[group][]entry{}
 	for i := range sessions {
@@ -175,9 +184,13 @@ func (ix *Index) Rebuild(sessions []session.Session) {
 		}
 		b := ahocorasick.NewAhoCorasickBuilder(ahocorasick.Opts{MatchKind: ahocorasick.LeftMostLongestMatch, DFA: true})
 		gi.ac = b.Build(patterns)
+		total += len(patterns)
 		next[g] = gi
 	}
 	ix.groups.Store(&next)
+	if ix.observe != nil {
+		ix.observe(total, ix.now().Sub(began))
+	}
 }
 
 // Detect finds the session for a request. parentID is the URL-based shadow mock the request
@@ -358,4 +371,10 @@ func StatusFor(err error) int {
 		return http.StatusConflict
 	}
 	return http.StatusInternalServerError
+}
+
+// Observe reports each rebuild: how many patterns the new index holds and how long it took.
+// now is the clock the duration is measured with.
+func (ix *Index) Observe(now func() time.Time, fn func(patterns int, took time.Duration)) {
+	ix.now, ix.observe = now, fn
 }
