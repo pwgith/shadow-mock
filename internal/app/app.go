@@ -118,6 +118,8 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	client := egress.New(egress.Options{BlockPrivate: cfg.Egress.BlockPrivate})
 	hooks := webhook.New(client, renderer.Templates, o.Clock, o.Logger)
 	a.closers = append(a.closers, func() error { hooks.Close(); return nil })
+	jrnl := journal.NewMemory(cfg.Storage.Journal.Hot.MaxEntries)
+	jrnl.LimitBodies(cfg.Storage.Journal.Hot.MaxBodyBytes)
 	svc := &mock.Service{
 		Mappings: mappings,
 		Files:    files,
@@ -125,7 +127,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Layers:   engine.NewManager(mappings, registry, match.Options{Now: o.Clock.Now, CustomMatchers: custom}, o.Logger),
 		Detector: detector,
 		Counters: counter.NewMemory(),
-		Journal:  journal.NewMemory(cfg.Storage.Journal.Hot.MaxEntries),
+		Journal:  jrnl,
 		Renderer: renderer,
 		Webhooks: hooks,
 		Proxy:    proxy.New(client),

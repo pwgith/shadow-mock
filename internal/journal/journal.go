@@ -71,11 +71,16 @@ func (e *Entry) InScope(s store.Scope) bool {
 type Memory struct {
 	mu      sync.RWMutex
 	max     int
+	maxBody int      // bodies longer than this are cut when an entry is kept; 0 keeps them whole
 	entries []*Entry // oldest first
 }
 
 // NewMemory returns a journal holding at most maxEntries entries; 0 disables it.
 func NewMemory(maxEntries int) *Memory { return &Memory{max: maxEntries} }
+
+// LimitBodies makes the journal keep at most n bytes of each request and response body. Without
+// a limit, a journal of N entries can hold N times the largest body the server accepts.
+func (j *Memory) LimitBodies(n int) { j.maxBody = n }
 
 // Enabled reports whether the journal records anything.
 func (j *Memory) Enabled() bool { return j.max > 0 }
@@ -87,6 +92,7 @@ func (j *Memory) Append(e *Entry) {
 	}
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	e = j.trimmed(e)
 	j.entries = append(j.entries, e)
 	if over := len(j.entries) - j.max; over > 0 {
 		j.entries = slices.Delete(j.entries, 0, over)
@@ -138,4 +144,24 @@ func (j *Memory) Remove(s store.Scope, drop func(*Entry) bool) []*Entry {
 // Count returns how many entries in scope s satisfy keep.
 func (j *Memory) Count(s store.Scope, keep func(*Entry) bool) int {
 	return len(j.Query(s, keep, 0))
+}
+
+// trimmed returns e, or a copy of it whose bodies are cut to the journal's body limit.
+func (j *Memory) trimmed(e *Entry) *Entry {
+	if j.maxBody <= 0 {
+		return e
+	}
+	reqBig := e.Request != nil && len(e.Request.Body) > j.maxBody
+	respBig := len(e.Response.Body) > j.maxBody
+	if !reqBig && !respBig {
+		return e
+	}
+	cp := *e
+	if reqBig {
+		cp.Request = e.Request.WithBody(slices.Clone(e.Request.Body[:j.maxBody]))
+	}
+	if respBig {
+		cp.Response.Body = slices.Clone(e.Response.Body[:j.maxBody])
+	}
+	return &cp
 }

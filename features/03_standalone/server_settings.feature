@@ -117,3 +117,20 @@ Feature: Server settings that change behaviour
     When I send a "GET" request to "/pay"
     Then the response status is 202
     And the webhook receiver "hooks" receives nothing within 800 ms
+
+  Scenario: storage.journal.hot.maxBodyBytes cuts the bodies the journal keeps
+    Given Shadow Mock is running with configuration:
+      """yaml
+      storage: { journal: { hot: { maxBodyBytes: 100 } } }
+      """
+    And the global mapping:
+      """json
+      { "request": { "method": "POST", "urlPath": "/in" }, "response": { "status": 200, "body": "ok" } }
+      """
+    When I send a "POST" request to "/in" with body:
+      """
+      ${text:300}
+      """
+    Then the response status is 200
+    When I call admin "GET" "/requests"
+    Then the response JSON at "$.requests[0].request.body" matches "^x{100}$"

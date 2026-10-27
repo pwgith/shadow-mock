@@ -28,6 +28,15 @@ func TestBlocked(t *testing.T) {
 		{"0.0.0.0", true},
 		{"224.0.0.1", true},
 		{"::ffff:127.0.0.1", true}, // IPv4 mapped into IPv6
+		{"100.100.100.200", true},  // carrier-grade NAT range, used by some clouds for metadata
+		{"100.64.0.1", true},
+		{"198.18.0.1", true},
+		{"240.0.0.1", true},
+		{"255.255.255.255", true},
+		{"64:ff9b::7f00:1", true},     // NAT64 wrapping 127.0.0.1
+		{"64:ff9b::a9fe:a9fe", true},  // NAT64 wrapping 169.254.169.254
+		{"2002:7f00:1::1", true},      // 6to4 wrapping 127.0.0.1
+		{"64:ff9b::5db8:d822", false}, // NAT64 wrapping the public 93.184.216.34
 		{"93.184.216.34", false},
 		{"2606:2800:220:1:248:1893:25c8:1946", false},
 	}
