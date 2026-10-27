@@ -83,6 +83,11 @@ func (w *world) initHTTP(sc *godog.ScenarioContext) {
 	})
 	sc.Step(`^I send a request:$`, w.sendTable)
 
+	sc.Step(`^I send a "([^"]*)" request to "([^"]*)" from IP "([^"]*)"$`, func(m, p, ip string) error {
+		r := newRequest(m, p)
+		r.header.Set("X-Forwarded-For", ip)
+		return w.sendOne(r)
+	})
 	sc.Step(`^a "([^"]*)" request to "([^"]*)" returns status (\d+)$`, func(m, p string, want int) error {
 		return w.sendExpectStatus(newRequest(m, p), want)
 	})
@@ -91,6 +96,11 @@ func (w *world) initHTTP(sc *godog.ScenarioContext) {
 	})
 	sc.Step(`^a "([^"]*)" request to "([^"]*)" returns body "([^"]*)"$`, func(m, p, want string) error {
 		return w.sendExpectBody(newRequest(m, p), want)
+	})
+	sc.Step(`^a "([^"]*)" request to "([^"]*)" with key "([^"]*)" returns status (\d+)$`, func(m, p, key string, want int) error {
+		r := newRequest(m, p)
+		r.header.Set("X-Shadow-Mock-Key", key)
+		return w.sendExpectStatus(r, want)
 	})
 	sc.Step(`^a "([^"]*)" request to "([^"]*)" with key "([^"]*)" returns body "([^"]*)"$`, func(m, p, key, want string) error {
 		r := newRequest(m, p)

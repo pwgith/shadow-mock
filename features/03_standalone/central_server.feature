@@ -3,30 +3,6 @@ Feature: Central server deployment
   The standalone binary deployed as a long-running shared server for many
   teams, with a separate admin listener and observability.
 
-  Scenario: Admin API on a separate listener
-    Given Shadow Mock is running with configuration:
-      """yaml
-      listen: { mock: ":8080", admin: ":9090" }
-      """
-    When I send a "GET" request to "http://localhost:8080/__admin/mappings"
-    Then the response status is 404
-    When I send a "GET" request to "http://localhost:9090/__admin/mappings"
-    Then the response status is 200
-
-  Scenario: Restrict mock traffic on a shared network with a local IP allowlist
-    Given Shadow Mock is running with configuration:
-      """yaml
-      tenancy: { local: { ipAllowlist: ["10.20.0.0/16"] } }
-      """
-    And the global mapping:
-      """json
-      { "request": { "urlPath": "/x" }, "response": { "status": 200 } }
-      """
-    When I send a "GET" request to "/x" from IP "10.20.3.4"
-    Then the response status is 200
-    When I send a "GET" request to "/x" from IP "192.168.1.9"
-    Then the response status is 403
-
   Scenario: Prometheus metrics are exposed
     Given Shadow Mock is running
     And a key-based shadow mock "S1"

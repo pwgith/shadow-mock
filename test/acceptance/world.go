@@ -110,6 +110,7 @@ type world struct {
 
 	app      *app.App
 	srv      *httptest.Server
+	adminSrv *httptest.Server // set when listen.admin gives the admin API its own listener
 	cancel   context.CancelFunc
 	stopOnce sync.Once
 	stopped  chan struct{}
@@ -174,6 +175,8 @@ func (w *world) start() error {
 	cfg := config.Default()
 	cfg.Root = w.root
 	cfg.Storage.Global.Watch = w.watch
+	// The test client stands in for a proxy, so a step can say which address a request comes from.
+	cfg.Server.ClientIP = config.ClientIP{Header: "X-Forwarded-For", TrustedProxies: []string{"127.0.0.0/8", "::1/128"}}
 	for _, y := range w.yamls {
 		if err := config.Merge(&cfg, []byte(y)); err != nil {
 			return fmt.Errorf("configuration: %w", err)
@@ -190,6 +193,9 @@ func (w *world) start() error {
 		return errors.Join(fmt.Errorf("start engine: %w", err), a.Close())
 	}
 	w.app, w.cancel, w.srv = a, cancel, httptest.NewServer(a.Handler())
+	if cfg.Listen.Admin != "" {
+		w.adminSrv = httptest.NewServer(a.Handlers()[cfg.Listen.Admin])
+	}
 	w.stopOnce = sync.Once{}
 	w.stopped = make(chan struct{})
 	return nil
@@ -203,6 +209,10 @@ func (w *world) stop() error {
 		return nil
 	}
 	w.srv.Close()
+	if w.adminSrv != nil {
+		w.adminSrv.Close()
+		w.adminSrv = nil
+	}
 	w.cancel()
 	err := w.app.Close()
 	w.app, w.srv = nil, nil
@@ -279,7 +289,7 @@ func (w *world) sub(s string) string {
 	})
 	if w.srv != nil {
 		s = strings.ReplaceAll(s, "{mock base}", w.srv.URL)
-		s = strings.ReplaceAll(s, "{admin base}", w.srv.URL+w.adminPrefix())
+		s = strings.ReplaceAll(s, "{admin base}", w.adminBase()+w.adminPrefix())
 	}
 	return s
 }
@@ -303,4 +313,16 @@ func (w *world) logContains(parts ...string) bool {
 		}
 	}
 	return false
+}
+
+// adminBase is where the admin API is served: its own listener when the configuration gives it
+// one, otherwise the mock listener.
+func (w *world) adminBase() string {
+	if w.adminSrv != nil {
+		return w.adminSrv.URL
+	}
+	if w.srv != nil {
+		return w.srv.URL
+	}
+	return ""
 }
