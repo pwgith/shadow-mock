@@ -66,13 +66,22 @@ Date formats are Java-style patterns, such as `yyyy-MM-dd'T'HH:mm:ssXXX`.
 ### Strings and encoding
 
 `base64`, `urlEncode`, `trim`, `lower`, `upper`, `capitalize`, `replace`, `substring`, `join`,
-`size`, `regexExtract`, `regexGroups`.
+`size`, `regexExtract`.
 
 ```
 {{regexExtract request.path '[0-9]+'}}
 {{replace request.body 'secret' 'redacted'}}
 {{base64 request.body}}
 ```
+
+`regexExtract` prints the first match. To use the capture groups of a pattern, give it a variable
+name as a third argument. The groups are kept in that variable, and nothing is printed:
+
+```
+{{regexExtract 'order-123' '([a-z]+)-([0-9]+)' 'm'}}{{m.1}}-{{m.0}}
+```
+
+This prints `123-order`. `m.0` is the first group and `m.1` the second.
 
 ### Reading JSON and XML
 
