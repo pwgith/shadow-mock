@@ -87,7 +87,7 @@ func text(v any) string {
 	case fmt.Stringer:
 		return strings.NewReplacer(markStart, "", markEnd, "").Replace(t.String())
 	case []any, map[string]any:
-		b, err := json.Marshal(t)
+		b, err := marshal(t)
 		if err != nil {
 			return fmt.Sprint(t)
 		}

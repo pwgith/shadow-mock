@@ -77,12 +77,23 @@ func (e *Engine) compile(src string) (*compiled, error) {
 	if ok {
 		return c, nil
 	}
-	plain, assigns := rewrite(src)
+	main, inline := extractInline(src)
+	plain, assigns := rewrite(main)
 	t, err := raymond.Parse(plain)
 	if err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
 	}
 	t.RegisterHelpers(e.helpers())
+	for _, p := range inline {
+		body, a := rewrite(p.body)
+		assigns = assigns || a
+		pt, perr := raymond.Parse(body)
+		if perr != nil {
+			return nil, fmt.Errorf("parse partial %q: %w", p.name, perr)
+		}
+		pt.RegisterHelpers(e.helpers())
+		t.RegisterPartialTemplate(p.name, pt)
+	}
 	c = &compiled{tpl: t, assigns: assigns}
 	e.mu.Lock()
 	if len(e.cache) >= maxCached {

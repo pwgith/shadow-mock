@@ -24,7 +24,7 @@ func jsonHelpers() map[string]any {
 }
 
 func mustJSON(v any) []byte {
-	b, err := json.Marshal(plain(v))
+	b, err := marshal(plain(v))
 	if err != nil {
 		fail("cannot write %T as JSON: %v", v, err)
 	}
@@ -225,4 +225,16 @@ func plainMap(t map[string]any) map[string]any {
 		out[k] = plain(x)
 	}
 	return out
+}
+
+// marshal writes v as compact JSON. Unlike json.Marshal it leaves <, > and & as they are,
+// because mock bodies are not HTML and WireMock does not escape them either.
+func marshal(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err //nolint:wrapcheck // the callers wrap it
+	}
+	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }
