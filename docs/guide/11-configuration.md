@@ -60,7 +60,8 @@ storage:
   journal:
     hot:
       maxEntries: 10000       # 0 turns the journal off
-      maxBodyBytes: 65536     # bodies over this are truncated in the journal
+      maxBytes: 536870912     # memory budget for the whole journal (512 MiB); the oldest entries go first
+      maxBodyBytes: 0         # cut request and response bodies to this size; 0 keeps them whole
   blobs:
     driver: fs                # fs | memory
     dir: ./blobs
@@ -132,6 +133,7 @@ Durations are written as `30s`, `15m`, `1h`, `720h`.
   Set it when Shadow Mock is behind a proxy, so the URLs it hands out are ones clients can use.
 * **`egress.blockPrivate`** is meant for shared and hosted servers. It stops proxying and webhooks
   being used to reach internal addresses.
+* **`storage.journal.hot.maxBytes`** limits the memory the journal may hold. Without it, entries times body size is unbounded, because a request body can be up to `limits.maxBodyBytes`.
 * **`limits.maxBodyBytes`** caps request bodies. Larger ones get `413 body_too_large`.
 
 Some options (for example `storage.*.driver` values such as `postgres`, `redis` and `s3`, and

@@ -72,6 +72,8 @@ type Memory struct {
 	mu      sync.RWMutex
 	max     int
 	maxBody int      // bodies longer than this are cut when an entry is kept; 0 keeps them whole
+	maxSize int64    // the most memory the entries may hold in all; 0 means no budget
+	size    int64    // memory the entries hold now, as sizeOf counts it
 	entries []*Entry // oldest first
 }
 
@@ -81,6 +83,11 @@ func NewMemory(maxEntries int) *Memory { return &Memory{max: maxEntries} }
 // LimitBodies makes the journal keep at most n bytes of each request and response body. Without
 // a limit, a journal of N entries can hold N times the largest body the server accepts.
 func (j *Memory) LimitBodies(n int) { j.maxBody = n }
+
+// LimitSize gives the journal a memory budget. Entries keep their bodies whole, and the oldest
+// are dropped when the entries together outgrow the budget, so memory stays bounded without
+// cutting anything a test may want to read back. The newest entry is always kept.
+func (j *Memory) LimitSize(bytes int64) { j.maxSize = bytes }
 
 // Enabled reports whether the journal records anything.
 func (j *Memory) Enabled() bool { return j.max > 0 }
@@ -94,7 +101,15 @@ func (j *Memory) Append(e *Entry) {
 	defer j.mu.Unlock()
 	e = j.trimmed(e)
 	j.entries = append(j.entries, e)
-	if over := len(j.entries) - j.max; over > 0 {
+	j.size += sizeOf(e)
+	over := max(len(j.entries)-j.max, 0)
+	dropped := j.droppedSize(over)
+	for j.maxSize > 0 && over < len(j.entries)-1 && j.size-dropped > j.maxSize {
+		dropped += sizeOf(j.entries[over])
+		over++
+	}
+	if over > 0 {
+		j.size -= dropped
 		j.entries = slices.Delete(j.entries, 0, over)
 	}
 }
@@ -134,6 +149,7 @@ func (j *Memory) Remove(s store.Scope, drop func(*Entry) bool) []*Entry {
 	j.entries = slices.DeleteFunc(j.entries, func(e *Entry) bool {
 		if e.InScope(s) && (drop == nil || drop(e)) {
 			removed = append(removed, e)
+			j.size -= sizeOf(e)
 			return true
 		}
 		return false
@@ -164,4 +180,37 @@ func (j *Memory) trimmed(e *Entry) *Entry {
 		cp.Response.Body = slices.Clone(e.Response.Body[:j.maxBody])
 	}
 	return &cp
+}
+
+// droppedSize is the memory held by the n oldest entries.
+func (j *Memory) droppedSize(n int) int64 {
+	var total int64
+	for _, e := range j.entries[:n] {
+		total += sizeOf(e)
+	}
+	return total
+}
+
+// entryOverhead stands in for everything in an entry besides its bodies and headers: the stub
+// reference, the detection record, the strings and the structs themselves.
+const entryOverhead = 2048
+
+// sizeOf estimates the memory an entry holds. It need not be exact; it keeps the budget honest.
+func sizeOf(e *Entry) int64 {
+	n := int64(entryOverhead) + int64(len(e.Response.Body)) + headerSize(e.Response.Header)
+	if e.Request != nil {
+		n += int64(len(e.Request.Body)) + int64(len(e.Request.RawQuery)) + headerSize(e.Request.Header)
+	}
+	return n
+}
+
+func headerSize(h http.Header) int64 {
+	var n int64
+	for k, vs := range h {
+		n += int64(len(k))
+		for _, v := range vs {
+			n += int64(len(v))
+		}
+	}
+	return n
 }

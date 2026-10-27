@@ -4,7 +4,7 @@
 
 Shadow Mock records every request it serves: the request, the mapping that answered it (if any),
 the response, and how long it took. The journal holds the most recent 10,000 entries by default
-(`storage.journal.hot.maxEntries`; `0` turns it off).
+(`storage.journal.hot.maxEntries`; `0` turns it off). Bodies are kept whole, as in WireMock, so a test can read a large response back from the journal. The whole journal is also held to a memory budget (`storage.journal.hot.maxBytes`, 512 MiB by default): when the entries together outgrow it, the oldest are dropped first, and the newest entry is always kept. To cut long bodies instead, set `storage.journal.hot.maxBodyBytes`.
 
 ```bash
 curl localhost:8080/__admin/requests                    # most recent first

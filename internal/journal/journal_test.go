@@ -201,3 +201,63 @@ func TestMemoryWithoutALimitKeepsBodiesWhole(t *testing.T) {
 		t.Error("no limit set, so nothing is cut")
 	}
 }
+
+func bigEntry(id string, body int) *journal.Entry {
+	e := entry(id, "acme")
+	e.Request = &match.Request{Method: http.MethodPost, Path: "/in"}
+	e.Response = journal.Response{Status: 200, Body: make([]byte, body)}
+	return e
+}
+
+// A test that fetches a big response back from the journal must get all of it, as with WireMock.
+func TestMemoryKeepsBigBodiesWholeByDefault(t *testing.T) {
+	t.Parallel()
+	j := journal.NewMemory(10)
+	j.Append(bigEntry("1", 300_000))
+	if got := len(j.Query(store.Global("acme"), nil, 0)[0].Response.Body); got != 300_000 {
+		t.Errorf("kept %d bytes of a 300000-byte body, want all of it", got)
+	}
+}
+
+func TestMemoryBudgetDropsTheOldestEntries(t *testing.T) {
+	t.Parallel()
+	j := journal.NewMemory(100)
+	j.LimitSize(50_000)
+	for i := 1; i <= 5; i++ {
+		j.Append(bigEntry(strconv.Itoa(i), 20_000)) // about 22 KB each with overhead
+	}
+	got := ids(j.Query(store.Global("acme"), nil, 0))
+	if want := []string{"5", "4"}; !equal(got, want) {
+		t.Errorf("kept %v, want %v (the newest that fit in the budget)", got, want)
+	}
+}
+
+func TestMemoryBudgetKeepsTheNewestEntryEvenWhenItIsOverBudget(t *testing.T) {
+	t.Parallel()
+	j := journal.NewMemory(100)
+	j.LimitSize(10_000)
+	j.Append(bigEntry("1", 100))
+	j.Append(bigEntry("2", 500_000))
+	if got := ids(j.Query(store.Global("acme"), nil, 0)); !equal(got, []string{"2"}) {
+		t.Errorf("kept %v, want only the newest", got)
+	}
+	j.Append(bigEntry("3", 100))
+	if got := ids(j.Query(store.Global("acme"), nil, 0)); !equal(got, []string{"3"}) {
+		t.Errorf("after a small entry, kept %v, want the big one dropped", got)
+	}
+}
+
+func TestMemoryBudgetFollowsRemovals(t *testing.T) {
+	t.Parallel()
+	j := journal.NewMemory(100)
+	j.LimitSize(50_000)
+	j.Append(bigEntry("1", 20_000))
+	j.Append(bigEntry("2", 20_000))
+	j.Remove(store.Global("acme"), nil) // empties the journal, and the budget with it
+	for i := 3; i <= 4; i++ {
+		j.Append(bigEntry(strconv.Itoa(i), 20_000))
+	}
+	if got := ids(j.Query(store.Global("acme"), nil, 0)); !equal(got, []string{"4", "3"}) {
+		t.Errorf("kept %v, want 4 and 3: removed entries must not count against the budget", got)
+	}
+}
