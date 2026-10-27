@@ -368,10 +368,17 @@ func TestFaultsBreakTheConnection(t *testing.T) {
 			t.Parallel()
 			r, _, _ := newRenderer(t, true)
 			resp, _ := r.Render(t.Context(), def(t, `{"fault":"`+fault+`"}`), nil)
-			var writeErr error
-			recorded := false
+			// The handler runs on the server's goroutine and may still be running when the client
+			// sees the broken connection, so its outcome is handed over on a channel.
+			type outcome struct {
+				err      error
+				recorded bool
+			}
+			done := make(chan outcome, 1)
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				writeErr = r.Write(req.Context(), w, req, resp, func() { recorded = true })
+				recorded := false
+				err := r.Write(req.Context(), w, req, resp, func() { recorded = true })
+				done <- outcome{err: err, recorded: recorded}
 			}))
 			defer srv.Close()
 			client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}, Timeout: 10 * time.Second}
@@ -383,8 +390,13 @@ func TestFaultsBreakTheConnection(t *testing.T) {
 			if err == nil {
 				t.Errorf("%s: the client received a complete response", fault)
 			}
-			if writeErr != nil || !recorded {
-				t.Errorf("%s: Write = %v, beforeSend called %v", fault, writeErr, recorded)
+			select {
+			case got := <-done:
+				if got.err != nil || !got.recorded {
+					t.Errorf("%s: Write = %v, beforeSend called %v", fault, got.err, got.recorded)
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatalf("%s: the handler did not finish", fault)
 			}
 		})
 	}
