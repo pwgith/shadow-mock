@@ -1,0 +1,41 @@
+name: release-binaries
+
+# Builds the engine for every supported OS and CPU after each merge to main, and stores the
+# archives as a workflow artifact. Run it by hand from the Actions tab to build any branch.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Builds for different commits do not cancel each other; every merge keeps its binaries.
+concurrency:
+  group: release-binaries-${{ github.sha }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git describe needs tags and history to stamp the version
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Cross-compile and pack every target
+        run: bash scripts/build-release.sh
+      - name: Smoke test the linux/amd64 binary
+        run: |
+          tar -xzf dist/shadowmock_*_linux_amd64.tar.gz -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP"/shadowmock_*_linux_amd64/shadowmock -version
+      - name: Verify the checksums
+        run: cd dist && sha256sum --check SHA256SUMS
+      - name: Store the binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadowmock-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 90

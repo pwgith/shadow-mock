@@ -5,7 +5,7 @@ GOLANGCI := go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLA
 
 export GOLANGCI_LINT_VERSION GOVULNCHECK_VERSION
 
-.PHONY: fmt lint lint-fix test contract acceptance cover-check bench corpus ci
+.PHONY: fmt lint lint-fix test contract acceptance cover-check bench corpus release ci
 
 fmt:
 	$(GOLANGCI) fmt ./...
@@ -35,5 +35,9 @@ bench:
 
 corpus:
 	node scripts/check-corpus.js
+
+# Cross-compiles every supported OS and CPU into dist/ (what the release-binaries workflow runs).
+release:
+	bash scripts/build-release.sh
 
 ci: lint corpus cover-check
