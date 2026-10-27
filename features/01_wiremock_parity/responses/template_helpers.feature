@@ -183,9 +183,9 @@ Feature: Template helpers
   Scenario: Inline partials and block parameters in a template file
     Given the file "__files/echo/response.json":
       """
-      {{#*inline "item"}}{ "brand": {{#if (neq this.brand null)}}{{toJson this.brand}}{{else}}"Sony"{{/if}} }{{/inline}}
+      {{#*inline "row"}}{ "colour": {{#if (neq this.colour null)}}{{toJson this.colour}}{{else}}"Blue"{{/if}} }{{/inline}}
       {{#with (parseJson request.body) as |req|}}
-      { "claim": {{toJson req.claim_id}}, "items": [ {{#each req.items as |it|}}{{> item it}}{{#unless @last}},{{/unless}}{{else}}{{> item req}}{{/each}} ] }
+      { "order": {{toJson req.order_id}}, "rows": [ {{#each req.rows as |r|}}{{> row r}}{{#unless @last}},{{/unless}}{{else}}{{> row req}}{{/each}} ] }
       {{/with}}
       """
     And the global mapping:
@@ -195,9 +195,9 @@ Feature: Template helpers
       """
     When I send a "POST" request to "/echo" with body:
       """json
-      { "claim_id": "C1 & <C2>", "items": [ { "brand": "Apple" }, {} ] }
+      { "order_id": "O1 & <O2>", "rows": [ { "colour": "Red" }, {} ] }
       """
     Then the response status is 200
-    And the response JSON at "$.claim" is "C1 & <C2>"
-    And the response JSON at "$.items[0].brand" is "Apple"
-    And the response JSON at "$.items[1].brand" is "Sony"
+    And the response JSON at "$.order" is "O1 & <O2>"
+    And the response JSON at "$.rows[0].colour" is "Red"
+    And the response JSON at "$.rows[1].colour" is "Blue"

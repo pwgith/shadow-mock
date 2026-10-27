@@ -29,7 +29,9 @@ corpus/
 │   │   │                             base64Body, bodyFileName (json, xml, text, csv, missing), 204, 301, 500
 │   │   ├── 10-templating/            full request model, path parameters, transformerParameters,
 │   │   │                             templated bodyFileName, headers and file contents; date, random,
-│   │   │                             math, string, regex, logic, array and form helpers; JSON and XML helpers
+│   │   │                             math, string, regex, logic, array and form helpers; JSON and XML helpers,
+│   │   │                         inline partials, block parameters and per-field defaults (a template file
+│   │   │                         in the style of real WireMock setups, whose full output the conformance test checks)
 │   │   ├── 11-delays/                fixed, uniform, lognormal (+maxValue), chunked dribble, timeout
 │   │   ├── 12-faults/                all four fault types
 │   │   ├── 13-proxying/              proxyBaseUrl, partial mocking, header add/remove,

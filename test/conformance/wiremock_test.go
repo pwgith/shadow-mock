@@ -20,6 +20,9 @@ type tc struct {
 	fails bool
 	// contains lists text the 404 diagnostic must include.
 	contains []string
+	// body is the text a templated response must produce. A JSON body is compared as JSON, so
+	// spacing does not matter; anything else is compared exactly after trimming.
+	body string
 }
 
 // hdr builds headers from name, value pairs; a repeated name adds another value.
@@ -58,7 +61,7 @@ const mpType = "multipart/form-data; boundary=corpus"
 
 // wiremockCases covers corpus/wiremock/mappings.
 func wiremockCases() []tc {
-	return slices.Concat(urlAndMethodCases(), attributeCases(), valueCases(), bodyCases(), responseCases(), miscCases())
+	return slices.Concat(urlAndMethodCases(), attributeCases(), valueCases(), bodyCases(), responseCases(), miscCases(), shipmentCases())
 }
 
 func urlAndMethodCases() []tc {
@@ -380,6 +383,9 @@ func runCase(t *testing.T, e *env, ms []mapping, c tc) {
 	}
 	if !c.fails {
 		e.expectResponse(c.want, m.Response, r, c.status)
+		if c.body != "" {
+			e.expectRendered(c.want, c.body, r.body)
+		}
 	}
 }
 
@@ -389,4 +395,53 @@ func (e *env) with(t *testing.T) *env {
 	cp := *e
 	cp.t = t
 	return &cp
+}
+
+// A template that uses inline partials, block parameters, a partial called with a context, and a
+// default for every field. Its output is checked in full, because a templated response is
+// otherwise compared only by status.
+const (
+	defaultParcel = `{
+		"id": "parcel-0001", "number": 2, "weight_kg": 5, "colour": "Blue", "size": "M",
+		"category": "Household", "label": "Books", "kind": "Standard_Parcel",
+		"packed_on": "2025-04-25", "fragile": false, "mode": "standard", "state": "new",
+		"value": { "amount": 123.00, "currency": "EUR" }, "limit": { "amount": 1000.00, "currency": "EUR" },
+		"note": "Packing test", "tag": "Surface"
+	}`
+	shipmentsRequest = `{
+		"order_id": "O2",
+		"shipments": [
+			{ "shipment_id": "sh-1", "carrier": "air", "parcels": [
+				{ "colour": "Red & Gold", "size": "L", "weight_kg": 3, "fragile": true,
+				  "value": { "amount": 50.5, "currency": "USD" }, "note": "<this way up>" },
+				{} ] },
+			{ "shipment_code": "Other" }
+		]
+	}`
+)
+
+func shipmentCases() []tc {
+	defaultShipment := `{ "shipment_id": "shipment-0001", "shipment_code": "General_Shipment", "carrier": "freight",
+		"type": "StandardShipment", "parcels": [ ` + defaultParcel + ` ] }`
+	return []tc{
+		{
+			want: "c010000401", call: post("/wm/template/shipments", `{"order_id":"O1"}`, jsonCT, appJS),
+			body: `{ "order_id": "O1", "shipments": [ ` + defaultShipment + ` ] }`,
+		},
+		{
+			want: "c010000401", call: post("/wm/template/shipments", shipmentsRequest, jsonCT, appJS),
+			body: `{ "order_id": "O2", "shipments": [
+				{ "shipment_id": "sh-1", "shipment_code": "General_Shipment", "carrier": "air",
+				  "type": "StandardShipment", "parcels": [
+					{ "id": "parcel-0001", "number": 2, "weight_kg": 3, "colour": "Red & Gold", "size": "L",
+					  "category": "Household", "label": "Books", "kind": "Standard_Parcel",
+					  "packed_on": "2025-04-25", "fragile": true, "mode": "standard", "state": "new",
+					  "value": { "amount": 50.5, "currency": "USD" }, "limit": { "amount": 1000.00, "currency": "EUR" },
+					  "note": "<this way up>", "tag": "Surface" },
+					` + defaultParcel + ` ] },
+				{ "shipment_id": "shipment-0001", "shipment_code": "Other", "carrier": "freight",
+				  "type": "StandardShipment", "parcels": [ ` + defaultParcel + ` ] }
+			] }`,
+		},
+	}
 }
