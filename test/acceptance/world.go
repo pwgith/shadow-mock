@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -128,6 +129,7 @@ type world struct {
 	receivers      map[string]*receiver
 	upstreams      map[string]*upstream
 	matchers       []extension.RequestMatcher
+	sendErr        error // the last request failed on the wire
 	sessionNumbers map[string][]int
 
 	createdSession map[string]any
@@ -259,9 +261,16 @@ func (w *world) reconfigure(yaml string) error {
 
 var varPattern = regexp.MustCompile(`\$\{([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)?)\}`)
 
-// sub replaces ${NAME} for known variables, and the {mock base} and {admin base} shorthands.
-// Unknown ${…} text, such as ${json-unit.ignore}, is left alone.
+var textPattern = regexp.MustCompile(`\$\{text:(\d+)\}`)
+
+// sub replaces ${text:N} with N characters of filler, ${NAME} for known variables, and the
+// {mock base} and {admin base} shorthands. Unknown ${…} text, such as ${json-unit.ignore}, is
+// left alone.
 func (w *world) sub(s string) string {
+	s = textPattern.ReplaceAllStringFunc(s, func(m string) string {
+		n, _ := strconv.Atoi(textPattern.FindStringSubmatch(m)[1]) //nolint:errcheck // the pattern matched digits
+		return strings.Repeat("x", n)
+	})
 	s = varPattern.ReplaceAllStringFunc(s, func(m string) string {
 		if v, ok := w.vars[m[2:len(m)-1]]; ok {
 			return v

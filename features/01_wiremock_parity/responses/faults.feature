@@ -8,7 +8,6 @@ Feature: Fault injection
     Given Shadow Mock is running
 
   @standalone
-  @p3-harness
   Scenario Outline: Each fault type in standalone mode
     Given the global mapping:
       """json

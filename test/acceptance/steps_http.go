@@ -127,6 +127,12 @@ func (w *world) urlBasedPath(name, path string) string {
 
 func (w *world) sendOne(r *request) error {
 	_, err := w.send(r)
+	var te *transportError
+	if errors.As(err, &te) {
+		// A broken connection is what a fault scenario expects; the Then step checks for it.
+		w.sendErr, w.last = te, nil
+		return nil
+	}
 	return err
 }
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
@@ -50,6 +51,8 @@ func (s *Service) ServeMock(w http.ResponseWriter, r *http.Request, tr Traffic) 
 		ID: ids.NewUUID(), LoggedAt: s.Clock.Now().UTC(), Tenant: tr.Tenant, AbsoluteURL: tr.AbsoluteURL,
 	}}
 	defer s.finish(sv)
+	done := s.trackInFlight(tr.Path)
+	defer done()
 
 	body, err := readBody(w, r, s.Config.MaxBodyBytes)
 	if err != nil {
@@ -257,4 +260,21 @@ func layerLabel(sc store.Scope) string {
 		return "global"
 	}
 	return sc.SessionID
+}
+
+// trackInFlight counts a request as in flight on its path until the returned function runs.
+func (s *Service) trackInFlight(path string) func() {
+	c, _ := s.inflight.LoadOrStore(path, new(atomic.Int64))
+	n := c.(*atomic.Int64) //nolint:errcheck,forcetypeassert // only *atomic.Int64 is ever stored
+	n.Add(1)
+	return func() { n.Add(-1) }
+}
+
+// InFlight reports how many requests for a path are being served right now. A request is in
+// flight from the moment it arrives until its response is complete or its client has gone.
+func (s *Service) InFlight(path string) int {
+	if c, ok := s.inflight.Load(path); ok {
+		return int(c.(*atomic.Int64).Load()) //nolint:errcheck,forcetypeassert // only *atomic.Int64 is ever stored
+	}
+	return 0
 }

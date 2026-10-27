@@ -10,7 +10,6 @@ Feature: Gzip response compression
       { "request": { "urlPath": "/big" }, "response": { "status": 200, "body": "${text:4096}", "headers": { "Content-Type": "application/json" } } }
       """
 
-  @p3-harness
   Scenario Outline: Compression follows Accept-Encoding
     When I send a request:
       | method | path | header:Accept-Encoding |

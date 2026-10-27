@@ -18,8 +18,6 @@ var phases = []string{"@P0", "@P1", "@P2", "@P3"}
 // performance pipeline, later phases, and scenarios marked @wip with the reason beside them.
 var excluded = []string{
 	"@saas", "@multi-instance", "@perf", "@P4", "@P5", "@wip",
-	// P3 scenarios whose engine work or harness steps are still to come, one tag per piece.
-	"@p3-harness",
 }
 
 // defaultTags selects the standalone scenarios of the implemented phases. Godog tag filters are a comma-separated

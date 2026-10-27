@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,6 +23,8 @@ type reply struct {
 	header     http.Header
 	body       []byte
 	elapsed    time.Duration
+	// chunks counts the reads that returned data, which for a dribbled body is the chunks sent.
+	chunks int
 }
 
 // request describes one request a step sends.
@@ -85,17 +88,18 @@ func (w *world) send(r *request) (*reply, error) {
 	start := time.Now()
 	resp, err := w.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %w", r.method, target, err)
+		return nil, &transportError{fmt.Errorf("%s %s: %w", r.method, target, err)}
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
+	b, chunks, err := readChunks(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read response of %s %s: %w", r.method, target, err)
+		return nil, &transportError{fmt.Errorf("read response of %s %s: %w", r.method, target, err)}
 	}
 	rep := &reply{
 		status: resp.StatusCode, statusText: strings.TrimPrefix(resp.Status, fmt.Sprintf("%d ", resp.StatusCode)),
-		header: resp.Header, body: b, elapsed: time.Since(start),
+		header: resp.Header, body: b, elapsed: time.Since(start), chunks: chunks,
 	}
+	w.sendErr = nil
 	w.last = rep
 	w.history = append(w.history, rep)
 	return rep, nil
@@ -205,4 +209,32 @@ func jsonBytes(v any) []byte {
 		return nil
 	}
 	return b
+}
+
+// transportError is a request that failed on the wire: the connection broke, or the response
+// was malformed. Faults are meant to cause it, so steps record it instead of failing at once.
+type transportError struct{ err error }
+
+func (e *transportError) Error() string { return e.err.Error() }
+
+func (e *transportError) Unwrap() error { return e.err }
+
+// readChunks reads a body, counting the reads that returned data.
+func readChunks(r io.Reader) ([]byte, int, error) {
+	var out bytes.Buffer
+	buf := make([]byte, 32*1024)
+	chunks := 0
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			chunks++
+			out.Write(buf[:n])
+		}
+		if errors.Is(err, io.EOF) {
+			return out.Bytes(), chunks, nil
+		}
+		if err != nil {
+			return out.Bytes(), chunks, fmt.Errorf("read body: %w", err)
+		}
+	}
 }
