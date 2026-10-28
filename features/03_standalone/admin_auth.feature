@@ -1,4 +1,4 @@
-@standalone @central-server @FR-9.2 @NFR-5.2
+@standalone @central-server @P4 @FR-9.2 @NFR-5.2
 Feature: Admin tokens on the central server
   A shared server puts the admin API behind bearer tokens. Each token has a role.
   Mock traffic never needs one.

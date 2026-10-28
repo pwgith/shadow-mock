@@ -10,6 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/counter"
 	"github.com/pwgith/shadow-mock/internal/detect"
@@ -42,12 +46,15 @@ type served struct {
 	entry *journal.Entry
 	start time.Time
 	stage string
+	ctx   context.Context //nolint:containedctx // the request's context, kept to log and trace when it finishes
+	span  trace.Span
 }
 
 // ServeMock handles one mock request end to end.
 func (s *Service) ServeMock(w http.ResponseWriter, r *http.Request, tr Traffic) {
-	ctx := r.Context()
-	sv := &served{start: s.Clock.Now(), entry: &journal.Entry{
+	ctx, span := s.Telemetry.Start(r, "mock "+r.Method)
+	r = r.WithContext(ctx)
+	sv := &served{start: s.Clock.Now(), ctx: ctx, span: span, entry: &journal.Entry{
 		ID: ids.NewUUID(), LoggedAt: s.Clock.Now().UTC(), Tenant: tr.Tenant, AbsoluteURL: tr.AbsoluteURL,
 	}}
 	defer s.finish(sv)
@@ -245,6 +252,7 @@ func (s *Service) finish(sv *served) {
 		At: s.Clock.Now(), Tenant: e.Tenant, Layer: e.Layer, Path: path,
 		Latency: s.Clock.Now().Sub(sv.start), Stage: sv.stage,
 	})
+	s.observe(sv, path)
 }
 
 // Render exposes rendering for dry runs.
@@ -280,4 +288,40 @@ func (s *Service) InFlight(path string) int {
 		return int(c.(*atomic.Int64).Load()) //nolint:errcheck,forcetypeassert // only *atomic.Int64 is ever stored
 	}
 	return 0
+}
+
+// observe records the finished request in its trace and, when log.requests is on, in the log. The
+// path is logged and traced, never the query, because a query can carry a session key or a token.
+func (s *Service) observe(sv *served, path string) {
+	e := sv.entry
+	method := ""
+	if e.Request != nil {
+		method = e.Request.Method
+	}
+	if sv.span != nil {
+		attrs := []attribute.KeyValue{
+			attribute.String("http.request.method", method),
+			attribute.String("url.path", path),
+			attribute.Int("http.response.status_code", e.Response.Status),
+			attribute.String("shadowmock.layer", e.Layer),
+			attribute.String("shadowmock.detection_stage", sv.stage),
+			attribute.Bool("shadowmock.matched", e.Matched()),
+		}
+		if e.Stub != nil {
+			attrs = append(attrs, attribute.String("shadowmock.stub_id", e.Stub.ID))
+		}
+		if e.SessionID != "" {
+			attrs = append(attrs, attribute.String("shadowmock.session_id", e.SessionID))
+		}
+		sv.span.SetAttributes(attrs...)
+		if e.Response.Status >= http.StatusInternalServerError {
+			sv.span.SetStatus(codes.Error, http.StatusText(e.Response.Status))
+		}
+		sv.span.End()
+	}
+	if s.Config.LogRequests && s.Logger != nil {
+		s.Logger.InfoContext(sv.ctx, "request served",
+			"method", method, "path", path, "status", e.Response.Status, "layer", e.Layer,
+			"stage", sv.stage, "duration_ms", s.Clock.Now().Sub(sv.start).Milliseconds(), "session_id", e.SessionID)
+	}
 }

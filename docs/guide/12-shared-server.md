@@ -184,15 +184,48 @@ scrape_configs:
 
 Tracing and a Docker image are being added.
 
-## Logs
+## Logs and traces
 
 ```yaml
 log:
   level: info
   format: json
+  requests: true      # one line for each mock request
+tracing:
+  enabled: true
+  endpoint: http://otel-collector:4318
 ```
 
-JSON logs suit log collectors. Session keys are shown in shortened form.
+JSON logs suit a log collector. Session keys are shown in shortened form.
+
+With `log.requests: true` the server writes one line for each mock request:
+
+```json
+{"time":"…","level":"INFO","msg":"request served","method":"GET","path":"/payments","status":200,
+ "layer":"key-based","stage":"Header","duration_ms":3,"session_id":"ses_…",
+ "trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","span_id":"b7ad6b7169203331"}
+```
+
+The line never holds the query string, a body or a header, because a query can carry a session key
+or a token.
+
+With `tracing.enabled: true` the server exports OpenTelemetry spans to an OTLP/HTTP collector, one
+for each mock request (`mock GET`) and one for each admin call (`admin POST`). It continues the
+trace in a caller's W3C `traceparent` header, so a test run's trace includes the mock server. A
+call proxied to an upstream carries the trace on. A mock span has these attributes:
+
+| Attribute | Meaning |
+|---|---|
+| `http.request.method`, `url.path`, `http.response.status_code` | The request and its answer. The path has no query |
+| `shadowmock.layer` | `global`, `key-based` or `url-based`; empty when nothing matched |
+| `shadowmock.matched` | Whether a mapping answered |
+| `shadowmock.stub_id` | The mapping that answered |
+| `shadowmock.session_id` | The session, when there was one |
+| `shadowmock.detection_stage` | The stage that found the session |
+
+`sampleRatio` is the share of new traces kept. A trace a caller already sampled is kept, and one
+it chose not to sample is not recorded. Log lines carry the caller's `trace_id` even when tracing is
+off.
 
 ## A starting configuration
 

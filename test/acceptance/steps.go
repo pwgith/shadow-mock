@@ -28,6 +28,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 		w.initBehaviour(sc)
 		w.initMetrics(sc)
 		w.initAuth(sc)
+		w.initTracing(sc)
 		w.initRecordingAsserts(sc)
 		return ctx, nil
 	})

@@ -186,7 +186,8 @@ root directory and test clock, and drives it over HTTP. It runs what the engine 
 | Excluded | Why |
 |---|---|
 | `@saas`, `@multi-instance` | SaaS needs the Postgres, Redis and Clerk work in P5 |
-| `@P4`, `@P5` | Later phases (DESIGN.md §15) |
+| `@P4` | The central server (DESIGN.md §15) |
+| `@P5` | The hosted service, not run here (DESIGN.md §15) |
 | `@perf` | Runs in the benchmark pipeline |
 | `@wip` | Not runnable yet. The comment above each tag says what is missing: a TLS listener in the harness, the audit log, detection metrics, a counting store wrapper, the blob store, key redaction, the Docker image, a WireMock Java client, and a separate process to measure memory |
 

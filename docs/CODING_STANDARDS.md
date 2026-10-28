@@ -129,7 +129,7 @@ Other structure rules:
 * Use `log/slog` only, through a logger passed in or taken from context (`slog.InfoContext(ctx, …)`). Do not use `fmt.Print*` or `print` (`forbidigo`), and do not use the global `slog.Info` outside `cmd/` (`sloglint`).
 * Use key-value pairs with **snake_case** keys and constant messages: `logger.InfoContext(ctx, "session created", "session_id", id, "kind", kind)` (`sloglint`: kv-only, snake key naming, static messages).
 * **Never log secrets.** Session keys, JWTs, CI secrets and request bodies go through `redact.Key()` / `redact.Body()`. Session keys are shown as `smk_ABCD…` (security.feature). **(review, acceptance specs)**
-* **Metric labels** may be `org`, `layer`, `stage`, `status` and `method`, but never session id, path, client IP or user (central_server.feature). The metrics package exposes typed constructors that accept only those labels. **(review)**
+* **Metric labels** may be `org`, `layer`, `stage`, `status` and `method`, but never session id, path, client IP or user (`03_standalone/metrics.feature`). The metrics package exposes typed constructors that accept only those labels. **(review)**
 
 ## 12. HTTP
 

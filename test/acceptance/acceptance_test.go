@@ -11,13 +11,13 @@ import (
 )
 
 // phases lists the delivery phases the engine implements (DESIGN.md §15). Scenarios for
-// later phases are tagged @P4 and @P5 and are not run.
-var phases = []string{"@P0", "@P1", "@P2", "@P3"}
+// later phases are tagged @P5 and are not run.
+var phases = []string{"@P0", "@P1", "@P2", "@P3", "@P4"}
 
 // excluded lists what this harness does not run: SaaS and multi-instance behaviour, the
 // performance pipeline, later phases, and scenarios marked @wip with the reason beside them.
 var excluded = []string{
-	"@saas", "@multi-instance", "@perf", "@P4", "@P5", "@wip",
+	"@saas", "@multi-instance", "@perf", "@P5", "@wip",
 }
 
 // defaultTags selects the standalone scenarios of the implemented phases. Godog tag filters are a comma-separated

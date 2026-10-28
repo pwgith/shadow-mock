@@ -1,4 +1,4 @@
-@standalone @central-server @NFR-6.3
+@standalone @central-server @P4 @NFR-6.3
 Feature: Prometheus metrics
   The server exposes Prometheus metrics for requests, matches, detection and the session
   detector, labelled only by org, layer, stage, status and method.

@@ -58,7 +58,7 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-8.6 | `02_shadow_mocks/url_based/routing.feature` |
 | FR-8.7 | `02_shadow_mocks/common/seeding.feature` |
 | FR-9.1 | `03_standalone/standalone_mode.feature` |
-| FR-9.2 | `03_standalone/standalone_mode.feature` |
+| FR-9.2 | `03_standalone/standalone_mode.feature`, `03_standalone/admin_auth.feature` |
 | FR-9.3 | `04_saas/auth/jwt_authentication.feature` |
 | FR-9.3a | `04_saas/auth/jwt_authentication.feature` |
 | FR-9.3b | `04_saas/auth/ci_tokens.feature`, `05_management_app/ci_keys.feature`, `05_management_app/ci_token_exchange.feature` |
@@ -90,5 +90,5 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | NFR-5.4 | `06_non_functional/security.feature`, `03_standalone/server_settings.feature` |
 | NFR-6.1 | `03_standalone/configuration.feature` |
 | NFR-6.2 | `03_standalone/configuration.feature` |
-| NFR-6.3 | `03_standalone/central_server.feature` |
+| NFR-6.3 | `03_standalone/metrics.feature`, `03_standalone/tracing.feature` |
 | NFR-6.4 | `04_saas/operations/health_and_shutdown.feature` |
