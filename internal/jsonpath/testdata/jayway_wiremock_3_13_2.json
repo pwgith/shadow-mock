@@ -1,0 +1,4534 @@
+[
+ {
+  "expr": "$.a",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$['a']",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.['a']",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.zz",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.d",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.n",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.o",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.e",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[0]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[-1]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[5]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.e[0,1]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[1:]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[:2]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[-2:]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[*]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.*",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..g",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..zz",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.f.g",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$['f']['g']",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.f['g']",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$['a','b']",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..*",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.s",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.c",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.b",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[*].author",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..author",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.*",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store..price",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[2]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[-1:]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[0,1]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[:2]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.isbn)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.price < 10)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.price <= 8.95)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.price > 100)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$..book[?(@.category == 'fiction')]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.category == \"fiction\")]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.category != 'fiction')]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.price < 10 && @.category == 'fiction')]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.price > 10 || @.category == 'reference')]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(!@.isbn)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.author =~ /.*REES/i)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.author =~ /.*rees/)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$..book[?(@.author =~ /Nigel.*/)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.category in ['fiction','x'])]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.category nin ['fiction'])]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.price in [8.95, 12.99])]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.author contains 'Waugh')]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[?(@.price > $.expensive)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[?(@.price < $['expensive'])]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book.length()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book.size()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[*].price.min()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.store.book[*].price.max()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.store.book[*].price.avg()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.store.book[*].price.sum()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.store.bicycle.keys()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[0].keys()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.price.size() == 1)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$..book[?(@.author.length() > 3)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.store.book[?(@.title.length() == 6)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.store.book[*].author.length()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.expensive == 10)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.expensive > 10)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.store[?(@.color == 'red')]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.store.bicycle[?(@.color == 'red')]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[?(@.price > 10)].title",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[?(@.price > 100)].title",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": false
+ },
+ {
+  "expr": "$..book[?(@.price > 8 && @.price < 9)].title",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[?(@.category == 'fiction')].length()",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[0][?(@.price > 1)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?((@.price > 10 || @.category == 'reference') && @.title)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.price > 10 && (@.category == 'fiction' || false))]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "$[?(@.a == 'x')]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a == 'y')]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.b == 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.b > 1)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.b >= 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.b < 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.c == true)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.c == false)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.d == null)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.zz == null)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.a)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.zz)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(!@.zz)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.d)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.e.size() == 3)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.e.length() == 3)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.e size 3)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.s size 3)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.s.size() == 3)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.s.length() == 3)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.e empty false)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.n empty true)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.n empty false)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.s empty false)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.e subsetof [1,2,3,4])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.e subsetof [1,2])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.e anyof [3,9])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.e anyof [9])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.e noneof [9])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.e noneof [1])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.e contains 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.s contains 'b')]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a in ['x','y'])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a nin ['y'])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a =~ /x/)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a =~ /^x$/)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a =~ /X/i)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.b =~ /2/)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.b == '2')]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a == 'x' && @.b == 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a == 'z' || @.b == 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.f.g == 'h')]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@['a'] == 'x')]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.e[0] == 1)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.e[1] > 1)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.f[?(@.g == 'h')]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[?(@ > 1)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[?(@ == 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[?(@ > 5)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.e[?(@ in [1,5])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[?(@ nin [1,2,3])]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.a == 1)]",
+  "doc": [
+   {
+    "a": 1
+   },
+   {
+    "a": 2
+   }
+  ],
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a == 3)]",
+  "doc": [
+   {
+    "a": 1
+   },
+   {
+    "a": 2
+   }
+  ],
+  "matched": false
+ },
+ {
+  "expr": "$[0].a",
+  "doc": [
+   {
+    "a": 1
+   },
+   {
+    "a": 2
+   }
+  ],
+  "matched": true
+ },
+ {
+  "expr": "$.length()",
+  "doc": [
+   {
+    "a": 1
+   },
+   {
+    "a": 2
+   }
+  ],
+  "matched": true
+ },
+ {
+  "expr": "$.size()",
+  "doc": [
+   {
+    "a": 1
+   },
+   {
+    "a": 2
+   }
+  ],
+  "matched": true
+ },
+ {
+  "expr": "$[*].a",
+  "doc": [
+   {
+    "a": 1
+   },
+   {
+    "a": 2
+   }
+  ],
+  "matched": true
+ },
+ {
+  "expr": "$.a.b.c",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "a",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$a",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "$.",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "$[",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "$..",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "$.e[",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[?(@ >)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "$.e[?(",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "$[?(@.a == 'x']",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "$.e[1:2]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[::2]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": "rejected"
+ },
+ {
+  "expr": "$.e[0:3:2]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[-5:]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$['a b']",
+  "doc": {
+   "a b": 1
+  },
+  "matched": true
+ },
+ {
+  "expr": "$['a.b']",
+  "doc": {
+   "a.b": 1
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.a-b",
+  "doc": {
+   "a-b": 1
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.a_b",
+  "doc": {
+   "a_b": 1
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.é",
+  "doc": {
+   "é": 1
+  },
+  "matched": true
+ },
+ {
+  "expr": "$['1']",
+  "doc": {
+   "1": 1
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.1",
+  "doc": {
+   "1": 1
+  },
+  "matched": true
+ },
+ {
+  "expr": "$..book[?(@.price > 8.95)].price",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[?(@.price == 8.95)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.store.book[?(@.price == 12.99)]",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.expensive",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.expensive == 10)].expensive",
+  "doc": {
+   "store": {
+    "book": [
+     {
+      "category": "reference",
+      "author": "Nigel Rees",
+      "title": "Sayings",
+      "price": 8.95
+     },
+     {
+      "category": "fiction",
+      "author": "Evelyn Waugh",
+      "title": "Sword",
+      "price": 12.99
+     },
+     {
+      "category": "fiction",
+      "author": "Herman Melville",
+      "title": "Moby Dick",
+      "isbn": "0-553-21311-3",
+      "price": 8.99
+     }
+    ],
+    "bicycle": {
+     "color": "red",
+     "price": 19.95
+    }
+   },
+   "expensive": 10
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[?(@ >= 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e[?(@ != 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.b != 2)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$[?(@.b != 3)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.zz != 3)]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.zz == 'x' || @.a == 'x')]",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a == 'x')].b",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$[?(@.a == 'y')].b",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.e[?(@ > 1)].length()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e.first()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e.last()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e.index(1)",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.f.keys()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e.concat('x')",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.s.concat('x')",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e.stddev()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e.min()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e.max()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e.avg()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.e.sum()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.b.min()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.s.length()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.s.size()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": false
+ },
+ {
+  "expr": "$.f.length()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.f.size()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.n.length()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ },
+ {
+  "expr": "$.o.size()",
+  "doc": {
+   "a": "x",
+   "b": 2,
+   "c": true,
+   "d": null,
+   "e": [
+    1,
+    2,
+    3
+   ],
+   "f": {
+    "g": "h"
+   },
+   "s": "abc",
+   "n": [],
+   "o": {}
+  },
+  "matched": true
+ }
+]

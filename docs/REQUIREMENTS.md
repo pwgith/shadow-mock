@@ -44,7 +44,7 @@ The global session must behave like WireMock 3.x, so existing mapping files and 
 * **FR-1.1** Load mappings from `<root>/mappings/**/*.json`. Each file holds either one mapping or `{"mappings": [...]}`.
 * **FR-1.2** Load response bodies referenced by `bodyFileName` from `<root>/__files/`.
 * **FR-1.3** Accept the WireMock JSON schema unchanged: `id`, `uuid`, `name`, `priority`, `request`, `response`, `persistent`, `metadata`, `postServeActions`, `serveEventListeners`, plus the Shadow Mock extension `callResponses`. The scenario fields (`scenarioName`, `requiredScenarioState`, `newScenarioState`) are not supported and are rejected (FR-4.4).
-* **FR-1.4** Unknown fields are kept and round-tripped, not dropped.
+* **FR-1.4** Unknown fields are kept and round-tripped, not dropped, when `mappings.unknownFields` is `keep`. The default is `reject` (FR-10.9), which is what WireMock does.
 * **FR-1.5** Hot reload: file changes are picked up without a restart (optional flag, on by default in standalone).
 
 ### 3.2 Request matching
@@ -109,6 +109,27 @@ Shadow Mock replaces WireMock's scenarios with **call-count responses**: a mappi
 * **FR-6.3** WireMock-compatible `/__admin` REST API: mappings CRUD, `import`, `reset`, `save`, `files`, `requests`, `near-misses`, `recordings`, `settings`, `health`, `shutdown` (but not `scenarios`, FR-4.4), plus `counters` (FR-4.3).
 * **FR-6.4** Admin path prefix is configurable. Shadow Mock-specific endpoints live under `/__admin/sessions/...`, plus `/__admin/mappings/validate`, `/__admin/mappings/dry-run`, `/__admin/stats/live` and `/__admin/usage`, so they never collide with WireMock's.
 * **FR-6.5 SaaS restrictions.** In SaaS, `shutdown` and `save` are disabled. Global-scope writes (`mappings`, `files`, `import`, `settings`, global `reset`) are rejected with 403 because they are made through the management app (FR-9.5a). Session-scoped equivalents are allowed.
+
+### 3.9 WireMock parity completion
+
+Found by comparing Shadow Mock with a real WireMock 3.13.2 ([WIREMOCK_GAPS.md](WIREMOCK_GAPS.md)); the plan is in [PARITY_PLAN.md](PARITY_PLAN.md). In each case Shadow Mock must give the answer WireMock gives, unless COMPATIBILITY.md lists the difference.
+
+* **FR-10.1 JSONPath dialect.** `matchesJsonPath` and the JSON helpers use Jayway JsonPath syntax and behaviour: filters with `==`, `!=`, `<`, `<=`, `>`, `>=`, `=~`, `in`, `nin`, `subsetof`, `anyof`, `noneof`, `contains`, `size`, `empty`, `!`, `&&` and `||`; the functions `size()`, `min()`, `max()`, `avg()`, `sum()` and `keys()`; and filters that test the root object.
+* **FR-10.2 JsonUnit placeholders.** `equalToJson` supports every JsonUnit placeholder WireMock does, including `${json-unit.ignore-element}`.
+* **FR-10.3 Template blocks and assignment.** `assign`, `parseJson`, `formatJson`, `formatXml`, `trim`, `contains`, `matches`, `jsonArrayAdd` and `jsonMerge` work as block helpers, and a variable set by `assign`, `val`, `parseJson`, `regexExtract` or `formData` can be read later in the same template.
+* **FR-10.4 Template helper set.** `numberFormat`, `arrayRemove`, `isOdd`, `isEven`, `stripes`, `systemValue`, `formatXml`, `jsonSort`, and the Handlebars.java string helpers (`abbreviate`, `capitalizeFirst`, `center`, `cut`, `defaultIfEmpty`, `ljust`, `rjust`, `slugify`, `stringFormat`, `wordWrap`, `yesno`, `stripTags`, `dateFormat`) exist. `systemValue` is denied unless the key is permitted (`templating.permittedSystemKeys`).
+* **FR-10.5 Template value rendering.** Helpers print values as WireMock does: lists as `[a, b]`, `range` as a list, `arrayAdd` honours `position`, `arrayJoin` honours `prefix` and `suffix`, `math` divides integers as integers, `jsonPath` returns lists as JSON, `xPath` returns elements as markup, `urlEncode` honours `decode`, `hostname` returns the host name, `parseDate` accepts RFC 1123, RFC 1036, asctime, `unix` and `epoch`, and `truncateDate` accepts every truncation WireMock lists.
+* **FR-10.6 Template request model.** `request.id`, `request.path.N`, `request.requestLine`, negative and `last` indexes, `lookup` with `ids[].1` keys, `request.multipart` and `request.parts.<name>.body|bodyAsBase64|binary|headers`.
+* **FR-10.7 Journal queries.** `GET /__admin/requests` honours `unmatched`, `matchingStub`, `limit` (including 0) and `since`. Journal responses carry `requestJournalDisabled`. `requests/remove` answers `{"serveEvents": [...]}`, and journal entries carry `subEvents`.
+* **FR-10.8 Admin endpoints.** `requests/remove-by-metadata`, `DELETE mappings/unmatched`, `DELETE requests/{id}` (200 for an unknown id), `PUT settings`, the `proxyPassThrough` setting, `GET /__admin/docs` (OpenAPI document and Swagger page), and `GET /__admin/` as an alias for the mappings list. Stored mappings have `request.method` filled in as `ANY`, and persisted files are named `<name>-<id>.json`.
+* **FR-10.9 Strict mappings.** A mapping with a field Shadow Mock does not know is rejected with 422 and a JSON pointer, as WireMock does. `mappings.unknownFields: keep` restores FR-1.4.
+* **FR-10.10 Response framing.** `statusMessage` is sent as the reason phrase. `Matched-Stub-Id` and `Matched-Stub-Name` are sent on matched replies. Responses are gzipped at any size when the client accepts gzip, without `Vary`. Request bodies with `Content-Encoding: gzip` are decompressed before matching.
+* **FR-10.11 Server behaviours.** Stub CORS (`--enable-stub-cors`); files in `__files` served at `/__files/<path>` and as a fallback at `/<path>`; an unreachable proxy target answers 500 with WireMock's wording.
+* **FR-10.12 Recording output.** Recorded and snapshotted mappings use `urlPath` with `queryParameters`, a `name`, and text bodies as `body`; `outputFormat: IDS` returns `{"ids": [...]}`.
+* **FR-10.13 Command-line flags.** Every WireMock command-line flag is accepted. Each is implemented, accepted with a startup warning because it tunes the Java server, or (until FR-10.14 and FR-10.15 are built) refused with a clear message.
+* **FR-10.14 TLS and HTTP/2.** HTTPS listener with PEM, PKCS12 and JKS key material, optional client certificates, a generated self-signed certificate when none is given, HTTP/2 over TLS and in plain text, and the `--https-*`, `--disable-http`, `--disable-http2-*` and `--admin-api-require-https` flags.
+* **FR-10.15 Browser proxy.** Optional browser-proxy mode with a CA keystore, `CONNECT` handling and per-host certificates. Off unless asked for.
+* **FR-10.16 Extension replacements.** Built-in, opt-in `jwt` and `jwks` helpers, a Faker `random` helper, and a `graphql` body matcher.
 
 ## 4. Functional requirements: key-based shadow mocks
 
@@ -214,7 +235,7 @@ Shadow Mock replaces WireMock's scenarios with **call-count responses**: a mappi
 * A UI in the engine. The engine is API-only, and the SaaS UI is the separate Shadow Mock management app (SAAS.md §1.1)
 * "Underlay" session mappings that apply only when no global mapping matches. Session mappings are overrides only.
 * Scanning **response** bodies of proxied calls for session keys
-* WebSocket and SSE mocking
+* WebSocket, SSE and messaging mocking (WireMock 4.x beta), gRPC, and the Java-only features (JUnit and Spring integrations, WAR deployment, Java extension points)
 * WireMock scenarios (stateful named state machines). Replaced by call-count responses (FR-4.1 to FR-4.4)
 
 ## 9. Decisions log
@@ -236,6 +257,9 @@ Shadow Mock replaces WireMock's scenarios with **call-count responses**: a mappi
 | 14 | Pricing structure | Platform org fee (Free, Team $19, Business $79, Enterprise) plus per-app tiers. Shadow Mock: Free, Starter $29, Team $99, Business $399, Enterprise, with overage on requests and p95 concurrent sessions. Proposal; see SAAS.md §12 |
 | 15 | Session TTLs | Key-based: default 1 h, max 24 h. URL-based: default 24 h, max 30 days. Both renewable, and both count as concurrent sessions while active (FR-7.2) |
 | 16 | Stateful behaviour (2026-10-27) | WireMock scenarios are **not supported**; mappings using them are rejected with a clear error. Replaced by **call-count responses** (`callResponses`), with counters per mapping per layer scope. Shadow mocks cover test isolation, and call counts cover retries, polling, flaky dependencies and rate limits. Cross-endpoint state is not covered; revisit if users need it |
+| 17 | Unknown mapping fields (2026-10-28) | Rejected with 422 by default, as WireMock does (supersedes the keep-and-round-trip default of FR-1.4). `mappings.unknownFields: keep` restores it |
+| 18 | WireMock 4.x messaging, WebSockets, SSE (2026-10-28) | Still out of scope (decision 4). Listed under Not supported in COMPATIBILITY.md |
+| 19 | WireMock parity gaps (2026-10-28) | All gaps found against WireMock 3.13.2 are closed in the order of PARITY_PLAN.md, each proved by a corpus case checked against the real WireMock. TLS, HTTP/2, browser proxy and the extension replacements are in scope (FR-10.14 to FR-10.16) |
 
 ## 10. Open questions
 Pricing levels in SAAS.md §12 are a proposal to validate with early customers. Items to verify before launch are listed in SAAS.md §13.

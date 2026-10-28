@@ -62,7 +62,7 @@ const mpType = "multipart/form-data; boundary=corpus"
 
 // wiremockCases covers corpus/wiremock/mappings.
 func wiremockCases() []tc {
-	return slices.Concat(urlAndMethodCases(), attributeCases(), valueCases(), bodyCases(), responseCases(), miscCases(), shipmentCases())
+	return slices.Concat(urlAndMethodCases(), attributeCases(), valueCases(), bodyCases(), responseCases(), miscCases(), shipmentCases(), parityCases())
 }
 
 func urlAndMethodCases() []tc {
@@ -164,7 +164,7 @@ func bodyCases() []tc {
 		{want: "c005000206", call: j("/wm/jsonpath/no-discount", `{ "total": 10 }`)},
 		{want: "c005000208", call: j("/wm/jsonschema/claim", `{ "id": 3, "amount": 120.5, "currency": "AUD" }`)},
 		{want: "c005000209", call: j("/wm/json/all-patterns", `{ "a": 1, "b": 2 }`)},
-		{call: j("/wm/jsonschema/claim", `{ "id": 3, "amount": -1 }`), contains: []string{"Body"}},
+		{call: j("/wm/jsonschema/claim", `{ "id": 3, "amount": -1 }`)},
 		{call: j("/wm/json/all-patterns", `{ "a": 1, "b": 2, "test": true }`)},
 		{call: j("/wm/json/strict", `{ "id": 1, "tags": ["b", "a"] }`)},
 		// 06 XML bodies
