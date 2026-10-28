@@ -1733,7 +1733,8 @@
  {
   "name": "hostname twice",
   "tpl": "{{hostname}}",
-  "want": "DESKTOP-N0HKV31"
+  "want": "<the host the probe ran on>",
+  "skip": "the host name is the machine it ran on, so the recorded value cannot match another machine"
  },
  {
   "name": "arrayRemove pos start",

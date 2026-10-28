@@ -97,3 +97,17 @@ func TestHelpersRenderAsWireMockDoes(t *testing.T) {
 		})
 	}
 }
+
+// The recorded host name is the machine the probe ran on, so the golden case is skipped and the
+// helper is checked against this machine instead.
+func TestHostnameIsThisMachine(t *testing.T) {
+	t.Parallel()
+	want, err := os.Hostname()
+	if err != nil {
+		t.Skip(err)
+	}
+	got, err := engine().Render("{{hostname}}", respond.Data(&respond.Input{Request: &match.Request{}}, nil))
+	if err != nil || got != want {
+		t.Fatalf("Render(hostname) = %q, %v; want %q", got, err, want)
+	}
+}
