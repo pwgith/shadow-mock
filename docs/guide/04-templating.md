@@ -120,6 +120,29 @@ separator. `range` gives the whole numbers from one to another, both included.
 {{math request.callNumber '*' 10}}
 ```
 
+## Variables and block helpers
+
+Some helpers use the text between their tags as input. `assign` stores that text under a name that the rest of the template reads:
+
+```handlebars
+{{#assign 'existing'}}[{"id": 1}]{{/assign}}
+{{#jsonArrayAdd existing maxItems=2}}{"id": 2}{{/jsonArrayAdd}}
+```
+
+| Block helper | What it does |
+|---|---|
+| `{{#assign 'name'}}text{{/assign}}` | Stores the text, trimmed. It prints nothing |
+| `{{#parseJson 'name'}}json{{/parseJson}}` | Parses the JSON into `name`. With no name it returns the parsed value |
+| `{{#formatJson}}json{{/formatJson}}` | Lays JSON out as WireMock does (`"a" : 1`, arrays on one line). `format='compact'` removes the layout. Key order is kept |
+| `{{#formatXml}}xml{{/formatXml}}` | Indents XML. `format='compact'` removes the layout |
+| `{{#trim}}  text  {{/trim}}` | Removes white space from both ends |
+| `{{#jsonArrayAdd list}}item{{/jsonArrayAdd}}` | Appends the item (JSON) to the array. Options: `maxItems=n` drops the oldest items, `flatten=true` adds an array's elements |
+| `{{#jsonMerge base}}json{{/jsonMerge}}` | Merges the JSON over `base`. `removeNulls=true` drops null members |
+
+`val` can set a variable too: `{{val request.query.tier.first or='basic' assign='tier'}}` prints nothing and keeps the value's type, so `{{#lt count 20}}` still compares numbers.
+
+The comparison helpers (`eq`, `neq`, `lt`, `lte`, `gt`, `gte`, `and`, `or`, `not`) and `contains` and `matches` work as blocks with an optional `{{else}}`: `{{#gt count 3}}many{{else}}few{{/gt}}`.
+
 ## Partials and block parameters
 
 A template can define a reusable piece of itself with `{{#*inline "name"}}…{{/inline}}` and use it

@@ -83,6 +83,7 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | `{{x}}}` (a tag followed by a closing brace, as in `{"a": {{x}}}`) | A syntax error. Write `{{x}} }` | Accepted |
 | A helper given a missing value, for example `{{capitalize request.query.name}}` with no `name` | A 500 (a `NullPointerException`) | Renders an empty string |
 | `eq`, `neq` and `contains` on request values, for example `(eq request.method 'GET')` or `(eq request.query.plan 'gold')` | False, because WireMock compares the request-model object with a string. Use `.first`, as in `request.query.plan.first` | True when the text is equal |
+| The `else` part of `{{#contains}}…{{else}}…{{/contains}}` | Not rendered | Rendered, as for every other block helper |
 | `this.size` (or another name that is also a Java `Map` property) on an object | The number of entries in the object | The field named `size`, if there is one |
 
 ### JSONPath
@@ -93,7 +94,7 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 
 | Area | WireMock | Shadow Mock |
 |---|---|---|
-| `{{toJson x}}` and `{{formatJson x}}` layout | Pretty printed with Jackson's spacing (`"a" : 1`) | Compact. The JSON is equal |
+| `{{toJson x}}` layout | Pretty printed with Jackson's spacing (`"a" : 1`) | Compact. The JSON is equal |
 | The body of a failed response, for example a missing `bodyFileName` | An HTML error page with a stack trace | A small JSON error, `{"error": "not_found", ...}`. Both are status 500 |
 | A request that fails because its body file is missing | Not written to the journal | Written to the journal |
 | `MALFORMED_RESPONSE_CHUNK` | Sends the headers and no valid body | Sends the headers and a broken chunk. Go's HTTP client fails on Shadow Mock's and not on WireMock's |

@@ -168,7 +168,7 @@ func headerDifferences(ours, theirs http.Header, oursBase, theirsBase string) []
 func bodyDifference(ours, theirs *reply, oursBase, theirsBase string) string {
 	ob := bytes.ReplaceAll(ours.body, []byte(strings.TrimPrefix(oursBase, "http://")), []byte("HOST"))
 	wb := bytes.ReplaceAll(theirs.body, []byte(strings.TrimPrefix(theirsBase, "http://")), []byte("HOST"))
-	if bytes.Equal(ob, wb) {
+	if bytes.Equal(ob, wb) || bytes.Equal(bytes.ReplaceAll(wb, []byte(crlf), []byte("\n")), ob) {
 		return ""
 	}
 	var o, w any
@@ -312,8 +312,12 @@ func entryDifference(ours, theirs journalEntry) string {
 	return strings.Join(out, "; ")
 }
 
+const crlf = "\r\n"
+
 // sameText compares two bodies, as JSON when both are JSON so layout does not matter.
 func sameText(a, b string) bool {
+	// A WireMock on Windows ends lines with CRLF where it formats text; the layout is the same.
+	a, b = strings.ReplaceAll(a, crlf, "\n"), strings.ReplaceAll(b, crlf, "\n")
 	if a == b {
 		return true
 	}

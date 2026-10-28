@@ -81,6 +81,8 @@ func (w *world) initResponseAsserts(sc *godog.ScenarioContext) {
 		}
 		return nil
 	})
+	sc.Step(`^the response body equals '(.*)'$`, w.bodyEquals)
+	sc.Step(`^the response body is:$`, func(doc *godog.DocString) error { return w.bodyEquals(doc.Content) })
 	sc.Step(`^the response body contains "([^"]*)"$`, func(part string) error {
 		r, err := w.needLast()
 		if err != nil {
@@ -735,4 +737,17 @@ func (w *world) initMappingAsserts(sc *godog.ScenarioContext) {
 		}
 		return nil
 	})
+}
+
+// bodyEquals checks the last response body against text that may contain quotes. Leading and
+// trailing white space is ignored, because formatted output ends with a newline.
+func (w *world) bodyEquals(want string) error {
+	r, err := w.needLast()
+	if err != nil {
+		return err
+	}
+	if got := strings.TrimSpace(string(r.body)); got != strings.TrimSpace(w.sub(want)) {
+		return fmt.Errorf("body = %q, want %q (status %d)", truncate(r.body), w.sub(want), r.status)
+	}
+	return nil
 }

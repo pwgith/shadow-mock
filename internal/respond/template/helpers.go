@@ -75,6 +75,7 @@ func (e *Engine) helpers() map[string]any {
 		// closeBrace writes the literal brace that follows a tag, as in {"a": {{x}}}; see rewrite.
 		"closeBrace": func(_ *raymond.Options) any { return safe("}") },
 	}
+	maps.Copy(h, blockHelpers())
 	maps.Copy(h, jsonHelpers())
 	maps.Copy(h, moreHelpers())
 	return h
@@ -483,13 +484,19 @@ func matchesHelper(s, pattern any, _ *raymond.Options) any {
 // val implements {{val value or=fallback}}: the value, or the fallback when it is missing or empty.
 // default= is accepted as well.
 func val(v any, o *raymond.Options) any {
-	if text(v) != "" {
-		return v
+	result := v
+	if text(v) == "" {
+		if fallback := o.HashProp("or"); fallback != nil {
+			result = fallback
+		} else {
+			result = safe(o.HashStr("default"))
+		}
 	}
-	if fallback := o.HashProp("or"); fallback != nil {
-		return fallback
+	if name := o.HashStr("assign"); name != "" {
+		setVar(o, name, Safe(result))
+		return safe("")
 	}
-	return safe(o.HashStr("default"))
+	return result
 }
 
 // arrayAdd implements (arrayAdd list item position=start): a new list with the item added at the
