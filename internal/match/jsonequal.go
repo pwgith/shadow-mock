@@ -14,6 +14,7 @@ import (
 const (
 	placeholderPrefix = "${json-unit."
 	phIgnore          = "${json-unit.ignore}"
+	phIgnoreElement   = "${json-unit.ignore-element}"
 	phAnyString       = "${json-unit.any-string}"
 	phAnyNumber       = "${json-unit.any-number}"
 	phAnyBoolean      = "${json-unit.any-boolean}"
@@ -99,7 +100,7 @@ func (m *jsonEqual) equal(want, got any) bool {
 
 func (m *jsonEqual) placeholder(s string, got any) bool {
 	switch s {
-	case phIgnore:
+	case phIgnore, phIgnoreElement:
 		return true
 	case phAnyString:
 		_, ok := got.(string)
@@ -122,7 +123,7 @@ func (m *jsonEqual) equalObject(want, got map[string]any) bool {
 	for k, wv := range want {
 		gv, ok := got[k]
 		if !ok {
-			if s, isString := wv.(string); isString && s == phIgnore {
+			if s, isString := wv.(string); isString && (s == phIgnore || s == phIgnoreElement) {
 				continue
 			}
 			return false

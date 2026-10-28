@@ -1,0 +1,361 @@
+{
+  "mappings": [
+    {
+      "id": "c0160001-0016-4000-8000-000000000001",
+      "name": "matchesJsonPath (Jayway): root-filter",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/root-filter",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.status == 'OPEN')]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath root-filter"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000002",
+      "name": "matchesJsonPath (Jayway): size-function",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/size-function",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.things.size() == 2)]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath size-function"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000003",
+      "name": "matchesJsonPath (Jayway): regex-filter",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/regex-filter",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.sku =~ /a.*/i)]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath regex-filter"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000004",
+      "name": "matchesJsonPath (Jayway): in-operator",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/in-operator",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.tier in ['gold','platinum'])]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath in-operator"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000005",
+      "name": "matchesJsonPath (Jayway): nin-operator",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/nin-operator",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.tier nin ['bronze'])]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath nin-operator"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000006",
+      "name": "matchesJsonPath (Jayway): contains-operator",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/contains-operator",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.tags contains 'vip')]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath contains-operator"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000007",
+      "name": "matchesJsonPath (Jayway): anyof-operator",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/anyof-operator",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.tags anyof ['vip','staff'])]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath anyof-operator"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000008",
+      "name": "matchesJsonPath (Jayway): subsetof-operator",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/subsetof-operator",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.tags subsetof ['vip','staff','new'])]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath subsetof-operator"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000009",
+      "name": "matchesJsonPath (Jayway): size-operator",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/size-operator",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.items size 2)]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath size-operator"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000010",
+      "name": "matchesJsonPath (Jayway): empty-operator",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/empty-operator",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.items empty true)]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath empty-operator"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000011",
+      "name": "matchesJsonPath (Jayway): length-function",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/length-function",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$.items.length()"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath length-function"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000012",
+      "name": "matchesJsonPath (Jayway): negative-index",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/negative-index",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$.items[-1]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath negative-index"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000013",
+      "name": "matchesJsonPath (Jayway): deep-scan",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/deep-scan",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$..sku"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath deep-scan"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000014",
+      "name": "matchesJsonPath (Jayway): number-vs-string",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/number-vs-string",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.code == '42')]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath number-vs-string"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000015",
+      "name": "matchesJsonPath (Jayway): missing-is-not-equal",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/missing-is-not-equal",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$[?(@.nope != 'x')]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath missing-is-not-equal"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000016",
+      "name": "matchesJsonPath (Jayway): root-reference",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "matchesJsonPath"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonpath/root-reference",
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": "$.items[?(@.price > $.limit)]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "jsonpath root-reference"
+      }
+    },
+    {
+      "id": "c0160001-0016-4000-8000-000000000017",
+      "name": "equalToJson: ignore-element placeholder",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "equalToJson"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/jsonunit/ignore-element",
+        "bodyPatterns": [
+          {
+            "equalToJson": "{ \"id\": 1, \"note\": \"${json-unit.ignore-element}\" }"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": "ignore-element"
+      }
+    }
+  ]
+}

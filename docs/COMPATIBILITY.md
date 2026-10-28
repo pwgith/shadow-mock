@@ -85,6 +85,10 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | `eq`, `neq` and `contains` on request values, for example `(eq request.method 'GET')` or `(eq request.query.plan 'gold')` | False, because WireMock compares the request-model object with a string. Use `.first`, as in `request.query.plan.first` | True when the text is equal |
 | `this.size` (or another name that is also a Java `Map` property) on an object | The number of entries in the object | The field named `size`, if there is one |
 
+### JSONPath
+
+`matchesJsonPath` follows Jayway JsonPath, as WireMock does. Two expressions that WireMock accepts only by accident are refused: an unclosed bracket (`$.e[`), which WireMock reads as if it were closed.
+
 ### Where the bytes differ but the meaning does not
 
 | Area | WireMock | Shadow Mock |

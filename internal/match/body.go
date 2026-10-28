@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/ohler55/ojg/jp"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
+	"github.com/pwgith/shadow-mock/internal/jsonpath"
 	"github.com/pwgith/shadow-mock/internal/model"
 )
 
@@ -113,7 +113,7 @@ func compileJSONPath(raw json.RawMessage, o Options) (ContentMatcher, error) {
 		}
 		sub = compiled
 	}
-	x, err := jp.ParseString(expr)
+	x, err := jsonpath.Parse(expr)
 	if err != nil {
 		return nil, fmt.Errorf("matchesJsonPath: invalid expression %q: %w", expr, err)
 	}
@@ -124,29 +124,10 @@ func compileJSONPath(raw json.RawMessage, o Options) (ContentMatcher, error) {
 		}
 		results := x.Get(doc)
 		if sub == nil {
-			return boolResult(nonEmpty(results))
+			return boolResult(x.Matches(doc))
 		}
 		return matchJSONPathResults(sub, results)
 	}), nil
-}
-
-func nonEmpty(results []any) bool {
-	for _, r := range results {
-		switch t := r.(type) {
-		case nil:
-		case []any:
-			if len(t) > 0 {
-				return true
-			}
-		case map[string]any:
-			if len(t) > 0 {
-				return true
-			}
-		default:
-			return true
-		}
-	}
-	return false
 }
 
 func matchJSONPathResults(sub ContentMatcher, results []any) Result {

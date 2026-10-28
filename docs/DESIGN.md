@@ -780,6 +780,7 @@ None of these changes touch `engine`, `match`, `detect` or `admin` handler code.
 | **P1 – Shadow** | Session registry and TTL, detection stages 1 to 3, then the Aho-Corasick metadata and body scans, session-scoped admin, call-count responses with counters per session, scenario-field rejection, override and mask |
 | **P2 – URL-based shadow mocks** | `/d/<id>` path-prefix routing, nested key-based shadow mock inside a URL-based shadow mock |
 | **P3 – Parity** | Templating, delays and faults, gzip responses, proxy, record and playback, XML and XPath, JSON schema, multipart, webhooks, near misses, conformance suite |
+| **P3.1 – Parity completion** | Everything in PARITY_PLAN.md: Jayway JSONPath, template blocks and helpers, admin API shapes and filters, wire behaviours, command-line flags, recording shape, TLS and HTTP/2, browser proxy, extension replacements (FR-10.1 to FR-10.16) |
 | **P4 – Central server** | Separate admin listener, metrics and tracing, Docker, hardening, quotas |
 | **P5 – SaaS** | Clerk and machine JWT auth, org-handle path tenancy with JWT org match, per-org IP allowlist, usage metering and quotas, Postgres (shared schema, migrations, JSON Schema export) and Redis, distributed change events, async journal and stats, validate and dry-run endpoints for the management app |
 

@@ -91,6 +91,22 @@ Other request fields: `basicAuthCredentials` (`username` and `password`), `host`
 { "bodyPatterns": [ { "matchesXPath": "//a:order/a:id", "xPathNamespaces": { "a": "urn:example" } } ] }
 ```
 
+### JSONPath expressions
+
+`matchesJsonPath` uses the same JSONPath dialect as WireMock (the Jayway library), so expressions written for WireMock behave the same here:
+
+| Feature | Examples |
+|---|---|
+| Filters on an array, or on an object (which tests the object itself) | `$.items[?(@.qty > 1)]`, `$[?(@.status == 'OPEN')]` |
+| Comparison, `&&`, `||`, `!`, groups | `==`, `!=`, `<`, `<=`, `>`, `>=` |
+| Regular expression (matches the whole value; flag `i`) | `$[?(@.sku =~ /a.*/i)]` |
+| List operators | `in`, `nin`, `subsetof`, `anyof`, `noneof`, `contains`, `size`, `empty` |
+| Functions at the end of a path | `length()`, `size()`, `keys()`, `first()`, `last()`, `index(n)`, `min()`, `max()`, `avg()`, `sum()`, `stddev()`, `concat('x')` |
+| Picking elements | `[0]`, `[-1]`, `[0,2]`, `[1:]`, `['a','b']`, `..name`, `*` |
+| Reference to the root inside a filter | `$.items[?(@.price > $.limit)]` |
+
+A number equals a string that reads as the same number (`@.code == '42'` matches `42`). A path that finds nothing, a JSON `null`, an empty array or an empty object does not match.
+
 ## Custom matchers
 
 A Go program that embeds Shadow Mock can register its own matchers by implementing
