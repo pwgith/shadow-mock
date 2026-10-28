@@ -21,6 +21,7 @@ Unknown keys in the file are an error, so typos fail at startup instead of being
 | `--root-dir` | The directory holding `mappings/` and `__files/` |
 | `--verbose` | Debug logging |
 | `--version` | Print the version and exit |
+| `--healthcheck` | Ask a running server on this configuration for `/__health`, then exit 0 (healthy) or 1. Used by the Docker health check |
 
 ## Environment variables
 

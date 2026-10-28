@@ -1,0 +1,28 @@
+# Configuration for deploy/docker-compose.yml. Change allowedHosts and publicBaseUrl to your name.
+mode: server
+auth:
+  driver: token
+  tokens:
+    - { name: ops, role: admin, tokenEnv: SHADOWMOCK_OPS_TOKEN }
+    - { name: ci, role: editor, tokenEnv: SHADOWMOCK_CI_TOKEN }
+listen:
+  mock: ":8080"
+  admin: ":9090"
+admin:
+  globalWrites: deny
+  allowedHosts: [mocks.example.com]
+storage:
+  sessions:
+    driver: fs
+server:
+  publicBaseUrl: https://mocks.example.com
+egress:
+  blockPrivate: true
+limits:
+  maxSessions: 500
+  maxMappingsPerSession: 200
+  maxDelay: 10s
+  requestsPerSecond: 100
+  burst: 200
+log:
+  format: json

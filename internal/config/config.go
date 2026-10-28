@@ -284,6 +284,8 @@ func Default() Config {
 // Flags are the command-line options that are not configuration.
 type Flags struct {
 	ShowVersion bool
+	// HealthCheck asks a running server on this configuration whether it is healthy, and exits.
+	HealthCheck bool
 }
 
 // Resolve builds the configuration from command-line arguments, the environment (through
@@ -299,6 +301,7 @@ func Resolve(args []string, lookup func(string) (string, bool)) (Config, Flags, 
 	verbose := fl.Bool("verbose", false, "log at debug level")
 	var f Flags
 	fl.BoolVar(&f.ShowVersion, "version", false, "print the version and exit")
+	fl.BoolVar(&f.HealthCheck, "healthcheck", false, "check that a server on this configuration is healthy, then exit 0 or 1")
 	if err := fl.Parse(args); err != nil {
 		return Config{}, f, fmt.Errorf("parse flags: %w", err)
 	}

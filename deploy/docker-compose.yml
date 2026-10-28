@@ -1,0 +1,25 @@
+# A shared Shadow Mock server. Copy this folder, set the two tokens in a .env file next to it, then:
+#   docker compose up -d
+# See docs/guide/15-docker.md.
+services:
+  shadowmock:
+    image: ghcr.io/pwgith/shadow-mock:latest   # pin a version such as :0.2.0 for production
+    restart: unless-stopped
+    command: ["-config", "/config/shadowmock.yaml"]
+    environment:
+      SHADOWMOCK_OPS_TOKEN: ${SHADOWMOCK_OPS_TOKEN:?set SHADOWMOCK_OPS_TOKEN in .env}
+      SHADOWMOCK_CI_TOKEN: ${SHADOWMOCK_CI_TOKEN:?set SHADOWMOCK_CI_TOKEN in .env}
+      # The health check reads the mock port from here, so keep it equal to listen.mock in the file.
+      SHADOWMOCK_LISTEN_MOCK: ":8080"
+    ports:
+      - "8080:8080"   # mock traffic
+      - "9090:9090"   # admin API: keep this off the public network
+    volumes:
+      - ./shadowmock.yaml:/config/shadowmock.yaml:ro
+      - shadowmock-data:/data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  shadowmock-data:

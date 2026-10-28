@@ -49,7 +49,37 @@ func run(args []string, lookup func(string) (string, bool), stdout io.Writer) er
 		fmt.Fprintln(stdout, version)
 		return nil
 	}
+	if flags.HealthCheck {
+		return healthCheck(context.Background(), cfg.Listen.Mock, &http.Client{})
+	}
 	return serve(cfg, newLogger(cfg.Log))
+}
+
+// healthCheck asks the server listening on addr for /__health. It exists so a container, which has
+// no curl, can check itself: docker runs "shadowmock -healthcheck" with the container's settings.
+func healthCheck(ctx context.Context, addr string, client *http.Client) error {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("health check: %w", err)
+	}
+	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
+		host = "127.0.0.1"
+	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+net.JoinHostPort(host, port)+"/__health", http.NoBody)
+	if err != nil {
+		return fmt.Errorf("health check: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("health check: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("health check: %s", resp.Status)
+	}
+	return nil
 }
 
 func newLogger(c config.Log) *slog.Logger {

@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -110,5 +112,37 @@ func TestListenReportsAnAddressThatCannotBeUsed(t *testing.T) {
 	t.Parallel()
 	if _, err := listen("not-an-address", 0); err == nil {
 		t.Error("a bad address should be an error")
+	}
+}
+
+func TestHealthCheck(t *testing.T) {
+	t.Parallel()
+	status := http.StatusOK
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/__health" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(status)
+	}))
+	defer srv.Close()
+	if err := healthCheck(t.Context(), srv.Listener.Addr().String(), srv.Client()); err != nil {
+		t.Errorf("a healthy server: %v", err)
+	}
+	status = http.StatusServiceUnavailable
+	if err := healthCheck(t.Context(), srv.Listener.Addr().String(), srv.Client()); err == nil {
+		t.Error("an unhealthy server should fail the check")
+	}
+	if err := healthCheck(t.Context(), "not-an-address", srv.Client()); err == nil {
+		t.Error("a bad address should fail the check")
+	}
+	_, port, _ := net.SplitHostPort(srv.Listener.Addr().String())
+	status = http.StatusOK
+	if err := healthCheck(t.Context(), ":"+port, srv.Client()); err != nil {
+		t.Errorf("a listener on all addresses is reached over loopback: %v", err)
+	}
+	srv.Close()
+	if err := healthCheck(t.Context(), srv.Listener.Addr().String(), &http.Client{}); err == nil {
+		t.Error("a server that is down should fail the check")
 	}
 }

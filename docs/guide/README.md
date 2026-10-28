@@ -21,6 +21,7 @@ Read the pages in order the first time, then use them as a reference.
 | [12. Running a shared server](12-shared-server.md) | Separate admin port, IP allowlist, health checks |
 | [13. Coming from WireMock](13-coming-from-wiremock.md) | What is the same, what differs |
 | [14. Troubleshooting](14-troubleshooting.md) | Common problems and fixes |
+| [15. Running in Docker](15-docker.md) | The container image, Compose example, health check |
 
 ## Terms
 
