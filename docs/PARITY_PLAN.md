@@ -82,6 +82,22 @@ now listed under "Not supported" in COMPATIBILITY.md so the answer is written do
 
 ### 3. Templating helpers, rendering and request model (FR-10.4 to FR-10.6)
 
+**Status: done.** What the probes of WireMock 3.13.2 changed from the list below:
+
+* `jsonSort` is WireMock 4.x only and is not built. `numberFormat` has no `locale=` or `maxFractionDigits=`
+  option; it takes the locale as its third parameter and the options are the Java names
+  (`maximumFractionDigits`, `groupingUsed`, `roundingMode` and so on).
+* `parseDate` does not read RFC 1036, and `truncateDate` has nine names, not "every truncation".
+* Negative indexes are off by one in WireMock and are not copied. `last` is.
+* `jsonRemove` and `jsonArrayAdd jsonPath=` still use the old JSONPath library; moving them needs a remove
+  operation in `internal/jsonpath`, which goes with a later workstream.
+* The engine could not print a list through its String method, so every output tag now passes its value
+  through `printValue`, and helpers with optional parameters are chosen by how many parameters the call has.
+* The helper probes are recorded in `internal/respond/template/testdata/wiremock_helpers.json` (530 cases,
+  62 skipped with a reason), and eleven corpus cases cover the rest on both servers.
+
+The plan as first written:
+
 * **Helpers added:** `numberFormat` (predefined formats, DecimalFormat patterns, locale, digits,
   grouping, rounding), `arrayRemove`, `isOdd`, `isEven`, `stripes`, `systemValue` (denied unless allowed
   by `templating.permittedSystemKeys`, as WireMock denies by default), `formatXml` (helper and block),

@@ -73,15 +73,22 @@ func parseJSONBlock(name any, o *raymond.Options) any {
 
 // formatXML implements {{formatXml xml format='pretty'|'compact'}}; pretty is the default.
 func formatXML(doc any, o *raymond.Options) any {
-	src := text(doc)
+	out, err := prettyXML(text(doc), o.HashStr("format") == "compact")
+	if err != nil {
+		fail("formatXml: %v", err)
+	}
+	return safe(out)
+}
+
+// prettyXML lays out XML text with 2-space indents and a trailing newline, or with no layout.
+func prettyXML(src string, compact bool) (string, error) {
 	if !xmlguard.DepthOK([]byte(src)) {
-		fail("formatXml: the XML is nested more than %d levels deep", xmlguard.MaxDepth)
+		return "", fmt.Errorf("the XML is nested more than %d levels deep", xmlguard.MaxDepth)
 	}
 	root, err := parseXMLTree(src)
 	if err != nil {
-		fail("formatXml: the input is not valid XML: %v", err)
+		return "", fmt.Errorf("the input is not valid XML: %w", err)
 	}
-	compact := o.HashStr("format") == "compact"
 	var b strings.Builder
 	for i, n := range root.children {
 		if !compact && i > 0 {
@@ -92,7 +99,7 @@ func formatXML(doc any, o *raymond.Options) any {
 	if !compact {
 		b.WriteString("\n")
 	}
-	return safe(b.String())
+	return b.String(), nil
 }
 
 // xmlNode is an element, comment, processing instruction or text.

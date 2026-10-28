@@ -93,3 +93,22 @@ func (r *Request) parts() []part {
 		out = append(out, part{header: p.Header, body: b})
 	}
 }
+
+// MultipartPart is one part of a multipart request body.
+type MultipartPart struct {
+	Header textproto.MIMEHeader
+	Body   []byte
+}
+
+// Multipart returns the parts of a multipart body, and whether the request is multipart at all.
+func (r *Request) Multipart() ([]MultipartPart, bool) {
+	mt, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || !strings.HasPrefix(mt, "multipart/") || params["boundary"] == "" {
+		return nil, false
+	}
+	var out []MultipartPart
+	for _, p := range r.parts() {
+		out = append(out, MultipartPart{Header: p.header, Body: p.body})
+	}
+	return out, true
+}

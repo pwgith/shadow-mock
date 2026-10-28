@@ -48,6 +48,17 @@ func parityCases() []tc {
 		{want: "c018000207", call: get("/wm/parity/template/json-merge")},
 		{want: "c018000208", call: get("/wm/parity/template/val-assign?tier=gold")},
 		{want: "c018000209", call: get("/wm/parity/template/comparison-blocks")},
+		{want: "c018000301", call: get("/wm/parity/template/number-format")},
+		{want: "c018000302", call: get("/wm/parity/template/string-helpers")},
+		{want: "c018000303", call: get("/wm/parity/template/small-helpers")},
+		{want: "c018000304", call: get("/wm/parity/template/list-rendering")},
+		{want: "c018000305", call: get("/wm/parity/template/math")},
+		{want: "c018000306", call: j("/wm/parity/template/jsonpath-values", `{ "items": [ { "id": 1 }, { "id": 2 } ], "o": { "k": 1 }, "s": "x" }`)},
+		{want: "c018000307", call: post("/wm/parity/template/xpath-values", `<a><b x="1">t</b><b>u</b></a>`, jsonCT, "application/xml")},
+		{want: "c018000308", call: get("/wm/parity/template/url-encode")},
+		{want: "c018000309", call: get("/wm/parity/template/dates")},
+		{want: "c018000310", call: get("/wm/parity/template/request-model/a/b?x=1&x=2&ids[]=p&ids[]=q")},
+		{want: "c018000311", call: post("/wm/parity/template/multipart", "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--BB--\r\n", jsonCT, "multipart/form-data; boundary=BB")},
 		{want: "c018000210", call: get("/wm/parity/template/trim-block")},
 	}
 }

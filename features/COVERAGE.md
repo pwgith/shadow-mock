@@ -73,7 +73,9 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-10.1 | `01_wiremock_parity/request_matching/jsonpath_dialect.feature` |
 | FR-10.2 | `01_wiremock_parity/request_matching/jsonpath_dialect.feature` |
 | FR-10.3 | `01_wiremock_parity/responses/template_blocks.feature` |
-| FR-10.4 to FR-10.16 | planned, see [PARITY_PLAN.md](../docs/PARITY_PLAN.md); each gets a feature as its workstream is built |
+| FR-10.4, FR-10.5 | `01_wiremock_parity/responses/template_helper_parity.feature` |
+| FR-10.6 | `01_wiremock_parity/responses/template_request_model.feature` |
+| FR-10.7 to FR-10.16 | planned, see [PARITY_PLAN.md](../docs/PARITY_PLAN.md); each gets a feature as its workstream is built |
 | NFR-1.1 | `06_non_functional/compatibility.feature` |
 | NFR-1.2 | `02_shadow_mocks/key_based/session_scoped_admin.feature`, `06_non_functional/compatibility.feature` |
 | NFR-2.1 | `06_non_functional/performance.feature` |

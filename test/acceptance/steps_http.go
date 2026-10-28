@@ -22,6 +22,7 @@ func (w *world) initHTTP(sc *godog.ScenarioContext) {
 	sc.Step(`^I send a "([^"]*)" request to "([^"]*)" with body:$`, func(m, p string, doc *godog.DocString) error {
 		return w.sendSimple(m, p, nil, doc.Content, docType(doc))
 	})
+	sc.Step(`^I send a "([^"]*)" request to "([^"]*)" with multipart parts:$`, w.sendMultipart)
 	sc.Step(`^I send a "([^"]*)" request to "([^"]*)" with header "([^"]*)" set to "([^"]*)"$`, func(m, p, h, v string) error {
 		return w.sendSimple(m, p, http.Header{h: {v}}, "")
 	})
@@ -160,6 +161,21 @@ func (w *world) sendSimple(method, path string, header http.Header, body string,
 		}
 	}
 	return w.sendOne(r)
+}
+
+// sendMultipart sends a multipart/form-data body built from a table of name, content type and body
+// columns; a part with no content type has none.
+func (w *world) sendMultipart(method, path string, table *godog.Table) error {
+	var b strings.Builder
+	for _, row := range table.Rows[1:] {
+		b.WriteString("--BB\r\nContent-Disposition: form-data; name=\"" + row.Cells[0].Value + "\"\r\n")
+		if ct := row.Cells[1].Value; ct != "" {
+			b.WriteString("Content-Type: " + ct + "\r\n")
+		}
+		b.WriteString("\r\n" + row.Cells[2].Value + "\r\n")
+	}
+	b.WriteString("--BB--\r\n")
+	return w.sendSimple(method, path, nil, b.String(), "multipart/form-data; boundary=BB")
 }
 
 func (w *world) sendMany(n int, method, path string, header http.Header) error {

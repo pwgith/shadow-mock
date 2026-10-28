@@ -199,6 +199,8 @@ type Limits struct {
 // Templating configures response templating (P3).
 type Templating struct {
 	Global bool `yaml:"global"`
+	// PermittedSystemKeys lists the environment variables the systemValue helper may read.
+	PermittedSystemKeys []string `yaml:"permittedSystemKeys"`
 }
 
 // Egress configures outbound calls made for mappings: webhooks and proxying.

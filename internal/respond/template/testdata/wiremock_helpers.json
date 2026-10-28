@@ -1,0 +1,2938 @@
+[
+ {
+  "name": "numberFormat default",
+  "tpl": "{{numberFormat 1234.5678}}",
+  "want": "1,234.568"
+ },
+ {
+  "name": "numberFormat integer",
+  "tpl": "{{numberFormat 1234567}}",
+  "want": "1,234,567"
+ },
+ {
+  "name": "numberFormat percent",
+  "tpl": "{{numberFormat 0.256 'percent'}}",
+  "want": "26%"
+ },
+ {
+  "name": "numberFormat currency",
+  "tpl": "{{numberFormat 1234.5 'currency'}}",
+  "want": "$1,234.50"
+ },
+ {
+  "name": "numberFormat integer fmt",
+  "tpl": "{{numberFormat 1234.5 'integer'}}",
+  "want": "1,234"
+ },
+ {
+  "name": "numberFormat number fmt",
+  "tpl": "{{numberFormat 1234.5678 'number'}}",
+  "want": "number1235"
+ },
+ {
+  "name": "numberFormat pattern",
+  "tpl": "{{numberFormat 1234.5678 '#,##0.00'}}",
+  "want": "1,234.57"
+ },
+ {
+  "name": "numberFormat pattern zeros",
+  "tpl": "{{numberFormat 3.1 '000.000'}}",
+  "want": "003.100"
+ },
+ {
+  "name": "numberFormat locale",
+  "tpl": "{{numberFormat 1234.5678 locale='de'}}",
+  "want": "1,234.568"
+ },
+ {
+  "name": "numberFormat locale fr",
+  "tpl": "{{numberFormat 1234567.891 locale='fr'}}",
+  "want": "1,234,567.891"
+ },
+ {
+  "name": "numberFormat maxFractionDigits",
+  "tpl": "{{numberFormat 1.23456 maxFractionDigits=2}}",
+  "want": "1.235"
+ },
+ {
+  "name": "numberFormat minFractionDigits",
+  "tpl": "{{numberFormat 1 minFractionDigits=3}}",
+  "want": "1"
+ },
+ {
+  "name": "numberFormat maxIntegerDigits",
+  "tpl": "{{numberFormat 123456 maxIntegerDigits=3}}",
+  "want": "123,456"
+ },
+ {
+  "name": "numberFormat groupingUsed false",
+  "tpl": "{{numberFormat 1234567 groupingUsed=false}}",
+  "want": "1234567"
+ },
+ {
+  "name": "numberFormat rounding HALF_UP",
+  "tpl": "{{numberFormat 2.5 maxFractionDigits=0 roundingMode='HALF_UP'}}",
+  "want": "2.5"
+ },
+ {
+  "name": "numberFormat rounding half even default",
+  "tpl": "{{numberFormat 2.5 maxFractionDigits=0}}",
+  "want": "2.5"
+ },
+ {
+  "name": "numberFormat negative",
+  "tpl": "{{numberFormat -1234.5}}",
+  "want": "-1,234.5"
+ },
+ {
+  "name": "numberFormat string number",
+  "tpl": "{{numberFormat '42.1234'}}",
+  "want": ""
+ },
+ {
+  "name": "numberFormat bad",
+  "tpl": "{{numberFormat 'abc'}}",
+  "want": ""
+ },
+ {
+  "name": "arrayRemove",
+  "tpl": "{{arrayRemove (array 1 2 3) 2}}",
+  "want": "[1, 2]"
+ },
+ {
+  "name": "arrayRemove strings",
+  "tpl": "{{arrayRemove (array 'a' 'b' 'c') 'b'}}",
+  "want": "[a, b]"
+ },
+ {
+  "name": "arrayRemove absent",
+  "tpl": "{{arrayRemove (array 1 2) 9}}",
+  "want": "[1]"
+ },
+ {
+  "name": "arrayRemove dup",
+  "tpl": "{{arrayRemove (array 1 2 1) 1}}",
+  "want": "[1, 2]"
+ },
+ {
+  "name": "isOdd",
+  "tpl": "{{isOdd 3}}-{{isOdd 4}}",
+  "want": "odd-"
+ },
+ {
+  "name": "isEven",
+  "tpl": "{{isEven 3}}-{{isEven 4}}",
+  "want": "-even"
+ },
+ {
+  "name": "isOdd block",
+  "tpl": "{{#isOdd 3}}odd{{else}}even{{/isOdd}}",
+  "want": "odd",
+  "skip": "WireMock does not render the else part of a block helper; this engine does"
+ },
+ {
+  "name": "isEven block",
+  "tpl": "{{#isEven 3}}even{{else}}odd{{/isEven}}",
+  "want": "",
+  "skip": "WireMock does not render the else part of a block helper; this engine does"
+ },
+ {
+  "name": "stripes",
+  "tpl": "{{stripes 3 'odd' 'even'}}-{{stripes 4 'odd' 'even'}}",
+  "want": "even-odd"
+ },
+ {
+  "name": "stripes in each",
+  "tpl": "{{#each (array 'a' 'b' 'c')}}{{stripes @index 'x' 'y'}}{{/each}}",
+  "want": "xyx"
+ },
+ {
+  "name": "systemValue denied",
+  "tpl": "{{systemValue type='PROPERTY' key='java.version'}}",
+  "want": "[ERROR: Access to java.version is denied]"
+ },
+ {
+  "name": "systemValue env denied",
+  "tpl": "{{systemValue type='ENVIRONMENT' key='PATH'}}",
+  "want": "[ERROR: Access to PATH is denied]"
+ },
+ {
+  "name": "jsonSort array",
+  "tpl": "{{jsonSort '[3,1,2]'}}",
+  "error": true,
+  "skip": "jsonSort exists only in WireMock 4.x"
+ },
+ {
+  "name": "abbreviate",
+  "tpl": "{{abbreviate 'Handlebars is great' 10}}",
+  "want": "Handleb..."
+ },
+ {
+  "name": "abbreviate short",
+  "tpl": "{{abbreviate 'abc' 10}}",
+  "want": "abc"
+ },
+ {
+  "name": "capitalizeFirst",
+  "tpl": "{{capitalizeFirst 'hello world'}}",
+  "want": "Hello world"
+ },
+ {
+  "name": "center",
+  "tpl": "[{{center 'ab' size=6}}]",
+  "want": "[  ab  ]"
+ },
+ {
+  "name": "center pad",
+  "tpl": "[{{center 'ab' size=7 pad='*'}}]",
+  "want": "[**ab***]"
+ },
+ {
+  "name": "cut",
+  "tpl": "{{cut 'a-b-c' '-'}}",
+  "want": "abc"
+ },
+ {
+  "name": "defaultIfEmpty empty",
+  "tpl": "{{defaultIfEmpty '' 'dflt'}}",
+  "want": "dflt"
+ },
+ {
+  "name": "defaultIfEmpty val",
+  "tpl": "{{defaultIfEmpty 'v' 'dflt'}}",
+  "want": "v"
+ },
+ {
+  "name": "defaultIfEmpty missing",
+  "tpl": "{{defaultIfEmpty nothing 'dflt'}}",
+  "want": "dflt"
+ },
+ {
+  "name": "ljust",
+  "tpl": "[{{ljust 'ab' 6}}]",
+  "error": true
+ },
+ {
+  "name": "ljust pad",
+  "tpl": "[{{ljust 'ab' 6 pad='.'}}]",
+  "error": true
+ },
+ {
+  "name": "rjust",
+  "tpl": "[{{rjust 'ab' 6}}]",
+  "error": true
+ },
+ {
+  "name": "rjust pad",
+  "tpl": "[{{rjust 'ab' 6 pad='.'}}]",
+  "error": true
+ },
+ {
+  "name": "slugify",
+  "tpl": "{{slugify 'Hello World, It is Me!'}}",
+  "want": "hello-world-it-is-me"
+ },
+ {
+  "name": "stringFormat",
+  "tpl": "{{stringFormat 'Hi %s you are %s' 'Bob' 'ok'}}",
+  "want": "Hi Bob you are ok"
+ },
+ {
+  "name": "stringFormat number",
+  "tpl": "{{stringFormat '%d items' 5}}",
+  "want": "5 items"
+ },
+ {
+  "name": "stringFormat float",
+  "tpl": "{{stringFormat '%.2f' 3.14159}}",
+  "want": "3.14"
+ },
+ {
+  "name": "wordWrap",
+  "tpl": "{{wordWrap 'aaa bbb ccc ddd eee' 8}}",
+  "want": "aaa bbb\nccc ddd\neee"
+ },
+ {
+  "name": "yesno true",
+  "tpl": "{{yesno true 'Y' 'N'}}",
+  "want": "yes"
+ },
+ {
+  "name": "yesno false",
+  "tpl": "{{yesno false 'Y' 'N'}}",
+  "want": "no"
+ },
+ {
+  "name": "yesno default",
+  "tpl": "{{yesno true}}-{{yesno false}}",
+  "want": "yes-no"
+ },
+ {
+  "name": "stripTags",
+  "tpl": "{{stripTags '<b>bold</b> and <i>it</i>'}}",
+  "want": "bold and it"
+ },
+ {
+  "name": "list prints",
+  "tpl": "{{array 1 2 3}}",
+  "want": "[1, 2, 3]"
+ },
+ {
+  "name": "list strings prints",
+  "tpl": "{{array 'a' 'b'}}",
+  "want": "[a, b]"
+ },
+ {
+  "name": "range",
+  "tpl": "{{range 1 4}}",
+  "want": "[1, 2, 3, 4]"
+ },
+ {
+  "name": "range each",
+  "tpl": "{{#each (range 1 4)}}{{this}}{{/each}}",
+  "want": "1234"
+ },
+ {
+  "name": "range size",
+  "tpl": "{{size (range 3 6)}}",
+  "want": "4"
+ },
+ {
+  "name": "arrayAdd position start",
+  "tpl": "{{arrayAdd (array 1 2) 9 position='start'}}",
+  "want": "[9, 1, 2]"
+ },
+ {
+  "name": "arrayAdd position end",
+  "tpl": "{{arrayAdd (array 1 2) 9 position='end'}}",
+  "want": "[1, 2, 9]"
+ },
+ {
+  "name": "arrayAdd default",
+  "tpl": "{{arrayAdd (array 1 2) 9}}",
+  "want": "[1, 2, 9]"
+ },
+ {
+  "name": "arrayJoin",
+  "tpl": "{{arrayJoin ',' (array 1 2 3)}}",
+  "want": "1,2,3"
+ },
+ {
+  "name": "arrayJoin prefix suffix",
+  "tpl": "{{arrayJoin ',' (array 1 2 3) prefix='[' suffix=']'}}",
+  "want": "[1,2,3]"
+ },
+ {
+  "name": "arrayJoin quoted",
+  "tpl": "{{arrayJoin ', ' (array 'a' 'b') prefix='\"' suffix='\"'}}",
+  "want": "\"a, b\""
+ },
+ {
+  "name": "math int div",
+  "tpl": "{{math 7 '/' 2}}",
+  "want": "4"
+ },
+ {
+  "name": "math int div exact",
+  "tpl": "{{math 8 '/' 2}}",
+  "want": "4"
+ },
+ {
+  "name": "math float div",
+  "tpl": "{{math 7.0 '/' 2}}",
+  "want": "3.5"
+ },
+ {
+  "name": "math add",
+  "tpl": "{{math 1 '+' 2}}",
+  "want": "3"
+ },
+ {
+  "name": "math mul",
+  "tpl": "{{math 3 '*' 2.5}}",
+  "want": "7.5"
+ },
+ {
+  "name": "math mod",
+  "tpl": "{{math 7 '%' 3}}",
+  "want": "1"
+ },
+ {
+  "name": "math sub",
+  "tpl": "{{math 1 '-' 3}}",
+  "want": "-2"
+ },
+ {
+  "name": "math int div by zero",
+  "tpl": "{{math 1 '/' 0}}",
+  "error": true
+ },
+ {
+  "name": "jsonPath list",
+  "tpl": "{{jsonPath request.body '$.items[*].id'}}",
+  "request": "{\"items\":[{\"id\":1},{\"id\":2}]}",
+  "want": "[1,2]"
+ },
+ {
+  "name": "jsonPath scalar",
+  "tpl": "{{jsonPath request.body '$.a'}}",
+  "request": "{\"a\":\"x\"}",
+  "want": "x"
+ },
+ {
+  "name": "jsonPath object",
+  "tpl": "{{jsonPath request.body '$.o'}}",
+  "request": "{\"o\":{\"k\":1}}",
+  "want": "{\n  \"k\" : 1\n}"
+ },
+ {
+  "name": "jsonPath array",
+  "tpl": "{{jsonPath request.body '$.arr'}}",
+  "request": "{\"arr\":[1,2]}",
+  "want": "[1,2]"
+ },
+ {
+  "name": "jsonPath missing",
+  "tpl": "[{{jsonPath request.body '$.zz'}}]",
+  "request": "{\"a\":1}",
+  "want": "[]"
+ },
+ {
+  "name": "jsonPath number",
+  "tpl": "{{jsonPath request.body '$.n'}}",
+  "request": "{\"n\":1.50}",
+  "want": "1.5"
+ },
+ {
+  "name": "jsonPath bool",
+  "tpl": "{{jsonPath request.body '$.b'}}",
+  "request": "{\"b\":true}",
+  "want": "true"
+ },
+ {
+  "name": "jsonPath null",
+  "tpl": "[{{jsonPath request.body '$.z'}}]",
+  "request": "{\"z\":null}",
+  "want": "[]"
+ },
+ {
+  "name": "jsonPath default",
+  "tpl": "{{jsonPath request.body '$.zz' default='dd'}}",
+  "request": "{\"a\":1}",
+  "want": "dd"
+ },
+ {
+  "name": "jsonPath filter",
+  "tpl": "{{jsonPath request.body '$.items[?(@.id>1)].id'}}",
+  "request": "{\"items\":[{\"id\":1},{\"id\":2}]}",
+  "want": "[2]"
+ },
+ {
+  "name": "xPath element",
+  "tpl": "{{xPath request.body '/a/b'}}",
+  "request": "<a><b>t</b></a>",
+  "want": "<b>t</b>\n"
+ },
+ {
+  "name": "xPath nested",
+  "tpl": "{{xPath request.body '/a'}}",
+  "request": "<a><b>t</b></a>",
+  "want": "<a>\n  <b>t</b>\n</a>\n"
+ },
+ {
+  "name": "xPath text",
+  "tpl": "{{xPath request.body '/a/b/text()'}}",
+  "request": "<a><b>t</b></a>",
+  "want": "t"
+ },
+ {
+  "name": "xPath attr",
+  "tpl": "{{xPath request.body '/a/@x'}}",
+  "request": "<a x=\"1\"><b>t</b></a>",
+  "want": "1"
+ },
+ {
+  "name": "xPath count",
+  "tpl": "{{xPath request.body 'count(/a/b)'}}",
+  "request": "<a><b>t</b><b>u</b></a>",
+  "want": "2"
+ },
+ {
+  "name": "xPath multiple",
+  "tpl": "{{xPath request.body '/a/b'}}",
+  "request": "<a><b>t</b><b>u</b></a>",
+  "want": "<b>t</b>\n"
+ },
+ {
+  "name": "xPath none",
+  "tpl": "[{{xPath request.body '/a/z'}}]",
+  "request": "<a><b>t</b></a>",
+  "want": "[]"
+ },
+ {
+  "name": "urlEncode",
+  "tpl": "{{urlEncode 'a b&c'}}",
+  "want": "a+b%26c"
+ },
+ {
+  "name": "urlEncode decode",
+  "tpl": "{{urlEncode 'a%20b%26c' decode=true}}",
+  "want": "a b&c"
+ },
+ {
+  "name": "urlEncode decode plus",
+  "tpl": "{{urlEncode 'a+b' decode=true}}",
+  "want": "a b"
+ },
+ {
+  "name": "parseDate rfc1123",
+  "tpl": "{{date (parseDate 'Tue, 15 Nov 1994 08:12:31 GMT') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "1994-11-15 08:12:31"
+ },
+ {
+  "name": "parseDate rfc1036",
+  "tpl": "{{date (parseDate 'Tuesday, 15-Nov-94 08:12:31 GMT') format='yyyy-MM-dd' timezone='UTC'}}",
+  "want": "2026-10-28",
+  "skip": "WireMock gives the current time for a date it cannot parse; this engine fails the render"
+ },
+ {
+  "name": "parseDate asctime",
+  "tpl": "{{date (parseDate 'Tue Nov 15 08:12:31 1994') format='yyyy-MM-dd' timezone='UTC'}}",
+  "want": "1994-11-15"
+ },
+ {
+  "name": "parseDate iso",
+  "tpl": "{{date (parseDate '2020-03-04T05:06:07Z') format='yyyy-MM-dd HH:mm' timezone='UTC'}}",
+  "want": "2020-03-04 05:06"
+ },
+ {
+  "name": "parseDate iso date only",
+  "tpl": "{{date (parseDate '2020-03-04') format='yyyy-MM-dd' timezone='UTC'}}",
+  "want": "2026-10-28",
+  "skip": "WireMock gives the current time for a date it cannot parse; this engine fails the render"
+ },
+ {
+  "name": "parseDate unix",
+  "tpl": "{{date (parseDate '1234567890' format='unix') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "2009-02-14 10:31:30",
+  "skip": "WireMock formats unix and epoch dates in the host's time zone"
+ },
+ {
+  "name": "parseDate epoch",
+  "tpl": "{{date (parseDate '1234567890123' format='epoch') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "2009-02-14 10:31:30",
+  "skip": "WireMock formats unix and epoch dates in the host's time zone"
+ },
+ {
+  "name": "parseDate custom",
+  "tpl": "{{date (parseDate '04/03/2020' format='dd/MM/yyyy') format='yyyy-MM-dd' timezone='UTC'}}",
+  "want": "2020-03-04"
+ },
+ {
+  "name": "truncateDate first hour of day",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first hour of day') format='HH:mm:ss' timezone='UTC'}}",
+  "want": "00:00:00"
+ },
+ {
+  "name": "truncateDate first minute of hour",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first minute of hour') format='HH:mm:ss' timezone='UTC'}}",
+  "want": "05:00:00"
+ },
+ {
+  "name": "truncateDate first second of minute",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first second of minute') format='HH:mm:ss' timezone='UTC'}}",
+  "want": "05:06:00"
+ },
+ {
+  "name": "truncateDate first day of month",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first day of month') format='yyyy-MM-dd' timezone='UTC'}}",
+  "want": "2020-03-01"
+ },
+ {
+  "name": "truncateDate first day of year",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first day of year') format='yyyy-MM-dd' timezone='UTC'}}",
+  "want": "2020-01-01"
+ },
+ {
+  "name": "truncateDate first month of year",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first month of year') format='yyyy-MM-dd' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate first day of week",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first day of week') format='yyyy-MM-dd' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate last day of month",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'last day of month') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "2020-03-31 00:00:00"
+ },
+ {
+  "name": "truncateDate last day of year",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'last day of year') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "2020-12-31 00:00:00"
+ },
+ {
+  "name": "truncateDate last hour of day",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'last hour of day') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate last minute of hour",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'last minute of hour') format='HH:mm:ss' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate last second of minute",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'last second of minute') format='HH:mm:ss' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate last month of year",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'last month of year') format='yyyy-MM-dd' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate last day of week",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'last day of week') format='yyyy-MM-dd' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate first millisecond of second",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first millisecond of second') format='HH:mm:ss.SSS' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate last millisecond of second",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'last millisecond of second') format='HH:mm:ss.SSS' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate bad",
+  "tpl": "{{truncateDate (parseDate '2020-03-04T05:06:07Z') 'bogus'}}",
+  "error": true
+ },
+ {
+  "name": "hostname nonempty",
+  "tpl": "{{#if (matches (hostname) '.+')}}ok{{else}}empty{{/if}}",
+  "want": "ok"
+ },
+ {
+  "name": "request.id uuid",
+  "tpl": "{{#if (matches request.id '[0-9a-f-]{36}')}}uuid{{else}}other{{/if}}",
+  "want": "uuid"
+ },
+ {
+  "name": "request.path.0",
+  "tpl": "{{request.path.0}}",
+  "path": "/t/a/b",
+  "want": "t"
+ },
+ {
+  "name": "request.path.1",
+  "tpl": "{{request.path.1}}",
+  "path": "/t/a/b",
+  "want": "a"
+ },
+ {
+  "name": "request.path.last",
+  "tpl": "{{request.path.[last]}}",
+  "path": "/t/a/b",
+  "want": ""
+ },
+ {
+  "name": "request.path.-1",
+  "tpl": "{{request.path.[-1]}}",
+  "path": "/t/a/b",
+  "want": ""
+ },
+ {
+  "name": "request.path.2",
+  "tpl": "{{request.path.[2]}}",
+  "path": "/t/a/b",
+  "want": "b"
+ },
+ {
+  "name": "request.path out of range",
+  "tpl": "[{{request.path.[9]}}]",
+  "path": "/t/a/b",
+  "want": "[]"
+ },
+ {
+  "name": "request.path plain",
+  "tpl": "{{request.path}}",
+  "path": "/t/a/b",
+  "want": "/t/a/b"
+ },
+ {
+  "name": "request.requestLine get",
+  "tpl": "{{request.requestLine}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "com.github.tomakehurst.wiremock.extension.responsetemplating.RequestLine@d01e610",
+  "skip": "WireMock prints a Java object identity"
+ },
+ {
+  "name": "request.requestLine post",
+  "tpl": "{{request.requestLine}}",
+  "path": "/t/a",
+  "want": "com.github.tomakehurst.wiremock.extension.responsetemplating.RequestLine@aa42137",
+  "skip": "WireMock prints a Java object identity"
+ },
+ {
+  "name": "request.url",
+  "tpl": "{{request.url}}",
+  "path": "/t/a?x=1&y=2",
+  "method": "GET",
+  "want": "/t/a?x=1&y=2"
+ },
+ {
+  "name": "request.query last",
+  "tpl": "{{request.query.x.[last]}}",
+  "path": "/t?x=1&x=2&x=3",
+  "method": "GET",
+  "want": "3"
+ },
+ {
+  "name": "request.query -1",
+  "tpl": "{{request.query.x.[-1]}}",
+  "path": "/t?x=1&x=2&x=3",
+  "method": "GET",
+  "want": "2",
+  "skip": "WireMock's negative index is off by one and is not copied"
+ },
+ {
+  "name": "request.query -2",
+  "tpl": "{{request.query.x.[-2]}}",
+  "path": "/t?x=1&x=2&x=3",
+  "method": "GET",
+  "want": "1",
+  "skip": "WireMock's negative index is off by one and is not copied"
+ },
+ {
+  "name": "request.query 1",
+  "tpl": "{{request.query.x.[1]}}",
+  "path": "/t?x=1&x=2&x=3",
+  "method": "GET",
+  "want": "2"
+ },
+ {
+  "name": "request.headers last",
+  "tpl": "{{request.headers.X-A.[last]}}",
+  "path": "/t",
+  "method": "GET",
+  "headers": {
+   "X-A": "p"
+  },
+  "want": "p"
+ },
+ {
+  "name": "lookup ids[] 1",
+  "tpl": "{{lookup request.query 'ids[].1'}}",
+  "path": "/t?ids[]=a&ids[]=b",
+  "method": "GET",
+  "want": "b"
+ },
+ {
+  "name": "lookup ids[] 0",
+  "tpl": "{{lookup request.query 'ids[].0'}}",
+  "path": "/t?ids[]=a&ids[]=b",
+  "method": "GET",
+  "want": "a"
+ },
+ {
+  "name": "lookup query key",
+  "tpl": "{{lookup request.query 'x'}}",
+  "path": "/t?x=1",
+  "method": "GET",
+  "want": "1"
+ },
+ {
+  "name": "lookup query key idx",
+  "tpl": "{{lookup request.query.x 1}}",
+  "path": "/t?x=1&x=2",
+  "method": "GET",
+  "want": "2"
+ },
+ {
+  "name": "multipart exists",
+  "tpl": "{{request.multipart}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "true"
+ },
+ {
+  "name": "parts name body",
+  "tpl": "{{request.parts.f.body}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "hello"
+ },
+ {
+  "name": "parts name bodyAsBase64",
+  "tpl": "{{request.parts.f.bodyAsBase64}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "aGVsbG8="
+ },
+ {
+  "name": "parts name headers",
+  "tpl": "{{request.parts.f.headers.Content-Type}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "text/plain"
+ },
+ {
+  "name": "parts name headers cd",
+  "tpl": "{{request.parts.f.headers.Content-Disposition}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "form-data; name=\"f\"; filename=\"a.txt\""
+ },
+ {
+  "name": "parts name binary",
+  "tpl": "{{request.parts.f.binary}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "false"
+ },
+ {
+  "name": "parts name missing",
+  "tpl": "[{{request.parts.zz.body}}]",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "[]"
+ },
+ {
+  "name": "multipart each",
+  "tpl": "{{#each request.multipart}}{{name}}={{body}};{{/each}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nhello\r\n--BB\r\nContent-Disposition: form-data; name=\"g\"\r\n\r\nworld\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "=;=;=;=;",
+  "skip": "WireMock iterates the parts oddly"
+ },
+ {
+  "name": "parts each",
+  "tpl": "{{#each request.parts}}{{@key}}={{body}};{{/each}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nhello\r\n--BB\r\nContent-Disposition: form-data; name=\"g\"\r\n\r\nworld\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "f=hello;g=world;",
+  "skip": "a Go map has no fixed order, so iterating the parts is not repeatable"
+ },
+ {
+  "name": "parts on non multipart",
+  "tpl": "[{{request.parts.f.body}}]",
+  "want": "[]"
+ },
+ {
+  "name": "numberFormat locale positional de",
+  "tpl": "{{numberFormat 1234.5678 'decimal' 'de'}}",
+  "want": "decimal1235"
+ },
+ {
+  "name": "numberFormat locale positional fr",
+  "tpl": "{{numberFormat 1234567.891 'decimal' 'fr'}}",
+  "want": "decimal1234568"
+ },
+ {
+  "name": "numberFormat locale en_GB currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'en_GB'}}",
+  "want": "£1,234.50"
+ },
+ {
+  "name": "numberFormat locale de currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'de_DE'}}",
+  "want": "1.234,50 €"
+ },
+ {
+  "name": "numberFormat percent locale",
+  "tpl": "{{numberFormat 0.256 'percent' 'de'}}",
+  "want": "26 %"
+ },
+ {
+  "name": "numberFormat decimal",
+  "tpl": "{{numberFormat 1234.5678 'decimal'}}",
+  "want": "decimal1235"
+ },
+ {
+  "name": "numberFormat pattern percent",
+  "tpl": "{{numberFormat 0.256 '0.0%'}}",
+  "want": "25.6%"
+ },
+ {
+  "name": "numberFormat pattern no group",
+  "tpl": "{{numberFormat 1234567.891 '0.#'}}",
+  "want": "1234567.9"
+ },
+ {
+  "name": "numberFormat pattern prefix",
+  "tpl": "{{numberFormat 12.5 '$#,##0.00'}}",
+  "want": "$12.50"
+ },
+ {
+  "name": "numberFormat pattern locale de",
+  "tpl": "{{numberFormat 1234.5 '#,##0.00' 'de'}}",
+  "want": "1.234,50"
+ },
+ {
+  "name": "numberFormat int arg",
+  "tpl": "{{numberFormat 7}}",
+  "want": "7"
+ },
+ {
+  "name": "numberFormat float arg",
+  "tpl": "{{numberFormat 0.5}}",
+  "want": "0.5"
+ },
+ {
+  "name": "numberFormat large",
+  "tpl": "{{numberFormat 12345678901234}}",
+  "want": "12,345,678,901,234"
+ },
+ {
+  "name": "numberFormat zero",
+  "tpl": "{{numberFormat 0}}",
+  "want": "0"
+ },
+ {
+  "name": "numberFormat rounding half",
+  "tpl": "{{numberFormat 0.0005}}",
+  "want": "0"
+ },
+ {
+  "name": "numberFormat rounding 2.5 pattern",
+  "tpl": "{{numberFormat 2.5 '0'}}",
+  "want": "2"
+ },
+ {
+  "name": "numberFormat rounding 3.5 pattern",
+  "tpl": "{{numberFormat 3.5 '0'}}",
+  "want": "4"
+ },
+ {
+  "name": "numberFormat string pos",
+  "tpl": "{{numberFormat '12' 'integer'}}",
+  "want": "integer",
+  "skip": "WireMock prints the format for a number written as text"
+ },
+ {
+  "name": "numberFormat from json",
+  "tpl": "{{numberFormat (jsonPath request.body '$.n') '0.00'}}",
+  "request": "{\"n\":3.14159}",
+  "want": "3.14"
+ },
+ {
+  "name": "ljust size",
+  "tpl": "[{{ljust 'ab' size=6}}]",
+  "want": "[ab    ]"
+ },
+ {
+  "name": "ljust size pad",
+  "tpl": "[{{ljust 'ab' size=6 pad='.'}}]",
+  "want": "[ab....]"
+ },
+ {
+  "name": "rjust size",
+  "tpl": "[{{rjust 'ab' size=6}}]",
+  "want": "[    ab]"
+ },
+ {
+  "name": "rjust size pad",
+  "tpl": "[{{rjust 'ab' size=6 pad='.'}}]",
+  "want": "[....ab]"
+ },
+ {
+  "name": "ljust short",
+  "tpl": "[{{ljust 'abcdef' size=3}}]",
+  "want": "[abcdef]"
+ },
+ {
+  "name": "center odd",
+  "tpl": "[{{center 'ab' size=5}}]",
+  "want": "[ ab  ]"
+ },
+ {
+  "name": "center short",
+  "tpl": "[{{center 'abcdef' size=3}}]",
+  "want": "[abcdef]"
+ },
+ {
+  "name": "abbreviate exact",
+  "tpl": "{{abbreviate 'abcdef' 6}}",
+  "want": "abcdef"
+ },
+ {
+  "name": "abbreviate tiny",
+  "tpl": "{{abbreviate 'abcdefghij' 4}}",
+  "want": "a..."
+ },
+ {
+  "name": "nl2br",
+  "tpl": "{{nl2br 'a\nb'}}",
+  "error": true,
+  "skip": "WireMock 3.13.2 has no nl2br"
+ },
+ {
+  "name": "capitalize fully",
+  "tpl": "{{capitalize 'hello big world' fully=true}}",
+  "want": "Hello Big World"
+ },
+ {
+  "name": "capitalize plain",
+  "tpl": "{{capitalize 'hello big world'}}",
+  "want": "Hello Big World"
+ },
+ {
+  "name": "wordWrap short",
+  "tpl": "{{wordWrap 'aaa bbb' 20}}",
+  "want": "aaa bbb"
+ },
+ {
+  "name": "wordWrap long word",
+  "tpl": "{{wordWrap 'aaaaaaaaaaaa bb' 5}}",
+  "want": "aaaaaaaaaaaa\nbb"
+ },
+ {
+  "name": "slugify upper",
+  "tpl": "{{slugify 'Ünï Cödé  Straße'}}",
+  "want": "ünï-cödé--straße"
+ },
+ {
+  "name": "stringFormat missing arg",
+  "tpl": "{{stringFormat '%s and %s' 'a'}}",
+  "error": true
+ },
+ {
+  "name": "stringFormat percent",
+  "tpl": "{{stringFormat '%5d|%-5d|' 42 42}}",
+  "want": "   42|42   |"
+ },
+ {
+  "name": "stringFormat hex",
+  "tpl": "{{stringFormat '%x' 255}}",
+  "want": "ff"
+ },
+ {
+  "name": "stripTags nested",
+  "tpl": "{{stripTags '<p>a<br/>b</p>'}}",
+  "want": "ab"
+ },
+ {
+  "name": "yesno custom three",
+  "tpl": "{{yesno null 'Y' 'N' 'M'}}",
+  "want": "maybe"
+ },
+ {
+  "name": "yesno string",
+  "tpl": "{{yesno 'x' 'Y' 'N'}}",
+  "error": true
+ },
+ {
+  "name": "yesno empty",
+  "tpl": "{{yesno '' 'Y' 'N'}}",
+  "error": true
+ },
+ {
+  "name": "yesno zero",
+  "tpl": "{{yesno 0 'Y' 'N'}}",
+  "error": true
+ },
+ {
+  "name": "cut multi",
+  "tpl": "{{cut 'banana' 'an'}}",
+  "want": "ba"
+ },
+ {
+  "name": "defaultIfEmpty zero",
+  "tpl": "{{defaultIfEmpty 0 'dflt'}}",
+  "want": "dflt"
+ },
+ {
+  "name": "defaultIfEmpty empty array",
+  "tpl": "{{defaultIfEmpty (array) 'dflt'}}",
+  "want": "dflt",
+  "skip": "(array) with no items is not supported"
+ },
+ {
+  "name": "dateFormat fmt",
+  "tpl": "{{dateFormat (parseDate '2020-03-04T05:06:07Z') format='yyyy-MM-dd'}}",
+  "want": "2020-03-04"
+ },
+ {
+  "name": "dateFormat full",
+  "tpl": "{{dateFormat (parseDate '2020-03-04T05:06:07Z') 'full'}}",
+  "want": "Wednesday, 4 March 2020",
+  "skip": "WireMock formats the styles in the host locale; this engine uses US English"
+ },
+ {
+  "name": "dateFormat short",
+  "tpl": "{{dateFormat (parseDate '2020-03-04T05:06:07Z') 'short'}}",
+  "want": "4/3/20",
+  "skip": "WireMock formats the styles in the host locale; this engine uses US English"
+ },
+ {
+  "name": "dateFormat medium",
+  "tpl": "{{dateFormat (parseDate '2020-03-04T05:06:07Z') 'medium'}}",
+  "want": "4 Mar 2020",
+  "skip": "WireMock formats the styles in the host locale; this engine uses US English"
+ },
+ {
+  "name": "dateFormat pattern pos",
+  "tpl": "{{dateFormat (parseDate '2020-03-04T05:06:07Z') 'yyyy/MM/dd'}}",
+  "want": "2020/03/04"
+ },
+ {
+  "name": "truncateDate first day of next month",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first day of next month') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "2020-04-01 00:00:00"
+ },
+ {
+  "name": "truncateDate first day of next year",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first day of next year') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "2021-01-01 00:00:00"
+ },
+ {
+  "name": "truncateDate first millisecond",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07.123Z') 'first millisecond of second') format='HH:mm:ss.SSS' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate first minute of next hour",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first minute of next hour') format='HH:mm:ss' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate first hour of next day",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'first hour of next day') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate last hour",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'last hour of day') format='HH:mm:ss' timezone='UTC'}}",
+  "error": true
+ },
+ {
+  "name": "truncateDate case",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07Z') 'FIRST DAY OF MONTH') format='yyyy-MM-dd' timezone='UTC'}}",
+  "want": "2020-03-01"
+ },
+ {
+  "name": "truncateDate string input",
+  "tpl": "{{truncateDate '2020-03-04T05:06:07Z' 'first day of month'}}",
+  "want": "[ERROR: A date object must be passed to the truncateDate helper]",
+  "skip": "this engine accepts a date written as text"
+ },
+ {
+  "name": "truncateDate now fmt",
+  "tpl": "{{#if (matches (truncateDate (now) 'first day of month') '.+')}}ok{{/if}}",
+  "want": "ok"
+ },
+ {
+  "name": "parseDate rfc1123 default fmt out",
+  "tpl": "{{parseDate 'Tue, 15 Nov 1994 08:12:31 GMT'}}",
+  "want": "1994-11-15T08:12:31Z"
+ },
+ {
+  "name": "parseDate iso out",
+  "tpl": "{{parseDate '2020-03-04T05:06:07Z'}}",
+  "want": "2020-03-04T05:06:07Z"
+ },
+ {
+  "name": "parseDate iso offset",
+  "tpl": "{{date (parseDate '2020-03-04T05:06:07+02:00') format='yyyy-MM-dd HH:mm' timezone='UTC'}}",
+  "want": "2020-03-04 05:06",
+  "skip": "WireMock prints the written wall-clock time for a date with an offset, ignoring timezone="
+ },
+ {
+  "name": "parseDate iso local",
+  "tpl": "{{date (parseDate '2020-03-04T05:06:07') format='yyyy-MM-dd HH:mm' timezone='UTC'}}",
+  "want": "2026-10-28 19:26",
+  "skip": "WireMock gives the current time for a date it cannot parse; this engine fails the render"
+ },
+ {
+  "name": "parseDate iso millis",
+  "tpl": "{{date (parseDate '2020-03-04T05:06:07.123Z') format='yyyy-MM-dd HH:mm:ss.SSS' timezone='UTC'}}",
+  "want": "2020-03-04 05:06:07.123",
+  "skip": "the date text keeps whole seconds, so the milliseconds are lost between helpers"
+ },
+ {
+  "name": "parseDate rfc1123 offset",
+  "tpl": "{{date (parseDate 'Tue, 15 Nov 1994 08:12:31 +0200') format='yyyy-MM-dd HH:mm' timezone='UTC'}}",
+  "want": "1994-11-15 08:12",
+  "skip": "WireMock prints the written wall-clock time for a date with an offset, ignoring timezone="
+ },
+ {
+  "name": "parseDate unix neg",
+  "tpl": "{{date (parseDate '-1' format='unix') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "1970-01-01 09:59:59",
+  "skip": "WireMock formats unix and epoch dates in the host's time zone"
+ },
+ {
+  "name": "request.requestLine.method",
+  "tpl": "{{request.requestLine.method}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "GET"
+ },
+ {
+  "name": "request.requestLine.pathAndQuery",
+  "tpl": "{{request.requestLine.pathAndQuery}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": ""
+ },
+ {
+  "name": "request.requestLine.path",
+  "tpl": "{{request.requestLine.path}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "/t/a"
+ },
+ {
+  "name": "request.requestLine.url",
+  "tpl": "{{request.requestLine.url}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "/t/a?x=1"
+ },
+ {
+  "name": "request.requestLine.host",
+  "tpl": "{{request.requestLine.host}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "localhost"
+ },
+ {
+  "name": "request.requestLine.port",
+  "tpl": "{{request.requestLine.port}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "18200"
+ },
+ {
+  "name": "request.requestLine.scheme",
+  "tpl": "{{request.requestLine.scheme}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "http"
+ },
+ {
+  "name": "request.requestLine.baseUrl",
+  "tpl": "{{request.requestLine.baseUrl}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "http://localhost:18200"
+ },
+ {
+  "name": "request.requestLine.httpVersion",
+  "tpl": "{{request.requestLine.httpVersion}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": ""
+ },
+ {
+  "name": "request.requestLine.query",
+  "tpl": "{{request.requestLine.query.x}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "1"
+ },
+ {
+  "name": "request.requestLine.pathSegments",
+  "tpl": "{{request.requestLine.pathSegments.[1]}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "a"
+ },
+ {
+  "name": "request.id twice same",
+  "tpl": "{{request.id}}",
+  "want": "26392a34-7892-4966-bc74-2fd8d7a8e4ea",
+  "skip": "a random id"
+ },
+ {
+  "name": "request.path.1 query ignored",
+  "tpl": "{{request.path.[1]}}|{{request.path.[0]}}",
+  "path": "/t/a?x=1",
+  "method": "GET",
+  "want": "a|t"
+ },
+ {
+  "name": "request.pathSegments direct",
+  "tpl": "{{request.pathSegments.[0]}}",
+  "path": "/t/a",
+  "method": "GET",
+  "want": "t"
+ },
+ {
+  "name": "request.path.each",
+  "tpl": "{{#each request.path}}<{{this}}>{{/each}}",
+  "path": "/t/a/b",
+  "method": "GET",
+  "want": "<t><a><b>",
+  "skip": "WireMock iterates only the segments; this engine also lists the path itself"
+ },
+ {
+  "name": "request.query each last",
+  "tpl": "{{request.query.x.last}}",
+  "path": "/t?x=1&x=2",
+  "method": "GET",
+  "want": "2"
+ },
+ {
+  "name": "request.query size",
+  "tpl": "{{size request.query.x}}",
+  "path": "/t?x=1&x=2",
+  "method": "GET",
+  "want": "2"
+ },
+ {
+  "name": "request.query -3",
+  "tpl": "{{request.query.x.[-3]}}",
+  "path": "/t?x=1&x=2&x=3",
+  "method": "GET",
+  "want": "",
+  "skip": "WireMock's negative index is off by one and is not copied"
+ },
+ {
+  "name": "request.query -9",
+  "tpl": "[{{request.query.x.[-9]}}]",
+  "path": "/t?x=1&x=2&x=3",
+  "method": "GET",
+  "want": "[]",
+  "skip": "WireMock's negative index is off by one and is not copied"
+ },
+ {
+  "name": "request.query 0",
+  "tpl": "{{request.query.x.[0]}}",
+  "path": "/t?x=1&x=2&x=3",
+  "method": "GET",
+  "want": "1"
+ },
+ {
+  "name": "request.headers -1",
+  "tpl": "{{request.headers.X-A.[-1]}}",
+  "path": "/t",
+  "method": "GET",
+  "headers": {
+   "X-A": "p"
+  },
+  "want": "",
+  "skip": "WireMock's negative index is off by one and is not copied"
+ },
+ {
+  "name": "request.cookies last",
+  "tpl": "{{request.cookies.a.[last]}}",
+  "path": "/t",
+  "method": "GET",
+  "headers": {
+   "Cookie": "a=1; b=2"
+  },
+  "want": "1"
+ },
+ {
+  "name": "multipart parts name",
+  "tpl": "{{request.parts.f.name}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "f"
+ },
+ {
+  "name": "multipart parts headers cd",
+  "tpl": "{{request.multipart.f.headers.Content-Disposition}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": ""
+ },
+ {
+  "name": "multipart parts bodyAsBase64 binary",
+  "tpl": "{{request.parts.f.bodyAsBase64}}|{{request.parts.f.binary}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: application/octet-stream\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "aGVsbG8=|true"
+ },
+ {
+  "name": "multipart parts two same name",
+  "tpl": "{{request.parts.f.body}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\none\r\n--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\ntwo\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "error": true,
+  "skip": "WireMock fails on repeated part names; this engine reads the first"
+ },
+ {
+  "name": "multipart parts two same name each",
+  "tpl": "{{#each request.parts.f}}<{{body}}>{{/each}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\none\r\n--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\ntwo\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "error": true,
+  "skip": "WireMock fails on repeated part names; this engine reads the first"
+ },
+ {
+  "name": "multipart parts second",
+  "tpl": "{{request.parts.f.[1].body}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\none\r\n--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\ntwo\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "error": true,
+  "skip": "WireMock fails on repeated part names; this engine reads the first"
+ },
+ {
+  "name": "multipart parts binary body",
+  "tpl": "{{request.parts.f.body}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a.bin\"\r\nContent-Type: image/png\r\n\r\nPNGDATA\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "PNGDATA"
+ },
+ {
+  "name": "jsonSort msg",
+  "tpl": "{{jsonSort '[3,1,2]'}}",
+  "error": true,
+  "skip": "jsonSort exists only in WireMock 4.x"
+ },
+ {
+  "name": "math int div neg",
+  "tpl": "{{math -7 '/' 2}}",
+  "want": "-4"
+ },
+ {
+  "name": "math int div 1 3",
+  "tpl": "{{math 1 '/' 3}}",
+  "want": "0"
+ },
+ {
+  "name": "math int div 10 3",
+  "tpl": "{{math 10 '/' 3}}",
+  "want": "3"
+ },
+ {
+  "name": "math float div 1 3",
+  "tpl": "{{math 1.0 '/' 3}}",
+  "want": "0.3"
+ },
+ {
+  "name": "math float div 10 4",
+  "tpl": "{{math 10.0 '/' 4}}",
+  "want": "2.5"
+ },
+ {
+  "name": "math div str",
+  "tpl": "{{math '7' '/' '2'}}",
+  "want": "4"
+ },
+ {
+  "name": "math mul int",
+  "tpl": "{{math 3 '*' 4}}",
+  "want": "12"
+ },
+ {
+  "name": "math add float",
+  "tpl": "{{math 0.1 '+' 0.2}}",
+  "want": "0.3"
+ },
+ {
+  "name": "math op word",
+  "tpl": "{{math 1 'add' 2}}",
+  "want": "[ERROR: add is not a valid mathematical operator]"
+ },
+ {
+  "name": "math long",
+  "tpl": "{{math 9223372036854775807 '+' 1}}",
+  "want": "-9223372036854775615",
+  "skip": "WireMock overflows a long here"
+ },
+ {
+  "name": "math mod float",
+  "tpl": "{{math 7.5 '%' 2}}",
+  "want": "1.5"
+ },
+ {
+  "name": "math mod zero",
+  "tpl": "{{math 7 '%' 0}}",
+  "error": true
+ },
+ {
+  "name": "math round",
+  "tpl": "{{math 7 '/' 2 roundingMode='DOWN'}}",
+  "want": "4"
+ },
+ {
+  "name": "array single",
+  "tpl": "{{array 1}}",
+  "want": "[1]"
+ },
+ {
+  "name": "array empty",
+  "tpl": "[{{array}}]",
+  "want": "[[]]",
+  "skip": "WireMock prints [[]] for no items"
+ },
+ {
+  "name": "array nested",
+  "tpl": "{{array (array 1 2) 3}}",
+  "want": "[[1, 2], 3]"
+ },
+ {
+  "name": "array of null",
+  "tpl": "{{array null 1}}",
+  "want": "[]",
+  "skip": "WireMock drops nulls"
+ },
+ {
+  "name": "list from each lookup",
+  "tpl": "{{request.query.x}}",
+  "path": "/t?x=1&x=2",
+  "method": "GET",
+  "want": "1"
+ },
+ {
+  "name": "list of one",
+  "tpl": "{{request.query.x}}",
+  "path": "/t?x=1",
+  "method": "GET",
+  "want": "1"
+ },
+ {
+  "name": "headers list",
+  "tpl": "{{request.headers.X-A}}",
+  "path": "/t",
+  "method": "GET",
+  "headers": {
+   "X-A": "p"
+  },
+  "want": "p"
+ },
+ {
+  "name": "arrayAdd to start list",
+  "tpl": "{{arrayAdd (array 1) 2 position='start'}}",
+  "want": "[2, 1]"
+ },
+ {
+  "name": "arrayAdd position bad",
+  "tpl": "{{arrayAdd (array 1) 2 position='middle'}}",
+  "want": "[ERROR: position must be 'start', 'end' or an integer]"
+ },
+ {
+  "name": "arrayAdd position num",
+  "tpl": "{{arrayAdd (array 1 2 3) 9 position=1}}",
+  "want": "[1, 9, 2, 3]"
+ },
+ {
+  "name": "arrayJoin one",
+  "tpl": "{{arrayJoin ',' (array 1)}}",
+  "want": "1"
+ },
+ {
+  "name": "arrayJoin empty",
+  "tpl": "[{{arrayJoin ',' (array)}}]",
+  "want": "[]",
+  "skip": "WireMock prints [] for an empty list"
+ },
+ {
+  "name": "arrayJoin empty with prefix",
+  "tpl": "[{{arrayJoin ',' (array) prefix='<' suffix='>'}}]",
+  "want": "[]",
+  "skip": "WireMock prints [] for an empty list"
+ },
+ {
+  "name": "arrayJoin nested json",
+  "tpl": "{{arrayJoin ';' (jsonPath request.body '$.a')}}",
+  "request": "{\"a\":[1,2]}",
+  "want": "1;2"
+ },
+ {
+  "name": "arrayJoin delim only",
+  "tpl": "{{arrayJoin ' | ' (array 'a' 'b' 'c')}}",
+  "want": "a | b | c"
+ },
+ {
+  "name": "arrayJoin omit delim",
+  "tpl": "{{arrayJoin (array 'a' 'b')}}",
+  "want": "[ERROR: Separator parameter must be a String]",
+  "skip": "WireMock reports a missing separator in the output; this engine fails the render"
+ },
+ {
+  "name": "arrayJoin omitEmpty",
+  "tpl": "{{arrayJoin ',' (array 'a' '' 'b') omitEmpty=true}}",
+  "want": "a,,b"
+ },
+ {
+  "name": "range 0",
+  "tpl": "{{range 0 0}}",
+  "want": "[0]"
+ },
+ {
+  "name": "range reverse",
+  "tpl": "{{range 4 1}}",
+  "error": true
+ },
+ {
+  "name": "range single",
+  "tpl": "{{range 3}}",
+  "want": "[ERROR: The range helper requires both lower and upper bounds as integer parameters]",
+  "skip": "WireMock reports a missing bound in the output; this engine fails the render"
+ },
+ {
+  "name": "range str",
+  "tpl": "{{range '1' '3'}}",
+  "want": "[1, 2, 3]"
+ },
+ {
+  "name": "jsonPath string array item",
+  "tpl": "{{jsonPath request.body '$.a'}}",
+  "request": "{\"a\":[\"x\",\"y\"]}",
+  "want": "[\"x\",\"y\"]"
+ },
+ {
+  "name": "jsonPath nested obj list",
+  "tpl": "{{jsonPath request.body '$.a'}}",
+  "request": "{\"a\":[{\"k\":1},{\"k\":2}]}",
+  "want": "[{\"k\":1},{\"k\":2}]"
+ },
+ {
+  "name": "jsonPath empty obj",
+  "tpl": "{{jsonPath request.body '$.o'}}",
+  "request": "{\"o\":{}}",
+  "want": "{ }"
+ },
+ {
+  "name": "jsonPath empty arr",
+  "tpl": "{{jsonPath request.body '$.o'}}",
+  "request": "{\"o\":[]}",
+  "want": "[]"
+ },
+ {
+  "name": "jsonPath big int",
+  "tpl": "{{jsonPath request.body '$.n'}}",
+  "request": "{\"n\":12345678901234567890}",
+  "want": "12345678901234567890",
+  "skip": "numbers are read as doubles"
+ },
+ {
+  "name": "jsonPath unicode",
+  "tpl": "{{jsonPath request.body '$.s'}}",
+  "request": "{\"s\":\"é\\n\"}",
+  "want": "é\n"
+ },
+ {
+  "name": "jsonPath wildcard strs",
+  "tpl": "{{jsonPath request.body '$.*'}}",
+  "request": "{\"a\":\"x\",\"b\":\"y\"}",
+  "want": "[\"x\",\"y\"]"
+ },
+ {
+  "name": "jsonPath deep list objects",
+  "tpl": "{{jsonPath request.body '$..k'}}",
+  "request": "{\"a\":{\"k\":1},\"b\":{\"k\":2}}",
+  "want": "[null,1,2]",
+  "skip": "WireMock includes a null for the root here"
+ },
+ {
+  "name": "jsonPath function",
+  "tpl": "{{jsonPath request.body '$.a.length()'}}",
+  "request": "{\"a\":[1,2,3]}",
+  "want": "3"
+ },
+ {
+  "name": "jsonPath on string doc",
+  "tpl": "{{jsonPath '{\"a\":5}' '$.a'}}",
+  "want": "5"
+ },
+ {
+  "name": "jsonPath on invalid",
+  "tpl": "{{jsonPath 'nope' '$.a'}}",
+  "want": "",
+  "skip": "WireMock prints nothing for text that is not JSON; this engine fails the render"
+ },
+ {
+  "name": "jsonPath bad path",
+  "tpl": "{{jsonPath request.body '$[?('}}",
+  "request": "{\"a\":1}",
+  "want": "[ERROR: $[?( is not a valid JSONPath expression]"
+ },
+ {
+  "name": "xPath attr node",
+  "tpl": "{{xPath request.body '/a/b/@x'}}",
+  "request": "<a><b x=\"7\">t</b></a>",
+  "want": "7"
+ },
+ {
+  "name": "xPath string fn",
+  "tpl": "{{xPath request.body 'string(/a/b)'}}",
+  "request": "<a><b>t</b></a>",
+  "want": "t"
+ },
+ {
+  "name": "xPath ns",
+  "tpl": "{{xPath request.body '/a/b'}}",
+  "request": "<a xmlns=\"urn:x\"><b>t</b></a>",
+  "want": "<b>t</b>\n"
+ },
+ {
+  "name": "xPath boolean",
+  "tpl": "{{xPath request.body 'boolean(/a/b)'}}",
+  "request": "<a><b>t</b></a>",
+  "want": "true"
+ },
+ {
+  "name": "xPath no text",
+  "tpl": "{{xPath request.body '/a/b'}}",
+  "request": "<a><b/></a>",
+  "want": "<b/>\n"
+ },
+ {
+  "name": "xPath with attrs",
+  "tpl": "{{xPath request.body '/a/b'}}",
+  "request": "<a><b x=\"1\">t</b></a>",
+  "want": "<b x=\"1\">t</b>\n"
+ },
+ {
+  "name": "xPath text multiple",
+  "tpl": "{{xPath request.body '/a/b/text()'}}",
+  "request": "<a><b>t</b><b>u</b></a>",
+  "want": "t"
+ },
+ {
+  "name": "xPath comment",
+  "tpl": "{{xPath request.body '/a/comment()'}}",
+  "request": "<a><!--c--></a>",
+  "want": "[#comment: c]",
+  "skip": "comment nodes are not supported"
+ },
+ {
+  "name": "xPath number",
+  "tpl": "{{xPath request.body 'sum(/a/b)'}}",
+  "request": "<a><b>1</b><b>2.5</b></a>",
+  "want": "3.5"
+ },
+ {
+  "name": "xPath bad",
+  "tpl": "{{xPath request.body '/a/['}}",
+  "request": "<a/>",
+  "want": "[ERROR: /a/[ is not a valid XPath expression]"
+ },
+ {
+  "name": "urlEncode space",
+  "tpl": "{{urlEncode 'a b'}}",
+  "want": "a+b"
+ },
+ {
+  "name": "urlEncode unicode",
+  "tpl": "{{urlEncode 'é/x'}}",
+  "want": "%C3%A9%2Fx"
+ },
+ {
+  "name": "urlEncode decode bad",
+  "tpl": "{{urlEncode '%zz' decode=true}}",
+  "error": true
+ },
+ {
+  "name": "urlEncode decode false",
+  "tpl": "{{urlEncode 'a b' decode=false}}",
+  "want": "a+b"
+ },
+ {
+  "name": "hostname twice",
+  "tpl": "{{hostname}}",
+  "want": "<the host the probe ran on>",
+  "skip": "the host name is the machine it ran on, so the recorded value cannot match another machine"
+ },
+ {
+  "name": "arrayRemove pos start",
+  "tpl": "{{arrayRemove (array 1 2 3) position='start'}}",
+  "want": "[2, 3]"
+ },
+ {
+  "name": "arrayRemove pos end",
+  "tpl": "{{arrayRemove (array 1 2 3) position='end'}}",
+  "want": "[1, 2]"
+ },
+ {
+  "name": "arrayRemove pos 1",
+  "tpl": "{{arrayRemove (array 1 2 3) position=1}}",
+  "want": "[1, 3]"
+ },
+ {
+  "name": "arrayRemove pos 0",
+  "tpl": "{{arrayRemove (array 1 2 3) position=0}}",
+  "want": "[2, 3]"
+ },
+ {
+  "name": "arrayRemove pos bad",
+  "tpl": "{{arrayRemove (array 1 2 3) position='x'}}",
+  "want": "[ERROR: position must be 'start', 'end' or an integer]"
+ },
+ {
+  "name": "arrayRemove pos out",
+  "tpl": "{{arrayRemove (array 1 2 3) position=9}}",
+  "want": "[ERROR: position must be greater than or equal to 0 and less than or equal to the size of the list]"
+ },
+ {
+  "name": "arrayRemove value opt",
+  "tpl": "{{arrayRemove (array 1 2 3) value=2}}",
+  "want": "[1, 2]"
+ },
+ {
+  "name": "arrayRemove empty",
+  "tpl": "{{arrayRemove (array)}}",
+  "error": true
+ },
+ {
+  "name": "arrayRemove only",
+  "tpl": "{{arrayRemove (array 1 2 3)}}",
+  "want": "[1, 2]"
+ },
+ {
+  "name": "arrayRemove neg",
+  "tpl": "{{arrayRemove (array 1 2 3) position=-1}}",
+  "want": "[ERROR: position must be greater than or equal to 0 and less than or equal to the size of the list]"
+ },
+ {
+  "name": "yesno hash",
+  "tpl": "{{yesno true yes='Y' no='N'}}-{{yesno false yes='Y' no='N'}}",
+  "want": "Y-N"
+ },
+ {
+  "name": "yesno maybe hash",
+  "tpl": "{{yesno null yes='Y' no='N' maybe='M'}}",
+  "want": "M"
+ },
+ {
+  "name": "yesno missing",
+  "tpl": "{{yesno nothing}}",
+  "want": "maybe"
+ },
+ {
+  "name": "numberFormat en_US",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'en_US'}}",
+  "want": "1,234,567.89"
+ },
+ {
+  "name": "numberFormat fr pattern",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'fr'}}",
+  "want": "1 234 567,89"
+ },
+ {
+  "name": "numberFormat fr_FR pattern",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'fr_FR'}}",
+  "want": "1 234 567,89"
+ },
+ {
+  "name": "numberFormat es",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'es'}}",
+  "want": "1.234.567,89"
+ },
+ {
+  "name": "numberFormat it",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'it'}}",
+  "want": "1.234.567,89"
+ },
+ {
+  "name": "numberFormat nl",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'nl'}}",
+  "want": "1.234.567,89"
+ },
+ {
+  "name": "numberFormat ja",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'ja'}}",
+  "want": "1,234,567.89"
+ },
+ {
+  "name": "numberFormat pt_BR",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'pt_BR'}}",
+  "want": "1.234.567,89"
+ },
+ {
+  "name": "numberFormat de_CH",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'de_CH'}}",
+  "want": "1’234’567.89"
+ },
+ {
+  "name": "numberFormat en_IN",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'en_IN'}}",
+  "want": "1,234,567.89"
+ },
+ {
+  "name": "numberFormat sv",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'sv'}}",
+  "want": "1 234 567,89"
+ },
+ {
+  "name": "numberFormat ru",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'ru'}}",
+  "want": "1 234 567,89"
+ },
+ {
+  "name": "numberFormat pl",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' 'pl'}}",
+  "want": "1 234 567,89"
+ },
+ {
+  "name": "numberFormat de integer",
+  "tpl": "{{numberFormat 1234567.5 'integer' 'de'}}",
+  "want": "1.234.568"
+ },
+ {
+  "name": "numberFormat fr currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'fr_FR'}}",
+  "want": "1 234,50 €"
+ },
+ {
+  "name": "numberFormat ja currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'ja_JP'}}",
+  "want": "￥1,234"
+ },
+ {
+  "name": "numberFormat es currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'es_ES'}}",
+  "want": "1.234,50 €"
+ },
+ {
+  "name": "numberFormat it currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'it_IT'}}",
+  "want": "1.234,50 €"
+ },
+ {
+  "name": "numberFormat en_US currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'en_US'}}",
+  "want": "$1,234.50"
+ },
+ {
+  "name": "numberFormat en_US currency neg",
+  "tpl": "{{numberFormat -1234.5 'currency' 'en_US'}}",
+  "want": "-$1,234.50"
+ },
+ {
+  "name": "numberFormat en_AU currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'en_AU'}}",
+  "want": "$1,234.50"
+ },
+ {
+  "name": "numberFormat en_CA currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'en_CA'}}",
+  "want": "$1,234.50"
+ },
+ {
+  "name": "numberFormat percent fr",
+  "tpl": "{{numberFormat 0.256 'percent' 'fr'}}",
+  "want": "26 %"
+ },
+ {
+  "name": "numberFormat percent en_US",
+  "tpl": "{{numberFormat 0.256 'percent' 'en_US'}}",
+  "want": "26%"
+ },
+ {
+  "name": "numberFormat percent big",
+  "tpl": "{{numberFormat 12.3456 'percent'}}",
+  "want": "1,235%"
+ },
+ {
+  "name": "numberFormat locale tag",
+  "tpl": "{{numberFormat 1234.5 '#,##0.00' 'de-DE'}}",
+  "error": true
+ },
+ {
+  "name": "numberFormat locale bad",
+  "tpl": "{{numberFormat 1234.5 '#,##0.00' 'zz'}}",
+  "want": "1,234.50"
+ },
+ {
+  "name": "numberFormat sci",
+  "tpl": "{{numberFormat 1234.5 '0.###E0'}}",
+  "want": "1.234e3",
+  "skip": "scientific patterns are not supported"
+ },
+ {
+  "name": "numberFormat quote",
+  "tpl": "{{numberFormat 12 '#''#'}}",
+  "error": true,
+  "skip": "WireMock reads the pattern's quote as a locale"
+ },
+ {
+  "name": "numberFormat neg pattern",
+  "tpl": "{{numberFormat -5 '#;(#)'}}",
+  "want": "(5)"
+ },
+ {
+  "name": "numberFormat neg pattern 2",
+  "tpl": "{{numberFormat -5.5 '0.0;(0.0)'}}",
+  "want": "(5.5)"
+ },
+ {
+  "name": "numberFormat suffix",
+  "tpl": "{{numberFormat 12 '0 units'}}",
+  "want": "12 units"
+ },
+ {
+  "name": "numberFormat grouping 4",
+  "tpl": "{{numberFormat 123456789 '#,####'}}",
+  "want": "1,2345,6789"
+ },
+ {
+  "name": "numberFormat permille",
+  "tpl": "{{numberFormat 0.5 '0‰'}}",
+  "want": "500‰",
+  "skip": "kept for completeness; the pattern is supported"
+ },
+ {
+  "name": "numberFormat currency sign",
+  "tpl": "{{numberFormat 12.5 '¤#,##0.00'}}",
+  "want": "$12.50"
+ },
+ {
+  "name": "numberFormat double big",
+  "tpl": "{{numberFormat 1e20}}",
+  "error": true,
+  "skip": "WireMock fails on 1e20"
+ },
+ {
+  "name": "numberFormat 3dec round",
+  "tpl": "{{numberFormat 1.0005}}",
+  "want": "1"
+ },
+ {
+  "name": "numberFormat 3dec round 2",
+  "tpl": "{{numberFormat 1.0015}}",
+  "want": "1.002"
+ },
+ {
+  "name": "numberFormat 0.125 pattern",
+  "tpl": "{{numberFormat 0.125 '0.00'}}",
+  "want": "0.12"
+ },
+ {
+  "name": "numberFormat 0.135 pattern",
+  "tpl": "{{numberFormat 0.135 '0.00'}}",
+  "want": "0.14"
+ },
+ {
+  "name": "numberFormat 1.005 pattern",
+  "tpl": "{{numberFormat 1.005 '0.00'}}",
+  "want": "1.00"
+ },
+ {
+  "name": "numberFormat nothing",
+  "tpl": "[{{numberFormat nothing}}]",
+  "want": "[]"
+ },
+ {
+  "name": "numberFormat bool",
+  "tpl": "[{{numberFormat true}}]",
+  "want": "[]"
+ },
+ {
+  "name": "numberFormat no args",
+  "tpl": "[{{numberFormat}}]",
+  "want": "[]",
+  "skip": "numberFormat needs a value"
+ },
+ {
+  "name": "numberFormat min digits",
+  "tpl": "{{numberFormat 5 '#.00'}}",
+  "want": "5.00"
+ },
+ {
+  "name": "numberFormat minint",
+  "tpl": "{{numberFormat 0.5 '#.##'}}",
+  "want": "0.5"
+ },
+ {
+  "name": "numberFormat minint 0",
+  "tpl": "{{numberFormat 0.5 '0.##'}}",
+  "want": "0.5"
+ },
+ {
+  "name": "multipart no content type",
+  "tpl": "{{request.parts.f.binary}}|{{request.parts.f.body}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nhello\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "true|hello"
+ },
+ {
+  "name": "multipart json part",
+  "tpl": "{{request.parts.f.binary}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: application/json\r\n\r\n{}\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "false"
+ },
+ {
+  "name": "multipart xml part",
+  "tpl": "{{request.parts.f.binary}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: application/xml\r\n\r\n<a/>\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "false"
+ },
+ {
+  "name": "multipart png part",
+  "tpl": "{{request.parts.f.binary}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: image/png\r\n\r\nx\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "true"
+ },
+ {
+  "name": "multipart text charset",
+  "tpl": "{{request.parts.f.binary}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nx\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "false"
+ },
+ {
+  "name": "multipart headers lower",
+  "tpl": "{{request.parts.f.headers.content-type}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: text/plain\r\n\r\nx\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "text/plain"
+ },
+ {
+  "name": "multipart headers custom",
+  "tpl": "{{request.parts.f.headers.X-Foo}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nX-Foo: bar\r\n\r\nx\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "bar"
+ },
+ {
+  "name": "multipart parts headers map",
+  "tpl": "{{request.parts.f.headers}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Type: text/plain\r\n\r\nx\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "{content-disposition=form-data; name=\"f\", content-type=text/plain}",
+  "skip": "WireMock prints a Java map"
+ },
+ {
+  "name": "multipart multipart on non",
+  "tpl": "[{{request.multipart}}]",
+  "want": "[false]"
+ },
+ {
+  "name": "multipart parts on urlencoded",
+  "tpl": "[{{request.parts.a.body}}]",
+  "request": "a=1",
+  "contentType": "application/x-www-form-urlencoded",
+  "want": "[]"
+ },
+ {
+  "name": "multipart if",
+  "tpl": "{{#if request.multipart}}yes{{else}}no{{/if}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nx\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "yes"
+ },
+ {
+  "name": "multipart if non",
+  "tpl": "{{#if request.multipart}}yes{{else}}no{{/if}}",
+  "want": "no"
+ },
+ {
+  "name": "multipart parts first name each",
+  "tpl": "{{#each request.parts}}{{name}}:{{body}},{{/each}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nx\r\n--BB\r\nContent-Disposition: form-data; name=\"g\"\r\n\r\ny\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "f:x,g:y,",
+  "skip": "a Go map has no fixed order, so iterating the parts is not repeatable"
+ },
+ {
+  "name": "multipart body of request",
+  "tpl": "{{request.body}}",
+  "request": "--BB\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nx\r\n--BB--\r\n",
+  "contentType": "multipart/form-data; boundary=BB",
+  "want": "--BB\nContent-Disposition: form-data; name=\"f\"\n\nx\n--BB--\n"
+ },
+ {
+  "name": "truncateDate first second",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07.5Z') 'first second of minute') format='HH:mm:ss.SSS' timezone='UTC'}}",
+  "want": "05:06:00.000"
+ },
+ {
+  "name": "truncateDate first minute millis",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07.5Z') 'first minute of hour') format='HH:mm:ss.SSS' timezone='UTC'}}",
+  "want": "05:00:00.000"
+ },
+ {
+  "name": "truncateDate last day of month feb",
+  "tpl": "{{date (truncateDate (parseDate '2020-02-04T05:06:07Z') 'last day of month') format='yyyy-MM-dd HH:mm:ss.SSS' timezone='UTC'}}",
+  "want": "2020-02-29 00:00:00.000"
+ },
+ {
+  "name": "truncateDate last day of year millis",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T05:06:07.5Z') 'last day of year') format='yyyy-MM-dd HH:mm:ss.SSS' timezone='UTC'}}",
+  "want": "2020-12-31 00:00:00.000"
+ },
+ {
+  "name": "truncateDate first day of next month dec",
+  "tpl": "{{date (truncateDate (parseDate '2020-12-04T05:06:07Z') 'first day of next month') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "2021-01-01 00:00:00"
+ },
+ {
+  "name": "truncateDate first hour tz",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T23:30:00Z') 'first hour of day') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "2020-03-04 00:00:00"
+ },
+ {
+  "name": "truncateDate first hour of day offset",
+  "tpl": "{{date (truncateDate (parseDate '2020-03-04T23:30:00+05:00') 'first hour of day') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}",
+  "want": "2020-03-04 00:00:00",
+  "skip": "WireMock prints the written wall-clock time for a date with an offset, ignoring timezone="
+ },
+ {
+  "name": "truncateDate then format iso",
+  "tpl": "{{truncateDate (parseDate '2020-03-04T05:06:07Z') 'first day of month'}}",
+  "want": "2020-03-01T00:00:00Z"
+ },
+ {
+  "name": "math chain",
+  "tpl": "{{math (math 1 '+' 2) '*' 4}}",
+  "want": "12"
+ },
+ {
+  "name": "math big dec",
+  "tpl": "{{math 1.10 '+' 2.205}}",
+  "want": "3.305"
+ },
+ {
+  "name": "math mul scale",
+  "tpl": "{{math 1.50 '*' 2}}",
+  "want": "3.0"
+ },
+ {
+  "name": "math float trailing",
+  "tpl": "{{math 2.0 '*' 3}}",
+  "want": "6.0"
+ },
+ {
+  "name": "math div 3 dec",
+  "tpl": "{{math 10.000 '/' 3}}",
+  "want": "3.3"
+ },
+ {
+  "name": "math sub neg",
+  "tpl": "{{math 1.5 '-' 3}}",
+  "want": "-1.5"
+ },
+ {
+  "name": "math from json num",
+  "tpl": "{{math (jsonPath request.body '$.a') '+' 1}}",
+  "request": "{\"a\":2}",
+  "want": "3"
+ },
+ {
+  "name": "math from query",
+  "tpl": "{{math request.query.n.first '*' 2}}",
+  "path": "/t?n=21",
+  "method": "GET",
+  "want": "42"
+ },
+ {
+  "name": "math from query float",
+  "tpl": "{{math request.query.n.first '/' 4}}",
+  "path": "/t?n=10.0",
+  "method": "GET",
+  "want": "2.5"
+ },
+ {
+  "name": "math div by zero float",
+  "tpl": "{{math 1.0 '/' 0}}",
+  "error": true
+ },
+ {
+  "name": "math op symbols names",
+  "tpl": "{{math 6 'multiply' 2}}",
+  "want": "[ERROR: multiply is not a valid mathematical operator]"
+ },
+ {
+  "name": "math op x",
+  "tpl": "{{math 6 'x' 2}}",
+  "want": "12",
+  "skip": "WireMock reads x as multiply"
+ },
+ {
+  "name": "math op plus word",
+  "tpl": "{{math 6 'plus' 2}}",
+  "want": "[ERROR: plus is not a valid mathematical operator]"
+ },
+ {
+  "name": "capitalize mixed",
+  "tpl": "{{capitalize 'hELLO wORLD'}}",
+  "want": "HELLO WORLD"
+ },
+ {
+  "name": "capitalize mixed fully",
+  "tpl": "{{capitalize 'hELLO wORLD' fully=true}}",
+  "want": "Hello World"
+ },
+ {
+  "name": "capitalizeFirst mixed",
+  "tpl": "{{capitalizeFirst 'hELLO wORLD'}}",
+  "want": "HELLO wORLD"
+ },
+ {
+  "name": "capitalize empty",
+  "tpl": "[{{capitalize ''}}]",
+  "want": "[]"
+ },
+ {
+  "name": "lower",
+  "tpl": "{{lower 'ABC'}}",
+  "want": "abc"
+ },
+ {
+  "name": "upper",
+  "tpl": "{{upper 'abc'}}",
+  "want": "ABC"
+ },
+ {
+  "name": "abbreviate unicode",
+  "tpl": "{{abbreviate 'héllo wörld again' 8}}",
+  "want": "héllo..."
+ },
+ {
+  "name": "cut none",
+  "tpl": "{{cut 'abc' 'x'}}",
+  "want": "abc"
+ },
+ {
+  "name": "center exact",
+  "tpl": "[{{center 'abcd' size=4}}]",
+  "want": "[abcd]"
+ },
+ {
+  "name": "center even pad",
+  "tpl": "[{{center 'ab' size=8 pad='-'}}]",
+  "want": "[---ab---]"
+ },
+ {
+  "name": "wordWrap newline in",
+  "tpl": "{{wordWrap 'aaa\nbbb ccc' 5}}",
+  "want": "aaa\nbbb\nccc",
+  "skip": "a string literal cannot contain a new line here"
+ },
+ {
+  "name": "wordWrap exact",
+  "tpl": "{{wordWrap 'aaa bbb' 7}}",
+  "want": "aaa bbb"
+ },
+ {
+  "name": "slugify symbols",
+  "tpl": "{{slugify 'a_b - c--d'}}",
+  "want": "ab--cd"
+ },
+ {
+  "name": "slugify trim",
+  "tpl": "{{slugify '  Hi  '}}",
+  "want": "hi"
+ },
+ {
+  "name": "stripTags attrs",
+  "tpl": "{{stripTags '<a href=\"x>y\">t</a>'}}",
+  "want": "y\">t"
+ },
+ {
+  "name": "stripTags entity",
+  "tpl": "{{stripTags 'a &amp; b'}}",
+  "want": "a &amp; b"
+ },
+ {
+  "name": "stringFormat s with number",
+  "tpl": "{{stringFormat '%s' 5}}",
+  "want": "5"
+ },
+ {
+  "name": "stringFormat d with float",
+  "tpl": "{{stringFormat '%d' 5.5}}",
+  "error": true
+ },
+ {
+  "name": "stringFormat f with int",
+  "tpl": "{{stringFormat '%.1f' 5}}",
+  "error": true,
+  "skip": "this engine formats a whole number with %f"
+ },
+ {
+  "name": "stringFormat percent escape",
+  "tpl": "{{stringFormat '100%% sure'}}",
+  "want": "100% sure"
+ },
+ {
+  "name": "stringFormat upper",
+  "tpl": "{{stringFormat '%S' 'abc'}}",
+  "want": "ABC"
+ },
+ {
+  "name": "stringFormat newline",
+  "tpl": "{{stringFormat 'a%nb'}}",
+  "want": "a\nb"
+ },
+ {
+  "name": "stringFormat index",
+  "tpl": "{{stringFormat '%2$s %1$s' 'a' 'b'}}",
+  "want": "b a"
+ },
+ {
+  "name": "stringFormat zero pad",
+  "tpl": "{{stringFormat '%05d' 42}}",
+  "want": "00042"
+ },
+ {
+  "name": "stringFormat comma",
+  "tpl": "{{stringFormat '%,d' 1234567}}",
+  "want": "1,234,567"
+ },
+ {
+  "name": "stringFormat bool",
+  "tpl": "{{stringFormat '%b' true}}",
+  "want": "true"
+ },
+ {
+  "name": "stringFormat bad",
+  "tpl": "{{stringFormat '%z' 1}}",
+  "error": true
+ },
+ {
+  "name": "defaultIfEmpty false",
+  "tpl": "{{defaultIfEmpty false 'dflt'}}",
+  "want": "dflt"
+ },
+ {
+  "name": "defaultIfEmpty space",
+  "tpl": "[{{defaultIfEmpty ' ' 'dflt'}}]",
+  "want": "[ ]"
+ },
+ {
+  "name": "isOdd negative",
+  "tpl": "{{isOdd -3}}|{{isEven -4}}",
+  "want": "odd|even"
+ },
+ {
+  "name": "isOdd string",
+  "tpl": "{{isOdd '3'}}",
+  "want": ""
+ },
+ {
+  "name": "isOdd float",
+  "tpl": "[{{isOdd 3.0}}]",
+  "want": "[odd]"
+ },
+ {
+  "name": "isOdd text",
+  "tpl": "[{{isOdd 'x'}}]",
+  "want": "[]"
+ },
+ {
+  "name": "isOdd if",
+  "tpl": "{{#if (isOdd 3)}}y{{else}}n{{/if}}",
+  "want": "y"
+ },
+ {
+  "name": "isEven if",
+  "tpl": "{{#if (isEven 3)}}y{{else}}n{{/if}}",
+  "want": "n"
+ },
+ {
+  "name": "stripes zero",
+  "tpl": "{{stripes 0 'a' 'b'}}",
+  "want": "a"
+ },
+ {
+  "name": "stripes one",
+  "tpl": "{{stripes 1 'a' 'b'}}",
+  "want": "b"
+ },
+ {
+  "name": "stripes neg",
+  "tpl": "{{stripes -1 'a' 'b'}}",
+  "want": "b"
+ },
+ {
+  "name": "systemValue bad type",
+  "tpl": "{{systemValue type='BOGUS' key='x'}}",
+  "want": "[ERROR: Access to x is denied]"
+ },
+ {
+  "name": "systemValue no key",
+  "tpl": "{{systemValue type='PROPERTY'}}",
+  "want": "[ERROR: The key cannot be empty]"
+ },
+ {
+  "name": "range 1 1",
+  "tpl": "{{range 1 1}}",
+  "want": "[1]"
+ },
+ {
+  "name": "range 5 7",
+  "tpl": "{{range 5 7}}",
+  "want": "[5, 6, 7]"
+ },
+ {
+  "name": "range floats",
+  "tpl": "{{range 1.5 3}}",
+  "want": "[1, 2, 3]"
+ },
+ {
+  "name": "array mixed",
+  "tpl": "{{array 1 'a' true 1.5}}",
+  "want": "[1, a, true, 1.5]"
+ },
+ {
+  "name": "array of floats",
+  "tpl": "{{array 1.0 2.50}}",
+  "want": "[1.0, 2.5]",
+  "skip": "a decimal number written as 1.0 is a whole number once parsed"
+ },
+ {
+  "name": "arrayAdd item list",
+  "tpl": "{{arrayAdd (array 1) (array 2 3)}}",
+  "want": "[1, [2, 3]]"
+ },
+ {
+  "name": "arrayJoin num",
+  "tpl": "{{arrayJoin '-' (range 1 3)}}",
+  "want": "1-2-3"
+ },
+ {
+  "name": "join list",
+  "tpl": "{{join (array 'a' 'b') ','}}",
+  "want": "a,b"
+ },
+ {
+  "name": "size list",
+  "tpl": "{{size (array 1 2 3)}}",
+  "want": "3"
+ },
+ {
+  "name": "lookup list",
+  "tpl": "{{lookup (array 'a' 'b') 1}}",
+  "want": "b"
+ },
+ {
+  "name": "each list obj",
+  "tpl": "{{#each (array 'a' 'b')}}{{@index}}={{this}};{{/each}}",
+  "want": "0=a;1=b;"
+ },
+ {
+  "name": "toJson list",
+  "tpl": "{{toJson (array 1 'a')}}",
+  "want": "[ 1, \"a\" ]",
+  "skip": "toJson prints compact JSON here (see COMPATIBILITY.md)"
+ },
+ {
+  "name": "jsonPath multi to each",
+  "tpl": "{{#each (jsonPath request.body '$.items[*].id')}}<{{this}}>{{/each}}",
+  "request": "{\"items\":[{\"id\":1},{\"id\":2}]}",
+  "want": "<1><2>"
+ },
+ {
+  "name": "jsonPath object field",
+  "tpl": "{{lookup (jsonPath request.body '$.o') 'k'}}",
+  "request": "{\"o\":{\"k\":1}}",
+  "want": "1"
+ },
+ {
+  "name": "jsonPath assign object",
+  "tpl": "{{#assign 'o'}}{{jsonPath request.body '$.o'}}{{/assign}}[{{o}}]",
+  "request": "{\"o\":{\"k\":1}}",
+  "want": "[{\n  \"k\" : 1\n}]"
+ },
+ {
+  "name": "jsonPath string with quotes",
+  "tpl": "{{jsonPath request.body '$.s'}}",
+  "request": "{\"s\":\"a\\\"b\"}",
+  "want": "a\"b"
+ },
+ {
+  "name": "jsonPath array of arrays",
+  "tpl": "{{jsonPath request.body '$.a'}}",
+  "request": "{\"a\":[[1,2],[3]]}",
+  "want": "[[1,2],[3]]"
+ },
+ {
+  "name": "jsonPath nested obj pretty",
+  "tpl": "{{jsonPath request.body '$.o'}}",
+  "request": "{\"o\":{\"a\":{\"b\":[1,2]},\"c\":\"d\"}}",
+  "want": "{\n  \"a\" : {\n    \"b\" : [ 1, 2 ]\n  },\n  \"c\" : \"d\"\n}"
+ },
+ {
+  "name": "jsonPath float whole",
+  "tpl": "{{jsonPath request.body '$.n'}}",
+  "request": "{\"n\":2.0}",
+  "want": "2.0",
+  "skip": "numbers are read as doubles, so 2.0 prints as 2"
+ },
+ {
+  "name": "jsonPath exp",
+  "tpl": "{{jsonPath request.body '$.n'}}",
+  "request": "{\"n\":1e3}",
+  "want": "1000.0",
+  "skip": "numbers are read as doubles"
+ },
+ {
+  "name": "jsonPath multi floats",
+  "tpl": "{{jsonPath request.body '$.*'}}",
+  "request": "{\"a\":1.5,\"b\":2}",
+  "want": "[1.5,2]"
+ },
+ {
+  "name": "jsonPath multi with null",
+  "tpl": "{{jsonPath request.body '$.*'}}",
+  "request": "{\"a\":null,\"b\":2}",
+  "want": "[null,2]"
+ },
+ {
+  "name": "jsonPath in toJson",
+  "tpl": "{{toJson (jsonPath request.body '$.items[*].id')}}",
+  "request": "{\"items\":[{\"id\":1},{\"id\":2}]}",
+  "want": "[ 1, 2 ]",
+  "skip": "toJson prints compact JSON here (see COMPATIBILITY.md)"
+ },
+ {
+  "name": "jsonPath in if",
+  "tpl": "{{#if (jsonPath request.body '$.zz')}}y{{else}}n{{/if}}",
+  "request": "{\"a\":1}",
+  "want": "n"
+ },
+ {
+  "name": "jsonPath size",
+  "tpl": "{{size (jsonPath request.body '$.items[*]')}}",
+  "request": "{\"items\":[1,2,3]}",
+  "want": "3"
+ },
+ {
+  "name": "jsonPath body object",
+  "tpl": "{{jsonPath request.body '$'}}",
+  "request": "{\"a\":1}",
+  "want": "{\n  \"a\" : 1\n}"
+ },
+ {
+  "name": "xPath second",
+  "tpl": "{{xPath request.body '/a/b[2]'}}",
+  "request": "<a><b>t</b><b>u</b></a>",
+  "want": "<b>u</b>\n"
+ },
+ {
+  "name": "xPath nested pretty",
+  "tpl": "{{xPath request.body '/a/b'}}",
+  "request": "<a><b><c>1</c><d>2</d></b></a>",
+  "want": "<b>\n  <c>1</c>\n  <d>2</d>\n</b>\n"
+ },
+ {
+  "name": "xPath mixed content",
+  "tpl": "{{xPath request.body '/a'}}",
+  "request": "<a>x<b>t</b>y</a>",
+  "want": "<a>\n  x\n  <b>t</b>\n  y\n</a>\n"
+ },
+ {
+  "name": "xPath two attrs",
+  "tpl": "{{xPath request.body '/a/b'}}",
+  "request": "<a><b x=\"1\" y=\"2\"/></a>",
+  "want": "<b x=\"1\" y=\"2\"/>\n"
+ },
+ {
+  "name": "xPath name fn",
+  "tpl": "{{xPath request.body 'name(/a/b)'}}",
+  "request": "<a><b/></a>",
+  "want": "b"
+ },
+ {
+  "name": "xPath doc",
+  "tpl": "{{xPath request.body '/'}}",
+  "request": "<a><b/></a>",
+  "want": "<a>\n  <b/>\n</a>\n"
+ },
+ {
+  "name": "xPath escape",
+  "tpl": "{{xPath request.body '/a/b'}}",
+  "request": "<a><b>x &amp; y &lt;</b></a>",
+  "want": "<b>x &amp; y &lt;</b>\n"
+ },
+ {
+  "name": "xPath text escape",
+  "tpl": "{{xPath request.body '/a/b/text()'}}",
+  "request": "<a><b>x &amp; y &lt;</b></a>",
+  "want": "x & y <"
+ },
+ {
+  "name": "urlEncode tilde",
+  "tpl": "{{urlEncode 'a~b*c.d-e_f'}}",
+  "want": "a%7Eb*c.d-e_f"
+ },
+ {
+  "name": "urlEncode empty",
+  "tpl": "[{{urlEncode ''}}]",
+  "want": "[]"
+ },
+ {
+  "name": "urlEncode num",
+  "tpl": "{{urlEncode 12}}",
+  "want": "12"
+ },
+ {
+  "name": "urlEncode decode utf8",
+  "tpl": "{{urlEncode '%C3%A9' decode=true}}",
+  "want": "é"
+ },
+ {
+  "name": "parseDate rfc1123 numeric",
+  "tpl": "{{parseDate 'Tue, 15 Nov 1994 08:12:31 +0000'}}",
+  "want": "1994-11-15T08:12:31Z"
+ },
+ {
+  "name": "parseDate asctime pad",
+  "tpl": "{{parseDate 'Sun Nov  6 08:49:37 1994'}}",
+  "want": "1994-11-06T08:49:37Z"
+ },
+ {
+  "name": "parseDate format only date",
+  "tpl": "{{parseDate '2020-03-04' format='yyyy-MM-dd'}}",
+  "want": "2020-03-04T00:00:00Z"
+ },
+ {
+  "name": "parseDate format datetime",
+  "tpl": "{{parseDate '2020-03-04 05:06:07' format='yyyy-MM-dd HH:mm:ss'}}",
+  "want": "2020-03-04T05:06:07Z"
+ },
+ {
+  "name": "parseDate unix out",
+  "tpl": "{{parseDate '86400' format='unix'}}",
+  "want": "1970-01-02T00:00:00Z"
+ },
+ {
+  "name": "parseDate epoch out",
+  "tpl": "{{parseDate '86400000' format='epoch'}}",
+  "want": "1970-01-02T00:00:00Z"
+ },
+ {
+  "name": "parseDate iso micros",
+  "tpl": "{{parseDate '2020-03-04T05:06:07.123456Z'}}",
+  "want": "2020-03-04T05:06:07Z"
+ },
+ {
+  "name": "parseDate iso nanos",
+  "tpl": "{{parseDate '2020-03-04T05:06:07.123456789Z'}}",
+  "want": "2020-03-04T05:06:07Z"
+ },
+ {
+  "name": "parseDate iso offset out",
+  "tpl": "{{parseDate '2020-03-04T05:06:07+02:00'}}",
+  "want": "2020-03-04T05:06:07+02:00"
+ },
+ {
+  "name": "parseDate iso millis out",
+  "tpl": "{{parseDate '2020-03-04T05:06:07.100Z'}}",
+  "want": "2020-03-04T05:06:07Z"
+ },
+ {
+  "name": "parseDate bad",
+  "tpl": "{{parseDate 'nope' format='yyyy-MM-dd'}}",
+  "want": "",
+  "skip": "WireMock prints nothing for a date it cannot parse; this engine fails the render"
+ },
+ {
+  "name": "truncateDate keeps offset",
+  "tpl": "{{truncateDate (parseDate '2020-03-04T23:30:00+05:00') 'first hour of day'}}",
+  "want": "2020-03-04T00:00:00+05:00"
+ },
+ {
+  "name": "truncateDate to format",
+  "tpl": "{{truncateDate (parseDate '2020-03-04T05:06:07Z') 'first hour of day' format='yyyy-MM-dd'}}",
+  "want": "2020-03-04T00:00:00Z",
+  "skip": "WireMock ignores format= on truncateDate"
+ },
+ {
+  "name": "jsonPath indefinite empty",
+  "tpl": "[{{jsonPath request.body '$.items[?(@.id>9)].id'}}]",
+  "request": "{\"items\":[{\"id\":1}]}",
+  "want": "[[]]"
+ },
+ {
+  "name": "jsonPath wildcard empty",
+  "tpl": "[{{jsonPath request.body '$.items[*]'}}]",
+  "request": "{\"items\":[]}",
+  "want": "[[]]"
+ },
+ {
+  "name": "jsonPath indefinite empty default",
+  "tpl": "[{{jsonPath request.body '$.items[?(@.id>9)].id' default='d'}}]",
+  "request": "{\"items\":[{\"id\":1}]}",
+  "want": "[[]]"
+ },
+ {
+  "name": "jsonPath definite null default",
+  "tpl": "[{{jsonPath request.body '$.z' default='d'}}]",
+  "request": "{\"z\":null}",
+  "want": "[d]"
+ },
+ {
+  "name": "jsonPath missing no default",
+  "tpl": "[{{jsonPath request.body '$.zz'}}]",
+  "request": "{\"a\":1}",
+  "want": "[]"
+ },
+ {
+  "name": "jsonPath empty string value",
+  "tpl": "[{{jsonPath request.body '$.s' default='d'}}]",
+  "request": "{\"s\":\"\"}",
+  "want": "[]"
+ },
+ {
+  "name": "xPath doc root",
+  "tpl": "{{xPath request.body '/'}}",
+  "request": "<a><b/></a>",
+  "want": "<a>\n  <b/>\n</a>\n"
+ },
+ {
+  "name": "xPath root elem star",
+  "tpl": "{{xPath request.body '/*'}}",
+  "request": "<a><b/></a>",
+  "want": "<a>\n  <b/>\n</a>\n"
+ },
+ {
+  "name": "xPath descendant",
+  "tpl": "{{xPath request.body '//b'}}",
+  "request": "<a><b>1</b></a>",
+  "want": "<b>1</b>\n"
+ },
+ {
+  "name": "xPath decl",
+  "tpl": "{{xPath request.body '/a/b'}}",
+  "request": "<?xml version=\"1.0\"?><a><b>1</b></a>",
+  "want": "<b>1</b>\n"
+ },
+ {
+  "name": "dateFormat hash",
+  "tpl": "{{dateFormat (parseDate '2020-03-04T05:06:07Z') format='yyyy-MM-dd'}}",
+  "want": "2020-03-04"
+ },
+ {
+  "name": "dateFormat hash two",
+  "tpl": "{{dateFormat (parseDate '2020-03-04T05:06:07Z') 'yyyy' format='MM'}}",
+  "want": "2020"
+ },
+ {
+  "name": "numberFormat hash locale",
+  "tpl": "{{numberFormat 1234.5 locale='de'}}",
+  "want": "1,234.5"
+ },
+ {
+  "name": "numberFormat grouping",
+  "tpl": "{{numberFormat 1234567.891 '#,##0.00' groupingUsed=false}}",
+  "want": "1234567.89"
+ },
+ {
+  "name": "numberFormat grouping with format name",
+  "tpl": "{{numberFormat 1234567.891 'integer' groupingUsed=false}}",
+  "want": "1234568"
+ },
+ {
+  "name": "numberFormat grouping true",
+  "tpl": "{{numberFormat 1234567.891 groupingUsed=true}}",
+  "want": "1,234,567.891"
+ },
+ {
+  "name": "numberFormat currency hash currency",
+  "tpl": "{{numberFormat 12.5 'currency' currency='EUR'}}",
+  "want": "$12.50"
+ },
+ {
+  "name": "numberFormat percent hash",
+  "tpl": "{{numberFormat 0.256 'percent' maximumFractionDigits=1}}",
+  "want": "25.6%"
+ },
+ {
+  "name": "numberFormat percent hash2",
+  "tpl": "{{numberFormat 0.256 'percent' maxFractionDigits=1}}",
+  "want": "26%"
+ },
+ {
+  "name": "numberFormat min int",
+  "tpl": "{{numberFormat 5 minimumIntegerDigits=3}}",
+  "want": "005"
+ },
+ {
+  "name": "numberFormat roundingMode",
+  "tpl": "{{numberFormat 2.5 '0' roundingMode='UP'}}",
+  "want": "3"
+ },
+ {
+  "name": "yesno pos extra",
+  "tpl": "{{yesno true 'Y' 'N'}}",
+  "want": "yes"
+ },
+ {
+  "name": "arrayRemove pos extra",
+  "tpl": "{{arrayRemove (array 1 2 3) 1}}",
+  "want": "[1, 2]"
+ },
+ {
+  "name": "es percent",
+  "tpl": "{{numberFormat 0.256 'percent' 'es'}}",
+  "want": "26 %"
+ },
+ {
+  "name": "it percent",
+  "tpl": "{{numberFormat 0.256 'percent' 'it'}}",
+  "want": "26%"
+ },
+ {
+  "name": "ja percent",
+  "tpl": "{{numberFormat 0.256 'percent' 'ja'}}",
+  "want": "26%"
+ },
+ {
+  "name": "nl percent",
+  "tpl": "{{numberFormat 0.256 'percent' 'nl'}}",
+  "want": "26%"
+ },
+ {
+  "name": "pt_BR percent",
+  "tpl": "{{numberFormat 0.256 'percent' 'pt_BR'}}",
+  "want": "26%"
+ },
+ {
+  "name": "nl currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'nl_NL'}}",
+  "want": "€ 1.234,50"
+ },
+ {
+  "name": "pt_BR currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'pt_BR'}}",
+  "want": "R$ 1.234,50"
+ },
+ {
+  "name": "sv currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'sv_SE'}}",
+  "want": "1 234,50 kr"
+ },
+ {
+  "name": "ru currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'ru_RU'}}",
+  "want": "1 234,50 ₽"
+ },
+ {
+  "name": "pl currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'pl_PL'}}",
+  "want": "1 234,50 zł"
+ },
+ {
+  "name": "de_CH currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'de_CH'}}",
+  "want": "CHF 1’234.50"
+ },
+ {
+  "name": "de_CH percent",
+  "tpl": "{{numberFormat 0.256 'percent' 'de_CH'}}",
+  "want": "26%"
+ },
+ {
+  "name": "en_IN currency",
+  "tpl": "{{numberFormat 1234567.5 'currency' 'en_IN'}}",
+  "want": "₹1,234,567.50"
+ },
+ {
+  "name": "ko currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'ko_KR'}}",
+  "want": "₩1,234"
+ },
+ {
+  "name": "zh currency",
+  "tpl": "{{numberFormat 1234.5 'currency' 'zh_CN'}}",
+  "want": "¥1,234.50"
+ }
+]

@@ -39,6 +39,10 @@ func plain(v any) any {
 		return string(t)
 	case []any:
 		return plainList(t)
+	case list:
+		return plainList(t)
+	case jsonList:
+		return plainList(t)
 	case map[string]any:
 		return plainMap(t)
 	case jsonObject:
@@ -204,8 +208,14 @@ func parsePath(expr any) (jp.Expr, error) {
 // element by element and iterates it; use toJson to print one.
 type jsonObject map[string]any
 
-// String implements fmt.Stringer.
-func (o jsonObject) String() string { return Mark(string(mustJSON(map[string]any(o)))) }
+// String implements fmt.Stringer; an object prints indented, as WireMock prints one.
+func (o jsonObject) String() string {
+	out, err := prettyJSON(string(mustJSON(map[string]any(o))))
+	if err != nil {
+		return Mark(string(mustJSON(map[string]any(o))))
+	}
+	return Mark(out)
+}
 
 // wrap marks the strings in a parsed JSON value as safe, and makes an object print as JSON.
 func wrap(v any) any {

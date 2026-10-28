@@ -36,7 +36,9 @@ func TestRender(t *testing.T) {
 		{"jsonPath number", "{{jsonPath body '$.n'}}", "15"},
 		{"jsonPath list", "{{toJson (jsonPath body '$.list')}}", "[1,2]"},
 		{"jsonPath list iterates", "{{#each (jsonPath body '$.list')}}<{{this}}>{{/each}}", "<1><2>"},
-		{"jsonPath object prints as JSON", "{{jsonPath body '$.customer'}}", `{"name":"Ada"}`},
+		{"jsonPath object prints indented", "{{jsonPath body '$.customer'}}", `{
+  "name" : "Ada"
+}`},
 		{"jsonPath no match", "[{{jsonPath body '$.nope'}}]", "[]"},
 		{"xPath", "{{xPath xml '/claim/id/text()'}}", "77"},
 		{"xPath no match", "[{{xPath xml '/claim/none'}}]", "[]"},
@@ -46,8 +48,11 @@ func TestRender(t *testing.T) {
 		{"regexExtract group", "{{regexExtract 'ab-123' '([a-z]+)-'}}", "ab"},
 		{"regexExtract default", "{{regexExtract 'abc' '[0-9]+' default='none'}}", "none"},
 		{"regexExtract assigns groups", "{{regexExtract 'ORD-778' '([A-Z]{3})-([0-9]+)' 'p'}}{{p.0}}/{{p.1}}", "ORD/778"},
-		{"math", "{{math 7 '%' 4}} {{math 3 '*' 4}} {{math 1 '/' 4}} {{math 5 '-' 7}} {{math 2 '+' 2}}", "3 12 0.25 -2 4"},
-		{"math on items", "{{#each items}}{{math qty '*' price}};{{/each}}", "3;4;"},
+		{"math", "{{math 7 '%' 4}} {{math 3 '*' 4}} {{math 1 '/' 4}} {{math 5 '-' 7}} {{math 2 '+' 2}}", "3 12 0 -2 4"},
+		{"math divides as WireMock does", "{{math 7 '/' 2}} {{math 7.5 '/' 2}} {{math 1.0 '/' 4}}", "4 3.8 0.3"},
+		{"math reports a bad operator inline", "{{math 1 '^' 2}}", "[ERROR: ^ is not a valid mathematical operator]"},
+		{"jsonPath reports a bad path inline", "{{jsonPath body '$[['}}", "[ERROR: $[[ is not a valid JSONPath expression]"},
+		{"math on items", "{{#each items}}{{math qty '*' price}};{{/each}}", "3.0;4;"},
 		{"base64", "{{base64 'hello'}}", "aGVsbG8="},
 		{"base64 decode", "{{base64 'aGVsbG8=' decode=true}}", "hello"},
 		{"base64 unpadded", "{{base64 'a' padding=false}}", "YQ"},
@@ -139,11 +144,9 @@ func TestRenderErrors(t *testing.T) {
 	t.Parallel()
 	tests := []struct{ name, tpl, want string }{
 		{"unclosed block", "{{#if x}}", "parse template"},
-		{"bad math operator", "{{math 1 '^' 2}}", "unknown operator"},
 		{"division by zero", "{{math 1 '/' 0}}", "division by zero"},
 		{"math on text", "{{math 'a' '+' 1}}", "must be numbers"},
 		{"bad JSON", "{{jsonPath 'nope' '$.a'}}", "not valid JSON"},
-		{"bad JSONPath", "{{jsonPath body '$[['}}", "JSONPath"},
 		{"bad XML", "{{xPath '<a>' '/a'}}", "not valid XML"},
 		{"bad regex", "{{regexExtract 'a' '('}}", "regexExtract"},
 		{"bad random type", "{{randomValue type='NOPE'}}", "unknown type"},

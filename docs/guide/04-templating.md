@@ -29,11 +29,16 @@ template.
 
 | Expression | Value |
 |---|---|
+| `request.id` | The id of the request in the journal |
 | `request.url` | The path and query string |
 | `request.path` | The path |
-| `request.pathSegments.[0]`, `request.pathSegments.0` | One path segment |
+| `request.path.[0]`, `request.path.0`, `request.pathSegments.[0]` | One path segment |
+| `request.requestLine.method`, `.path`, `.url`, `.host`, `.port`, `.scheme`, `.baseUrl`, `.query`, `.pathSegments` | The request line, which has the same fields as the request |
 | `request.method` | The HTTP method |
-| `request.query.name` | A query parameter. For repeated parameters, `request.query.name.0` is the first |
+| `request.query.name` | A query parameter; a repeated one prints as its first value. `request.query.name.[1]` is the second, `.[last]` the last, and `{{size request.query.name}}` counts them |
+| `{{lookup request.query 'ids[].1'}}` | The second value of a parameter named `ids[]` |
+| `request.multipart` | `true` when the body is multipart |
+| `request.parts.name.body`, `.bodyAsBase64`, `.binary`, `.name`, `.headers.Content-Type` | A part of a multipart body, by its name |
 | `request.headers.Name` | A header |
 | `request.cookies.name` | A cookie |
 | `request.body` | The body as text |
@@ -51,8 +56,9 @@ Inside a path template, a path parameter is available as `request.path.name`.
 |---|---|
 | `now` | `{{now}}`, `{{now offset='3 days'}}`, `{{now offset='-1 hours'}}`, `{{now format='yyyy-MM-dd'}}`, `{{now timezone='Europe/London'}}`, `{{now format='epoch'}}` (milliseconds) or `'unix'` |
 | `formatDate` | `{{formatDate request.query.d format='dd/MM/yyyy'}}` |
-| `parseDate` | `{{parseDate request.query.d format='yyyy-MM-dd'}}` |
-| `truncateDate` | `{{truncateDate (now) 'first day of month'}}` |
+| `parseDate` | `{{parseDate request.query.d format='yyyy-MM-dd'}}`. With no format it reads ISO 8601, RFC 1123 (`Tue, 15 Nov 1994 08:12:31 GMT`) and asctime dates. `format='unix'` reads seconds and `format='epoch'` milliseconds |
+| `truncateDate` | `{{truncateDate (now) 'first day of month'}}`. The truncations are `first second of minute`, `first minute of hour`, `first hour of day`, `first day of month`, `first day of next month`, `last day of month`, `first day of year`, `first day of next year` and `last day of year`; the `last` ones give the start of the last day |
+| `dateFormat` | `{{dateFormat date 'yyyy-MM-dd'}}` or `format='...'`. The styles `full`, `long`, `medium` and `short` are US English |
 
 Date formats are Java-style patterns, such as `yyyy-MM-dd'T'HH:mm:ssXXX`.
 
@@ -65,8 +71,8 @@ Date formats are Java-style patterns, such as `yyyy-MM-dd'T'HH:mm:ssXXX`.
 
 ### Strings and encoding
 
-`base64`, `urlEncode`, `trim`, `lower`, `upper`, `capitalize`, `replace`, `substring`, `join`,
-`size`, `regexExtract`, `pickRandom` (`{{pickRandom 'red' 'green'}}`), `randomDecimal` (`{{randomDecimal lower=1 upper=2}}`),
+`base64`, `urlEncode` (`decode=true` reverses it), `trim`, `lower`, `upper`, `replace`, `substring`, `join`,
+`size`, `regexExtract`, `hostname`, `pickRandom` (`{{pickRandom 'red' 'green'}}`), `randomDecimal` (`{{randomDecimal lower=1 upper=2}}`),
 `val` (`{{val request.query.id or='none'}}` gives the value, or the fallback when it is missing),
 and `date` (the same as `formatDate`).
 
@@ -85,12 +91,39 @@ name as a third argument. The groups are kept in that variable, and nothing is p
 
 This prints `123-order`. `m.0` is the first group and `m.1` the second.
 
+The Handlebars.java string helpers are there too:
+
+| Helper | Example | Prints |
+|---|---|---|
+| `capitalize` | `{{capitalize 'hello big world'}}` | `Hello Big World`. `fully=true` lower-cases the rest of each word |
+| `capitalizeFirst` | `{{capitalizeFirst 'hELLO'}}` | `HELLO` |
+| `abbreviate` | `{{abbreviate 'Handlebars is great' 10}}` | `Handleb...` |
+| `center`, `ljust`, `rjust` | `{{rjust 'ab' size=5 pad='.'}}` | `...ab` |
+| `cut` | `{{cut 'a-b-c' '-'}}` | `abc` |
+| `defaultIfEmpty` | `{{defaultIfEmpty request.query.q 'none'}}` | The value, or the fallback when it is missing, empty, zero or false |
+| `slugify` | `{{slugify 'Hello World, It is Me!'}}` | `hello-world-it-is-me` |
+| `stringFormat` | `{{stringFormat 'Hi %s, you are %05d' 'Bob' 42}}` | Java `String.format` |
+| `stripTags` | `{{stripTags '<b>bold</b>'}}` | `bold` |
+| `wordWrap` | `{{wordWrap text 20}}` | Lines of at most 20 characters |
+| `yesno` | `{{yesno flag yes='Y' no='N' maybe='?'}}` | `yes`, `no` or `maybe` by default; a missing value is `maybe` |
+
+`numberFormat` formats a number with `DecimalFormat`: `{{numberFormat value 'pattern' 'locale'}}`. The pattern
+is `integer`, `currency`, `percent` or a pattern such as `#,##0.00`, and it defaults to `#,##0.###`. The
+locale is written like `de_DE`. Options `minimumIntegerDigits`, `maximumIntegerDigits`,
+`minimumFractionDigits`, `maximumFractionDigits`, `groupingUsed` and `roundingMode` (`UP`, `DOWN`, `CEILING`,
+`FLOOR`, `HALF_UP`, `HALF_DOWN`, `HALF_EVEN`) change the result. Rounding is half-even by default.
+
+`isOdd` and `isEven` print `odd` or `even` for a number of that kind and nothing otherwise, so
+`{{#if (isOdd n)}}` works. `{{stripes index 'a' 'b'}}` prints `a` for an even index and `b` for an odd one, for
+alternating rows. `systemValue` reads an environment variable, but only one that is listed in
+`templating.permittedSystemKeys`; any other key prints `[ERROR: Access to NAME is denied]`.
+
 ### Reading JSON and XML
 
 | Helper | Use |
 |---|---|
-| `jsonPath` | `{{jsonPath request.body '$.items[0].id'}}` |
-| `xPath` | `{{xPath request.body '/order/@id'}}` |
+| `jsonPath` | `{{jsonPath request.body '$.items[0].id'}}`. A path that names one place gives its value, and any other path gives a list. An object prints indented and a list as compact JSON (`[1,2]`). When the path finds nothing the result is `default=`, or nothing |
+| `xPath` | `{{xPath request.body '/order/@id'}}`. An element prints as indented markup, text and attributes as their value, and `count()` and the other functions as their result. Only the first match is used |
 | `parseJson` | `{{parseJson request.body 'doc'}}` parses to a variable, then `{{doc.name}}` |
 | `toJson`, `formatJson` | Print a value, or pretty-print JSON |
 | `jsonMerge`, `jsonRemove`, `jsonArrayAdd` | Change a JSON document |
@@ -108,12 +141,18 @@ of a SOAP envelope, naming elements by their local names:
 ### Logic and maths
 
 `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `and`, `or`, `not`, `matches`, `math`, `array`,
-`arrayAdd`, `arrayJoin`, `range`, and the Handlebars built-ins `if`, `unless`, `each`, `with` and `lookup`.
+`arrayAdd`, `arrayRemove`, `arrayJoin`, `range`, and the Handlebars built-ins `if`, `unless`, `each`, `with` and `lookup`.
 
 `matches` tests the whole text against a regular expression, as a block or as an expression:
 `{{#matches request.query.code '[0-9]+'}}numeric{{else}}no{{/matches}}`. `arrayAdd` returns a new list
 with an item added at the end, or at the start with `position='start'`. `arrayJoin` joins a list with a
-separator. `range` gives the whole numbers from one to another, both included.
+separator, and `prefix=` and `suffix=` go around the whole result. `range` gives the whole numbers from one to another, both
+included. `arrayRemove` returns a new list without the last item, or without the one at `position='start'`,
+`'end'` or a number. A list prints the way Java prints it, `[1, 2, 3]`.
+
+`math` works on decimal numbers as WireMock does. A division gives the result with as many decimals as the first
+number has, rounded half up: `{{math 7 '/' 2}}` is `4`, `{{math 7.0 '/' 2}}` is `3.5` and `{{math 1 '/' 3}}` is `0`.
+`+`, `-`, `*` and `%` are exact.
 
 ```
 {{#if (eq request.method 'POST')}}created{{else}}ok{{/if}}

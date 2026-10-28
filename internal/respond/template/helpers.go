@@ -8,17 +8,13 @@ import (
 	"maps"
 	"math"
 	"math/big"
-	"net/url"
+	"reflect"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
-	"github.com/antchfx/xmlquery"
 	"github.com/mailgun/raymond/v2"
-
-	"github.com/pwgith/shadow-mock/internal/xmlguard"
 )
 
 // helpers returns WireMock's helper set. raymond fixes each helper's number of positional
@@ -37,7 +33,7 @@ func (e *Engine) helpers() map[string]any {
 		"randomInt":   randomInt,
 		// Strings and encodings.
 		"base64":       base64Helper,
-		"urlEncode":    func(s any, _ *raymond.Options) any { return safe(url.QueryEscape(text(s))) },
+		"urlEncode":    urlEncode,
 		"regexExtract": regexExtract,
 		"trim":         func(s any, _ *raymond.Options) any { return safe(strings.TrimSpace(text(s))) },
 		"lower":        func(s any, _ *raymond.Options) any { return safe(strings.ToLower(text(s))) },
@@ -54,30 +50,35 @@ func (e *Engine) helpers() map[string]any {
 		"xPath":     xPath,
 		"parseJson": func(doc any, _ *raymond.Options) any { return wrap(document(doc)) },
 		// Collections and arithmetic.
-		"array": func(items ...any) any { return items },
+		"array": func(items ...any) any { return list(items) },
 		"math":  mathHelper,
 		// Comparison, for use in subexpressions such as (eq a b).
-		"eq":        func(a, b any, _ *raymond.Options) any { return compare(a, b) == 0 },
-		"neq":       func(a, b any, _ *raymond.Options) any { return compare(a, b) != 0 },
-		"gt":        func(a, b any, _ *raymond.Options) any { return compare(a, b) > 0 },
-		"gte":       func(a, b any, _ *raymond.Options) any { return compare(a, b) >= 0 },
-		"lt":        func(a, b any, _ *raymond.Options) any { return compare(a, b) < 0 },
-		"lte":       func(a, b any, _ *raymond.Options) any { return compare(a, b) <= 0 },
-		"contains":  func(a, b any, _ *raymond.Options) any { return strings.Contains(text(a), text(b)) },
-		"and":       func(items ...any) any { return all(items, true) },
-		"or":        func(items ...any) any { return all(items, false) },
-		"not":       func(v any, _ *raymond.Options) any { return !truthy(v) },
-		"matches":   matchesHelper,
-		"val":       val,
-		"arrayAdd":  arrayAdd,
-		"arrayJoin": arrayJoin,
-		"range":     rangeHelper,
+		"eq":          func(a, b any, _ *raymond.Options) any { return compare(a, b) == 0 },
+		"neq":         func(a, b any, _ *raymond.Options) any { return compare(a, b) != 0 },
+		"gt":          func(a, b any, _ *raymond.Options) any { return compare(a, b) > 0 },
+		"gte":         func(a, b any, _ *raymond.Options) any { return compare(a, b) >= 0 },
+		"lt":          func(a, b any, _ *raymond.Options) any { return compare(a, b) < 0 },
+		"lte":         func(a, b any, _ *raymond.Options) any { return compare(a, b) <= 0 },
+		"contains":    func(a, b any, _ *raymond.Options) any { return strings.Contains(text(a), text(b)) },
+		"and":         func(items ...any) any { return all(items, true) },
+		"or":          func(items ...any) any { return all(items, false) },
+		"not":         func(v any, _ *raymond.Options) any { return !truthy(v) },
+		"matches":     matchesHelper,
+		"val":         val,
+		"arrayAdd":    arrayAdd,
+		"arrayRemove": arrayRemove,
+		"arrayJoin":   arrayJoin,
+		"range":       rangeHelper,
 		// closeBrace writes the literal brace that follows a tag, as in {"a": {{x}}}; see rewrite.
+		"printValue": printValue,
+		"lookup":     lookup,
 		"closeBrace": func(_ *raymond.Options) any { return safe("}") },
 	}
 	maps.Copy(h, blockHelpers())
 	maps.Copy(h, jsonHelpers())
 	maps.Copy(h, moreHelpers())
+	maps.Copy(h, e.stringHelpers())
+	maps.Copy(h, numberFormatVariants())
 	return h
 }
 
@@ -135,6 +136,14 @@ func truthy(v any) bool {
 		return t != 0
 	case []any:
 		return len(t) > 0
+	case list:
+		return len(t) > 0
+	case jsonList:
+		return len(t) > 0
+	case int:
+		return t != 0
+	case int64:
+		return t != 0
 	default:
 		return true
 	}
@@ -295,6 +304,9 @@ func pickChars(alphabet string, n int) string {
 	return b.String()
 }
 
+// UUID returns a random version 4 UUID.
+func UUID() string { return uuid() }
+
 func uuid() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
@@ -342,12 +354,6 @@ func regexExtract(s, pattern any, o *raymond.Options) any {
 	}
 }
 
-func capitalize(s any, _ *raymond.Options) any {
-	in := text(s)
-	r, n := utf8.DecodeRuneInString(in)
-	return safe(strings.ToUpper(string(r)) + in[n:])
-}
-
 // substring implements {{substring text start end}}; positions count characters.
 func substring(s, from, to any, _ *raymond.Options) any {
 	rs := []rune(text(s))
@@ -381,59 +387,19 @@ func size(v any, _ *raymond.Options) any {
 	switch t := v.(type) {
 	case []any:
 		return len(t)
+	case list:
+		return len(t)
+	case jsonList:
+		return len(t)
 	case map[string]any:
 		return len(t)
 	case jsonObject:
 		return len(t)
 	default:
+		if rv := reflect.ValueOf(v); rv.Kind() == reflect.Slice { // a request value that occurs more than once
+			return rv.Len()
+		}
 		return utf8.RuneCountInString(text(t))
-	}
-}
-
-// mathHelper implements {{math a '+' b}} for + - * / and %.
-func mathHelper(a, op, b any, _ *raymond.Options) any {
-	x, ok1 := number(a)
-	y, ok2 := number(b)
-	if !ok1 || !ok2 {
-		fail("math: operands %v and %v must be numbers", a, b)
-	}
-	switch o := text(op); o {
-	case "+":
-		return x + y
-	case "-":
-		return x - y
-	case "*":
-		return x * y
-	case "/":
-		if y == 0 {
-			fail("math: division by zero")
-		}
-		return x / y
-	case "%":
-		if y == 0 {
-			fail("math: division by zero")
-		}
-		return math.Mod(x, y)
-	default:
-		fail("math: unknown operator %q", o)
-		return nil
-	}
-}
-
-// jsonPath evaluates a JSONPath over JSON text or an already parsed value.
-func jsonPath(doc, expr any, o *raymond.Options) any {
-	x, err := parsePath(expr)
-	if err != nil {
-		fail("jsonPath: invalid expression %q: %v", text(expr), err)
-	}
-	res := x.Get(document(doc))
-	switch len(res) {
-	case 0:
-		return safe(o.HashStr("default")) // {{jsonPath body '$.a' default='x'}}
-	case 1:
-		return wrap(res[0])
-	default:
-		return wrap(res)
 	}
 }
 
@@ -450,25 +416,6 @@ func document(v any) any {
 	default:
 		return v
 	}
-}
-
-// xPath evaluates an XPath over XML text and returns the text of the first match.
-func xPath(doc, expr any, _ *raymond.Options) any {
-	if !xmlguard.DepthOK([]byte(text(doc))) {
-		fail("xPath: the XML is nested more than %d levels deep", xmlguard.MaxDepth)
-	}
-	root, err := xmlquery.Parse(strings.NewReader(text(doc)))
-	if err != nil {
-		fail("xPath: the input is not valid XML: %v", err)
-	}
-	nodes, err := xmlquery.QueryAll(root, text(expr))
-	if err != nil {
-		fail("xPath: invalid expression %q: %v", text(expr), err)
-	}
-	if len(nodes) == 0 {
-		return safe("")
-	}
-	return safe(nodes[0].InnerText())
 }
 
 // matchesHelper implements (matches text regex): true when the whole text matches. The block form
@@ -497,40 +444,6 @@ func val(v any, o *raymond.Options) any {
 		return safe("")
 	}
 	return result
-}
-
-// arrayAdd implements (arrayAdd list item position=start): a new list with the item added at the
-// end, or at the start.
-func arrayAdd(list, item any, o *raymond.Options) any {
-	in := asList(list)
-	if o.HashStr("position") == "start" {
-		return append([]any{item}, in...)
-	}
-	return append(slices.Clone(in), item)
-}
-
-// arrayJoin implements {{arrayJoin ',' list}}.
-func arrayJoin(sep, list any, _ *raymond.Options) any {
-	in := asList(list)
-	parts := make([]string, len(in))
-	for i, x := range in {
-		parts[i] = text(x)
-	}
-	return safe(strings.Join(parts, text(sep)))
-}
-
-// rangeHelper implements (range start end): the whole numbers from start to end, both included.
-func rangeHelper(from, to any, _ *raymond.Options) any {
-	a, ok1 := number(from)
-	b, ok2 := number(to)
-	if !ok1 || !ok2 || b < a || b-a > 100000 {
-		fail("range: %v to %v is not a usable range", from, to)
-	}
-	out := make([]any, 0, int(b-a)+1)
-	for i := a; i <= b; i++ {
-		out = append(out, i)
-	}
-	return out
 }
 
 // asList returns a template value as a list, or nil when it is not one.

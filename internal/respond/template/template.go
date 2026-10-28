@@ -22,6 +22,9 @@ const maxCached = 2048
 type Engine struct {
 	clock clock.Clock
 
+	// permitted lists the keys systemValue may read; WireMock refuses every key unless it is listed.
+	permitted map[string]bool
+
 	mu    sync.RWMutex
 	cache map[string]*compiled
 }
@@ -39,6 +42,14 @@ const varsKey = "vars"
 // New returns an engine whose time helpers read c.
 func New(c clock.Clock) *Engine {
 	return &Engine{clock: c, cache: map[string]*compiled{}}
+}
+
+// PermitSystemKeys sets the keys the systemValue helper may read.
+func (e *Engine) PermitSystemKeys(keys []string) {
+	e.permitted = make(map[string]bool, len(keys))
+	for _, k := range keys {
+		e.permitted[k] = true
+	}
 }
 
 // Render renders src with data as the root context. Text without any "{{" is returned as is.
@@ -75,8 +86,8 @@ func (e *Engine) compile(src string) (*compiled, error) {
 		return c, nil
 	}
 	main, inline := extractInline(src)
-	plain := rewrite(main)
 	known := e.helperNames()
+	plain := rewrite(main, known)
 	if err := checkHelpers(plain, known); err != nil {
 		return nil, err
 	}
@@ -86,7 +97,7 @@ func (e *Engine) compile(src string) (*compiled, error) {
 	}
 	t.RegisterHelpers(e.helpers())
 	for _, p := range inline {
-		body := rewrite(p.body)
+		body := rewrite(p.body, known)
 		if err := checkHelpers(body, known); err != nil {
 			return nil, fmt.Errorf("partial %q: %w", p.name, err)
 		}
