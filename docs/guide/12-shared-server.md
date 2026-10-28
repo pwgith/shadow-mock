@@ -210,7 +210,7 @@ scrape_configs:
       - targets: ["mocks.example.com:9090"]   # the admin listener, if you set one
 ```
 
-Tracing and a Docker image are being added.
+To run the server in a container, see [page 15](15-docker.md).
 
 ## Logs and traces
 

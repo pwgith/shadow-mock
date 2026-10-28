@@ -42,6 +42,16 @@ Never move or reuse a version tag. If a release is bad, publish the next patch v
 release that must not be downloaded, delete the release and its tag, and do not use that number
 again.
 
+## Container images
+
+The `docker` workflow publishes `ghcr.io/pwgith/shadow-mock` for `linux/amd64` and `linux/arm64`. A
+stable tag `v0.2.0` gives `0.2.0`, `0.2` and `latest`; a pre-release tag gives only its own
+version; every merge to `main` replaces `edge`. A pull request that changes the image builds it and
+checks that it reports the right version and turns healthy, without publishing.
+
+The first publish creates the package as private. In the repository's package settings on GitHub,
+make it public so users can pull it without signing in.
+
 ## Builds of `main`
 
 Every merge to `main` replaces one pre-release, **`edge`**, with a build of that commit. Use it to

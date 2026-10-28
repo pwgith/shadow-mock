@@ -40,6 +40,12 @@ Download a binary from the [releases page](https://github.com/pwgith/shadow-mock
 go build -o shadowmock ./cmd/shadowmock
 ```
 
+Or run the container image, for `linux/amd64` and `linux/arm64` ([guide](docs/guide/15-docker.md)):
+
+```bash
+docker run --rm -p 8080:8080 ghcr.io/pwgith/shadow-mock:latest
+```
+
 ## Usage
 
 Start the server in a directory holding `mappings/` and `__files/`, as WireMock does:

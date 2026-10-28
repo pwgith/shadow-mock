@@ -1,0 +1,103 @@
+name: docker
+
+# Builds the server image for linux/amd64 and linux/arm64. On a pull request it only builds and
+# smoke tests it; on a merge to main or a version tag it publishes to ghcr.io/pwgith/shadow-mock.
+# See docs/RELEASING.md.
+#
+#   push a v* tag   -> :X.Y.Z (and :X.Y and :latest for a stable release, not a pre-release)
+#   merge to main   -> :edge
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    paths: ['Dockerfile', '.dockerignore', 'deploy/**', 'cmd/**', 'internal/**', 'go.mod', 'go.sum', '.github/workflows/docker.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.event_name == 'pull_request' }}
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push the image to ghcr.io
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Work out the version and tags
+        id: v
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="$GITHUB_REF_NAME"
+            semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'
+            if ! [[ "$TAG" =~ $semver ]]; then
+              echo "::error::$TAG is not a semantic version."
+              exit 1
+            fi
+            version="${TAG#v}"
+            tags="${image}:${version}"
+            if [[ "$TAG" != *-* ]]; then
+              tags="${tags},${image}:${version%.*},${image}:latest"
+            fi
+          else
+            base="$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo v0.0.0)"
+            version="${base#v}-edge.${GITHUB_SHA::8}"
+            tags="${image}:edge"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+          echo "Building $version as $tags"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the image for this machine and smoke test it
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: shadow-mock:test
+          build-args: VERSION=${{ steps.v.outputs.version }}
+          cache-from: type=gha
+      - name: Check the version, the user and the health check
+        run: |
+          got="$(docker run --rm shadow-mock:test -version)"
+          if [[ "$got" != "${{ steps.v.outputs.version }}" ]]; then
+            echo "::error::the image reports version '$got'"
+            exit 1
+          fi
+          docker run -d --name sm -p 8080:8080 shadow-mock:test
+          for i in $(seq 1 30); do
+            status="$(docker inspect --format '{{.State.Health.Status}}' sm)"
+            [[ "$status" == healthy ]] && break
+            sleep 2
+          done
+          docker logs sm
+          [[ "$status" == healthy ]] || { echo "::error::the container is $status, not healthy"; exit 1; }
+          curl -fsS localhost:8080/__admin/version
+          [[ "$(docker inspect --format '{{.Config.User}}' sm)" == nonroot:nonroot ]]
+          docker rm -f sm
+      - name: Sign in to ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish for amd64 and arm64
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.v.outputs.tags }}
+          build-args: VERSION=${{ steps.v.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
