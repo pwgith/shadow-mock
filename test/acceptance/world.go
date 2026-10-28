@@ -24,8 +24,13 @@ import (
 	"sync"
 	"time"
 
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/pwgith/shadow-mock/internal/app"
 	"github.com/pwgith/shadow-mock/internal/config"
+	"github.com/pwgith/shadow-mock/internal/telemetry"
 	"github.com/pwgith/shadow-mock/pkg/extension"
 )
 
@@ -132,6 +137,9 @@ type world struct {
 	matchers       []extension.RequestMatcher
 	sendErr        error  // the last request failed on the wire
 	scrape         string // the last metrics scrape
+	spans          *tracetest.InMemoryExporter
+	traceID        string // the trace id of the last traceparent the scenario sent
+	parentSpanID   string // the span id in it
 	adminToken     string // sent as a bearer token on admin calls and scrapes, when not empty
 	sessionNumbers map[string][]int
 
@@ -184,8 +192,19 @@ func (w *world) start() error {
 			return fmt.Errorf("configuration: %w", err)
 		}
 	}
-	logger := slog.New(slog.NewTextHandler(w.logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	a, err := app.New(cfg, app.Options{Logger: logger, Clock: w.clk, Version: "acceptance", Shutdown: w.markStopped, Matchers: w.matchers})
+	logOpts := &slog.HandlerOptions{Level: slog.LevelDebug}
+	var inner slog.Handler = slog.NewTextHandler(w.logs, logOpts)
+	if cfg.Log.Format == "json" {
+		inner = slog.NewJSONHandler(w.logs, logOpts)
+	}
+	logger := slog.New(telemetry.NewLogHandler(inner))
+	var provider trace.TracerProvider
+	if cfg.Tracing.Enabled {
+		w.spans = tracetest.NewInMemoryExporter()
+		sampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(cfg.Tracing.SampleRatio))
+		provider = sdktrace.NewTracerProvider(sdktrace.WithSyncer(w.spans), sdktrace.WithSampler(sampler))
+	}
+	a, err := app.New(cfg, app.Options{Logger: logger, Clock: w.clk, Version: "acceptance", Shutdown: w.markStopped, Matchers: w.matchers, TracerProvider: provider})
 	if err != nil {
 		return fmt.Errorf("build engine: %w", err)
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/session"
 	"github.com/pwgith/shadow-mock/internal/stats"
 	"github.com/pwgith/shadow-mock/internal/store"
+	"github.com/pwgith/shadow-mock/internal/telemetry"
 	"github.com/pwgith/shadow-mock/internal/tenant"
 	"github.com/pwgith/shadow-mock/internal/webhook"
 )
@@ -37,6 +38,8 @@ type Config struct {
 	MatchedHeader bool
 	// SaaS turns off standalone-only operations such as save and shutdown.
 	SaaS bool
+	// LogRequests writes a log line for every mock request (log.requests).
+	LogRequests bool
 }
 
 // SessionSaver persists the session registry (storage.sessions.driver: fs).
@@ -65,9 +68,11 @@ type Service struct {
 	Stats    *stats.Tracker
 	// Metrics receives one call per served request; nil disables it.
 	Metrics Observer
-	Clock   clock.Clock
-	Logger  *slog.Logger
-	Config  Config
+	// Telemetry starts a span for each mock request; nil records nothing.
+	Telemetry *telemetry.Telemetry
+	Clock     clock.Clock
+	Logger    *slog.Logger
+	Config    Config
 
 	inflight sync.Map // path -> *atomic.Int64
 }

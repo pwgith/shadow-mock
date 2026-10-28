@@ -21,6 +21,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/clock"
 	"github.com/pwgith/shadow-mock/internal/config"
 	"github.com/pwgith/shadow-mock/internal/server"
+	"github.com/pwgith/shadow-mock/internal/telemetry"
 )
 
 // version is set at build time with -ldflags "-X main.version=…".
@@ -55,9 +56,9 @@ func newLogger(c config.Log) *slog.Logger {
 	}
 	opts := &slog.HandlerOptions{Level: level}
 	if strings.EqualFold(c.Format, "json") {
-		return slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		return slog.New(telemetry.NewLogHandler(slog.NewJSONHandler(os.Stderr, opts)))
 	}
-	return slog.New(slog.NewTextHandler(os.Stderr, opts))
+	return slog.New(telemetry.NewLogHandler(slog.NewTextHandler(os.Stderr, opts)))
 }
 
 func serve(cfg config.Config, logger *slog.Logger) error {

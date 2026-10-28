@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/pwgith/shadow-mock/internal/admin"
 	"github.com/pwgith/shadow-mock/internal/auth"
 	"github.com/pwgith/shadow-mock/internal/clock"
@@ -33,6 +35,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/store"
 	"github.com/pwgith/shadow-mock/internal/store/fs"
 	"github.com/pwgith/shadow-mock/internal/store/memory"
+	"github.com/pwgith/shadow-mock/internal/telemetry"
 	"github.com/pwgith/shadow-mock/internal/tenant"
 	"github.com/pwgith/shadow-mock/internal/webhook"
 	"github.com/pwgith/shadow-mock/pkg/extension"
@@ -47,6 +50,9 @@ type Options struct {
 	Version  string
 	// Matchers are custom request matchers that mappings can name (FR-2.7).
 	Matchers []extension.RequestMatcher
+	// TracerProvider, when set, receives the spans instead of the OTLP exporter the configuration
+	// describes. Tests give one that keeps them in memory; the caller owns it.
+	TracerProvider trace.TracerProvider
 }
 
 // App is the wired engine.
@@ -55,6 +61,7 @@ type App struct {
 	svc       *mock.Service
 	mockRoute *server.Router
 	metrics   *metrics.Metrics
+	tel       *telemetry.Telemetry
 	adminOnly *server.Router // set when admin has its own listener
 	globalFS  *fs.Mappings
 	sessions  *fs.SessionStore
@@ -92,9 +99,9 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	}
 	var sessionMappings store.MappingRepository = memory.NewMappings()
 	if cfg.Storage.Sessions.Driver == "fs" {
-		ss, err := fs.NewSessionStore(filepath.Join(cfg.Root, "sessions"))
-		if err != nil {
-			return nil, err
+		ss, serr := fs.NewSessionStore(filepath.Join(cfg.Root, "sessions"))
+		if serr != nil {
+			return nil, serr
 		}
 		a.sessions = ss
 		a.closers = append(a.closers, ss.Close)
@@ -115,6 +122,10 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Ambiguity: detect.Policy(d.Ambiguity),
 	})
 	detector.SetSource(registry.All)
+	tel, err := a.startTelemetry(cfg, o)
+	if err != nil {
+		return nil, err
+	}
 	mx := metrics.New(func() int { return len(registry.All()) })
 	detector.Observe(o.Clock.Now, mx.Rebuilt)
 	a.metrics = mx
@@ -127,24 +138,25 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	jrnl.LimitBodies(cfg.Storage.Journal.Hot.MaxBodyBytes)
 	jrnl.LimitSize(cfg.Storage.Journal.Hot.MaxBytes)
 	svc := &mock.Service{
-		Mappings: mappings,
-		Files:    files,
-		Sessions: registry,
-		Layers:   engine.NewManager(mappings, registry, match.Options{Now: o.Clock.Now, CustomMatchers: custom}, o.Logger),
-		Detector: detector,
-		Counters: counter.NewMemory(),
-		Journal:  jrnl,
-		Renderer: renderer,
-		Webhooks: hooks,
-		Proxy:    proxy.New(client),
-		Recorder: record.NewRecorder(),
-		Stats:    stats.New(),
-		Metrics:  mx,
-		Clock:    o.Clock,
-		Logger:   o.Logger,
+		Mappings:  mappings,
+		Files:     files,
+		Sessions:  registry,
+		Layers:    engine.NewManager(mappings, registry, match.Options{Now: o.Clock.Now, CustomMatchers: custom}, o.Logger),
+		Detector:  detector,
+		Counters:  counter.NewMemory(),
+		Journal:   jrnl,
+		Renderer:  renderer,
+		Webhooks:  hooks,
+		Proxy:     proxyWithTrace(client, tel),
+		Recorder:  record.NewRecorder(),
+		Stats:     stats.New(),
+		Metrics:   mx,
+		Telemetry: tel,
+		Clock:     o.Clock,
+		Logger:    o.Logger,
 		Config: mock.Config{
 			MaxBodyBytes: cfg.Limits.MaxBodyBytes, MappingSetsDir: filepath.Join(cfg.Root, "mapping-sets"),
-			MatchedHeader: cfg.Respond.MatchedHeader,
+			MatchedHeader: cfg.Respond.MatchedHeader, LogRequests: cfg.Log.Requests,
 		},
 	}
 	if a.sessions != nil {
@@ -186,6 +198,7 @@ func (a *App) routers(cfg config.Config, o Options) error {
 		ServeAdmin:   cfg.Listen.Admin == "",
 		Metrics:      a.metrics.Handler(),
 		MetricsAuth:  guard,
+		Telemetry:    a.tel,
 		AdminHosts:   cfg.Admin.AllowedHosts,
 		AdminOrigins: cfg.Admin.AllowedOrigins,
 	}
@@ -284,4 +297,28 @@ func (a *App) Handlers() map[string]http.Handler {
 		out[a.cfg.Listen.Admin] = a.adminOnly
 	}
 	return out
+}
+
+// proxyWithTrace returns a forwarder whose upstream calls continue the caller's trace.
+func proxyWithTrace(client *http.Client, tel *telemetry.Telemetry) *proxy.Forwarder {
+	f := proxy.New(client)
+	f.Inject = tel.Inject
+	return f
+}
+
+// startTelemetry sets up tracing, and flushes it when the app closes.
+func (a *App) startTelemetry(cfg config.Config, o Options) (*telemetry.Telemetry, error) {
+	tel, err := telemetry.New(context.Background(), telemetry.Config{
+		Enabled: cfg.Tracing.Enabled, Endpoint: cfg.Tracing.Endpoint, ServiceName: cfg.Tracing.ServiceName, SampleRatio: cfg.Tracing.SampleRatio,
+	}, o.Version, o.TracerProvider)
+	if err != nil {
+		return nil, err
+	}
+	a.tel = tel
+	a.closers = append(a.closers, func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return tel.Shutdown(ctx)
+	})
+	return tel, nil
 }

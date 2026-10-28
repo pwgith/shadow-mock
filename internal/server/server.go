@@ -10,11 +10,15 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+
 	"github.com/pwgith/shadow-mock/internal/admin"
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/auth"
 	"github.com/pwgith/shadow-mock/internal/mock"
 	"github.com/pwgith/shadow-mock/internal/stats"
+	"github.com/pwgith/shadow-mock/internal/telemetry"
 	"github.com/pwgith/shadow-mock/internal/tenant"
 )
 
@@ -43,6 +47,8 @@ type Router struct {
 	AdminHosts []string
 	// AdminOrigins are web pages allowed to make admin changes from a browser.
 	AdminOrigins []string
+	// Telemetry traces admin requests; nil records nothing.
+	Telemetry *telemetry.Telemetry
 }
 
 var _ http.Handler = (*Router)(nil)
@@ -98,7 +104,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if isAdmin {
 		r2 := r.Clone(admin.WithBasePath(ctx, prefix))
 		setPath(r2.URL, adminPath)
-		rt.Admin.ServeHTTP(w, r2)
+		rt.serveAdmin(w, r2)
 		return
 	}
 	tr := mock.Traffic{Tenant: org.ID, Path: rest, ClientIP: ip.String(), AbsoluteURL: absoluteURL(r)}
@@ -262,4 +268,32 @@ func (rt *Router) adminGate(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+// statusWriter remembers the status a handler wrote.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+// WriteHeader remembers the status and passes it on.
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+// Unwrap lets http.ResponseController reach the real writer.
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// serveAdmin runs the admin API inside a span that continues the caller's trace. The span names
+// the method and the status only; the path can carry a session id, which is not a span name.
+func (rt *Router) serveAdmin(w http.ResponseWriter, r *http.Request) {
+	ctx, span := rt.Telemetry.Start(r, "admin "+r.Method)
+	sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+	rt.Admin.ServeHTTP(sw, r.WithContext(ctx))
+	span.SetAttributes(attribute.String("http.request.method", r.Method), attribute.Int("http.response.status_code", sw.status), attribute.String("shadowmock.kind", "admin"))
+	if sw.status >= http.StatusInternalServerError {
+		span.SetStatus(codes.Error, http.StatusText(sw.status))
+	}
+	span.End()
 }

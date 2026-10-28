@@ -34,6 +34,9 @@ Unknown keys in the file are an error, so typos fail at startup instead of being
 | `SHADOWMOCK_LOG_FORMAT` | `log.format` |
 | `SHADOWMOCK_PUBLIC_BASE_URL` | `server.publicBaseUrl` |
 | `SHADOWMOCK_JOURNAL_MAX_ENTRIES` | `storage.journal.hot.maxEntries` |
+| `SHADOWMOCK_LOG_REQUESTS` | `log.requests` |
+| `SHADOWMOCK_TRACING_ENABLED` | `tracing.enabled` |
+| `SHADOWMOCK_TRACING_ENDPOINT` | `tracing.endpoint` |
 
 ## The YAML file
 
@@ -121,6 +124,13 @@ server:
 log:
   level: info                 # debug | info | warn | error
   format: text                # text | json
+  requests: false             # one line per mock request, with the trace id
+
+tracing:
+  enabled: false              # export OpenTelemetry spans
+  endpoint: ""                # OTLP/HTTP collector, such as http://localhost:4318
+  serviceName: shadowmock
+  sampleRatio: 1              # share of new traces kept, 0 to 1
 ```
 
 Durations are written as `30s`, `15m`, `1h`, `720h`.

@@ -57,6 +57,9 @@ type Result struct {
 // Forwarder sends requests upstream through an egress client.
 type Forwarder struct {
 	client *http.Client
+	// Inject, when set, adds the caller's trace context to the upstream request, so a proxied call
+	// continues the trace.
+	Inject func(ctx context.Context, h http.Header)
 }
 
 // New returns a forwarder that sends through client.
@@ -94,6 +97,9 @@ func (f *Forwarder) Forward(ctx context.Context, req *match.Request, base string
 	}
 	for k, v := range o.AdditionalHeaders {
 		out.Header.Set(k, v)
+	}
+	if f.Inject != nil {
+		f.Inject(ctx, out.Header)
 	}
 	resp, err := f.client.Do(out)
 	if err != nil {

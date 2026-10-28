@@ -195,6 +195,19 @@ type Egress struct {
 type Log struct {
 	Level  string `yaml:"level"`  // debug | info | warn | error
 	Format string `yaml:"format"` // text | json
+	// Requests writes one line for each mock request: method, path (never the query), status, layer,
+	// detection stage and duration, with the trace id when there is one.
+	Requests bool `yaml:"requests"`
+}
+
+// Tracing configures OpenTelemetry tracing (NFR-6.3).
+type Tracing struct {
+	Enabled bool `yaml:"enabled"`
+	// Endpoint is the OTLP/HTTP collector, such as http://localhost:4318. Empty uses the standard
+	// OTEL_EXPORTER_OTLP_* environment variables.
+	Endpoint    string  `yaml:"endpoint"`
+	ServiceName string  `yaml:"serviceName"`
+	SampleRatio float64 `yaml:"sampleRatio"` // share of new traces kept, 0 to 1
 }
 
 // Config is the whole configuration.
@@ -214,6 +227,7 @@ type Config struct {
 	Templating  Templating `yaml:"templating"`
 	Egress      Egress     `yaml:"egress"`
 	Log         Log        `yaml:"log"`
+	Tracing     Tracing    `yaml:"tracing"`
 }
 
 // Default returns the documented defaults (DESIGN.md §11).
@@ -245,8 +259,9 @@ func Default() Config {
 			},
 			URLBased: URLBased{PathPrefix: "/d", IDLength: 16, DefaultTTL: Duration(24 * time.Hour), MaxTTL: Duration(30 * 24 * time.Hour)},
 		},
-		Limits: Limits{MaxBodyBytes: 10 << 20},
-		Log:    Log{Level: "info", Format: "text"},
+		Limits:  Limits{MaxBodyBytes: 10 << 20},
+		Log:     Log{Level: "info", Format: "text"},
+		Tracing: Tracing{ServiceName: "shadowmock", SampleRatio: 1},
 	}
 }
 
@@ -336,17 +351,28 @@ func Merge(cfg *Config, data []byte) error {
 // applyEnv overrides settings from the environment.
 func applyEnv(cfg *Config, lookup func(string) (string, bool)) error {
 	strs := map[string]*string{
-		"SHADOWMOCK_MODE":            &cfg.Mode,
-		"SHADOWMOCK_LISTEN_MOCK":     &cfg.Listen.Mock,
-		"SHADOWMOCK_LISTEN_ADMIN":    &cfg.Listen.Admin,
-		"SHADOWMOCK_ROOT":            &cfg.Root,
-		"SHADOWMOCK_LOG_LEVEL":       &cfg.Log.Level,
-		"SHADOWMOCK_LOG_FORMAT":      &cfg.Log.Format,
-		"SHADOWMOCK_PUBLIC_BASE_URL": &cfg.Server.PublicBaseURL,
+		"SHADOWMOCK_MODE":             &cfg.Mode,
+		"SHADOWMOCK_LISTEN_MOCK":      &cfg.Listen.Mock,
+		"SHADOWMOCK_LISTEN_ADMIN":     &cfg.Listen.Admin,
+		"SHADOWMOCK_ROOT":             &cfg.Root,
+		"SHADOWMOCK_LOG_LEVEL":        &cfg.Log.Level,
+		"SHADOWMOCK_LOG_FORMAT":       &cfg.Log.Format,
+		"SHADOWMOCK_PUBLIC_BASE_URL":  &cfg.Server.PublicBaseURL,
+		"SHADOWMOCK_TRACING_ENDPOINT": &cfg.Tracing.Endpoint,
 	}
 	for k, dst := range strs {
 		if v, ok := lookup(k); ok && v != "" {
 			*dst = v
+		}
+	}
+	bools := map[string]*bool{"SHADOWMOCK_TRACING_ENABLED": &cfg.Tracing.Enabled, "SHADOWMOCK_LOG_REQUESTS": &cfg.Log.Requests}
+	for k, dst := range bools {
+		if v, ok := lookup(k); ok && v != "" {
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return fmt.Errorf("%s: %w", k, err)
+			}
+			*dst = b
 		}
 	}
 	if v, ok := lookup("SHADOWMOCK_JOURNAL_MAX_ENTRIES"); ok && v != "" {
@@ -396,6 +422,12 @@ func (c *Config) Validate() error {
 		return errors.New("sessions.urlBased.pathPrefix other than /d is not supported yet")
 	case c.Storage.Journal.Hot.MaxBodyBytes < 0 || c.Storage.Journal.Hot.MaxBytes < 0:
 		return errors.New("storage.journal.hot.maxBodyBytes and maxBytes must not be negative")
+	case c.Tracing.SampleRatio < 0 || c.Tracing.SampleRatio > 1:
+		return errors.New("tracing.sampleRatio must be between 0 and 1")
+	case c.Tracing.Endpoint != "" && !strings.HasPrefix(c.Tracing.Endpoint, "http://") && !strings.HasPrefix(c.Tracing.Endpoint, "https://"):
+		return errors.New("tracing.endpoint must be an http or https URL, such as http://localhost:4318")
+	case c.Tracing.Enabled && c.Tracing.ServiceName == "":
+		return errors.New("tracing.serviceName must not be empty when tracing is on")
 	case c.Storage.Journal.Hot.MaxEntries < 0:
 		return errors.New("storage.journal.hot.maxEntries must not be negative")
 	}
