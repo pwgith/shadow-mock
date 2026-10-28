@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/clock"
@@ -40,6 +41,16 @@ type Config struct {
 	SaaS bool
 	// LogRequests writes a log line for every mock request (log.requests).
 	LogRequests bool
+	// Limits caps what a shared server holds. A zero field is no limit.
+	Limits Limits
+}
+
+// Limits are the quotas the service enforces when something is created.
+type Limits struct {
+	MaxSessions           int
+	MaxMappings           int
+	MaxMappingsPerSession int
+	MaxDelay              time.Duration
 }
 
 // SessionSaver persists the session registry (storage.sessions.driver: fs).

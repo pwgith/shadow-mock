@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/net/netutil"
 
 	"golang.org/x/sync/errgroup"
 
@@ -81,10 +84,14 @@ func serve(cfg config.Config, logger *slog.Logger) error {
 	g, gctx := errgroup.WithContext(ctx)
 	for addr, h := range a.Handlers() {
 		srv := server.New(addr, h, maxDelay)
+		ln, err := listen(addr, cfg.Limits.MaxConnections)
+		if err != nil {
+			return err
+		}
 		g.Go(func() error {
-			logger.InfoContext(gctx, "listening", "addr", addr, "root", cfg.Root)
-			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				return fmt.Errorf("listen on %s: %w", addr, err)
+			logger.InfoContext(gctx, "listening", "addr", addr, "root", cfg.Root, "max_connections", cfg.Limits.MaxConnections)
+			if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				return fmt.Errorf("serve on %s: %w", addr, err)
 			}
 			return nil
 		})
@@ -103,4 +110,18 @@ func serve(cfg config.Config, logger *slog.Logger) error {
 	}
 	logger.InfoContext(ctx, "stopped")
 	return nil
+}
+
+// listen opens a TCP listener. With max above zero it holds at most that many connections open:
+// another waits in the kernel's queue until one closes, so a flood of connections cannot take the
+// server's memory or file descriptors.
+func listen(addr string, maxConns int) (net.Listener, error) {
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("listen on %s: %w", addr, err)
+	}
+	if maxConns > 0 {
+		return netutil.LimitListener(ln, maxConns), nil
+	}
+	return ln, nil
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/metrics"
 	"github.com/pwgith/shadow-mock/internal/mock"
 	"github.com/pwgith/shadow-mock/internal/proxy"
+	"github.com/pwgith/shadow-mock/internal/ratelimit"
 	"github.com/pwgith/shadow-mock/internal/record"
 	"github.com/pwgith/shadow-mock/internal/respond"
 	"github.com/pwgith/shadow-mock/internal/server"
@@ -115,12 +116,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		MinTokenLength: cfg.Sessions.Detect.MinTokenLength, KeyPrefix: cfg.Sessions.KeyPrefix, URLMockIDLength: cfg.Sessions.URLBased.IDLength,
 	}
 	registry := session.NewRegistry(o.Clock, limits)
-	d := cfg.Sessions.Detect
-	detector := detect.New(detect.Config{
-		Headers: d.Headers, QueryParams: d.QueryParams, Cookies: d.Cookies, ScanMetadata: d.ScanMetadata,
-		ScanBody: d.ScanBody, MaxScanBytes: d.MaxScanBytes, ContentTypes: d.ContentTypes, Decompress: d.Decompress,
-		Ambiguity: detect.Policy(d.Ambiguity),
-	})
+	detector := newDetector(cfg.Sessions.Detect)
 	detector.SetSource(registry.All)
 	tel, err := a.startTelemetry(cfg, o)
 	if err != nil {
@@ -131,6 +127,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	a.metrics = mx
 	renderer := respond.NewRenderer(files, o.Clock, cfg.Respond.Gzip != "off")
 	renderer.Templating = cfg.Templating.Global
+	renderer.MaxDelay = time.Duration(cfg.Limits.MaxDelay)
 	client := egress.New(egress.Options{BlockPrivate: cfg.Egress.BlockPrivate})
 	hooks := webhook.New(client, renderer.Templates, o.Clock, o.Logger)
 	a.closers = append(a.closers, func() error { hooks.Close(); return nil })
@@ -157,12 +154,25 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Config: mock.Config{
 			MaxBodyBytes: cfg.Limits.MaxBodyBytes, MappingSetsDir: filepath.Join(cfg.Root, "mapping-sets"),
 			MatchedHeader: cfg.Respond.MatchedHeader, LogRequests: cfg.Log.Requests,
+			Limits: mock.Limits{
+				MaxSessions: cfg.Limits.MaxSessions, MaxMappings: cfg.Limits.MaxMappings,
+				MaxMappingsPerSession: cfg.Limits.MaxMappingsPerSession, MaxDelay: time.Duration(cfg.Limits.MaxDelay),
+			},
 		},
 	}
 	if a.sessions != nil {
 		svc.SessionStore = a.sessions
 	}
 	return svc, nil
+}
+
+// newDetector builds the session-key detector from the sessions.detect settings.
+func newDetector(d config.Detect) *detect.Index {
+	return detect.New(detect.Config{
+		Headers: d.Headers, QueryParams: d.QueryParams, Cookies: d.Cookies, ScanMetadata: d.ScanMetadata,
+		ScanBody: d.ScanBody, MaxScanBytes: d.MaxScanBytes, ContentTypes: d.ContentTypes, Decompress: d.Decompress,
+		Ambiguity: detect.Policy(d.Ambiguity),
+	})
 }
 
 func (a *App) routers(cfg config.Config, o Options) error {
@@ -173,6 +183,10 @@ func (a *App) routers(cfg config.Config, o Options) error {
 	proxies, err := server.ParsePrefixes(cfg.Server.ClientIP.TrustedProxies)
 	if err != nil {
 		return fmt.Errorf("server.clientIp.trustedProxies: %w", err)
+	}
+	var limiter *ratelimit.Limiter
+	if cfg.Limits.RequestsPerSecond > 0 {
+		limiter = ratelimit.New(o.Clock, cfg.Limits.RequestsPerSecond, cfg.Limits.Burst)
 	}
 	var authn auth.Authenticator = auth.NoopAuthenticator{}
 	var guard auth.Authenticator // set when the admin API and the metrics need a token
@@ -199,6 +213,7 @@ func (a *App) routers(cfg config.Config, o Options) error {
 		Metrics:      a.metrics.Handler(),
 		MetricsAuth:  guard,
 		Telemetry:    a.tel,
+		Limiter:      limiter,
 		AdminHosts:   cfg.Admin.AllowedHosts,
 		AdminOrigins: cfg.Admin.AllowedOrigins,
 	}

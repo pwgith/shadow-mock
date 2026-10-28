@@ -3,10 +3,13 @@
 package server
 
 import (
+	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +20,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/auth"
 	"github.com/pwgith/shadow-mock/internal/mock"
+	"github.com/pwgith/shadow-mock/internal/ratelimit"
 	"github.com/pwgith/shadow-mock/internal/stats"
 	"github.com/pwgith/shadow-mock/internal/telemetry"
 	"github.com/pwgith/shadow-mock/internal/tenant"
@@ -49,6 +53,8 @@ type Router struct {
 	AdminOrigins []string
 	// Telemetry traces admin requests; nil records nothing.
 	Telemetry *telemetry.Telemetry
+	// Limiter, when set, limits how fast each client address may send mock traffic.
+	Limiter *ratelimit.Limiter
 }
 
 var _ http.Handler = (*Router)(nil)
@@ -64,14 +70,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rt.health(w, map[string]string{"storage": "up"})
 		return
 	case "/__metrics":
-		if rt.Metrics == nil {
-			apierr.New(http.StatusNotFound, apierr.NotFound, "Metrics are not exposed here.").Write(w)
-			return
-		}
-		if !rt.hostAllowed(w, r) || !rt.metricsAllowed(w, r) {
-			return
-		}
-		rt.Metrics.ServeHTTP(w, r)
+		rt.serveMetrics(w, r)
 		return
 	}
 	org, prefix, rest, ok := rt.org(path)
@@ -98,6 +97,9 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if isAdmin && !rt.adminGate(w, r) {
+		return
+	}
+	if !isAdmin && !rt.withinRate(w, ip) {
 		return
 	}
 	ctx := tenant.With(r.Context(), org.ID)
@@ -296,4 +298,34 @@ func (rt *Router) serveAdmin(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, http.StatusText(sw.status))
 	}
 	span.End()
+}
+
+// withinRate takes a token for the client from the rate limiter. A client over its rate gets 429 and
+// a Retry-After header, before any body is read.
+func (rt *Router) withinRate(w http.ResponseWriter, ip netip.Addr) bool {
+	if rt.Limiter == nil {
+		return true
+	}
+	ok, wait := rt.Limiter.Allow(ip.String())
+	if ok {
+		return true
+	}
+	seconds := int(math.Ceil(wait.Seconds()))
+	w.Header().Set("Retry-After", strconv.Itoa(max(seconds, 1)))
+	e := apierr.New(http.StatusTooManyRequests, apierr.RateLimited, "Too many requests from %s; try again in %d s.", ip, max(seconds, 1))
+	e.Details = map[string]any{"retryAfterSeconds": max(seconds, 1)}
+	e.Write(w)
+	return false
+}
+
+// serveMetrics serves /__metrics to a caller that passes the host and token checks.
+func (rt *Router) serveMetrics(w http.ResponseWriter, r *http.Request) {
+	if rt.Metrics == nil {
+		apierr.New(http.StatusNotFound, apierr.NotFound, "Metrics are not exposed here.").Write(w)
+		return
+	}
+	if !rt.hostAllowed(w, r) || !rt.metricsAllowed(w, r) {
+		return
+	}
+	rt.Metrics.ServeHTTP(w, r)
 }

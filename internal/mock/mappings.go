@@ -21,7 +21,7 @@ func (s *Service) Validate(m *model.StubMapping) error {
 	if _, err := engine.CompileMapping(m, s.Layers.Options()); err != nil {
 		return apierr.Invalid("/request", "%s", err.Error())
 	}
-	return nil
+	return s.checkDelays(m)
 }
 
 func metadataMatches(cm match.ContentMatcher, metadata map[string]any) bool {
@@ -47,6 +47,9 @@ func (s *Service) DecodeAndValidate(data []byte) (model.StubMapping, error) {
 // PutMapping creates a mapping, or replaces the one with the same id. A replaced mapping's
 // call counters restart (FR-4.2).
 func (s *Service) PutMapping(ctx context.Context, sc store.Scope, m model.StubMapping) (model.StubMapping, error) {
+	if err := s.checkMappingRoom(ctx, sc, []string{m.ID}, false); err != nil {
+		return model.StubMapping{}, err
+	}
 	if m.ID == "" {
 		m = m.WithID(ids.NewUUID())
 	}
@@ -137,30 +140,45 @@ func (s *Service) Import(ctx context.Context, sc store.Scope, ms []model.StubMap
 			return err
 		}
 	}
+	incoming := make([]string, len(ms))
+	for i := range ms {
+		incoming[i] = ms[i].ID
+	}
+	if err := s.checkMappingRoom(ctx, sc, incoming, o.DeleteAllNotInImport); err != nil {
+		return err
+	}
 	if o.DeleteAllNotInImport {
 		if err := s.Mappings.DeleteAll(ctx, sc); err != nil {
 			return fmt.Errorf("delete mappings: %w", err)
 		}
 	}
 	for _, m := range ms {
-		if m.ID != "" && o.DuplicatePolicy == "IGNORE" {
-			if _, err := s.Mappings.Get(ctx, sc, m.ID); err == nil {
-				continue
-			} else if !errors.Is(err, store.ErrNotFound) {
-				return fmt.Errorf("import: %w", err)
-			}
-		}
-		if m.ID == "" {
-			m = m.WithID(ids.NewUUID())
-		}
-		if err := s.Mappings.Put(ctx, sc, m); err != nil {
-			return fmt.Errorf("import: %w", err)
-		}
-		if err := s.Counters.ForgetStub(ctx, sc, m.ID); err != nil {
-			return fmt.Errorf("import: %w", err)
+		if err := s.importOne(ctx, sc, m, o); err != nil {
+			return err
 		}
 	}
 	return s.Layers.Rebuild(ctx, sc)
+}
+
+// importOne stores one imported mapping, leaving an existing one alone under the IGNORE policy.
+func (s *Service) importOne(ctx context.Context, sc store.Scope, m model.StubMapping, o ImportOptions) error {
+	if m.ID != "" && o.DuplicatePolicy == "IGNORE" {
+		if _, err := s.Mappings.Get(ctx, sc, m.ID); err == nil {
+			return nil
+		} else if !errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("import: %w", err)
+		}
+	}
+	if m.ID == "" {
+		m = m.WithID(ids.NewUUID())
+	}
+	if err := s.Mappings.Put(ctx, sc, m); err != nil {
+		return fmt.Errorf("import: %w", err)
+	}
+	if err := s.Counters.ForgetStub(ctx, sc, m.ID); err != nil {
+		return fmt.Errorf("import: %w", err)
+	}
+	return nil
 }
 
 // FindByMetadata returns the mappings whose metadata matches a content pattern.

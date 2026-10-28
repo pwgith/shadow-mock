@@ -194,6 +194,10 @@ func TestValidate(t *testing.T) {
 		{"admin prefix with a trailing slash", func(c *config.Config) { c.AdminPrefix = "/admin/" }, "adminPrefix"},
 		{"path prefix", func(c *config.Config) { c.Sessions.URLBased.PathPrefix = "/mock" }, "pathPrefix"},
 		{"negative journal", func(c *config.Config) { c.Storage.Journal.Hot.MaxEntries = -1 }, "must not be negative"},
+		{"negative session limit", func(c *config.Config) { c.Limits.MaxSessions = -1 }, "limits must not be negative"},
+		{"negative mapping limit", func(c *config.Config) { c.Limits.MaxMappingsPerSession = -1 }, "limits must not be negative"},
+		{"negative delay limit", func(c *config.Config) { c.Limits.MaxDelay = config.Duration(-time.Second) }, "limits must not be negative"},
+		{"negative rate", func(c *config.Config) { c.Limits.RequestsPerSecond = -0.5 }, "limits must not be negative"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

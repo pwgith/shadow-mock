@@ -273,3 +273,86 @@ func TestTheAllowlistCanCoverTheAdminAPI(t *testing.T) {
 		}
 	}
 }
+
+func rateRouter(t *testing.T, clk *clock.Fake, perSecond float64, burst int) *server.Router {
+	t.Helper()
+	cfg := config.Default()
+	cfg.Root = t.TempDir()
+	cfg.Storage.Global.Driver = "memory"
+	cfg.Limits.RequestsPerSecond, cfg.Limits.Burst = perSecond, burst
+	a, err := app.New(cfg, app.Options{Logger: slog.New(slog.DiscardHandler), Clock: clk, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := a.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	if err := a.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	rt, ok := a.Handler().(*server.Router)
+	if !ok {
+		t.Fatalf("the handler is a %T", a.Handler())
+	}
+	return rt
+}
+
+func fromAddr(t *testing.T, rt *server.Router, path, remote string) *httptest.ResponseRecorder {
+	t.Helper()
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, http.NoBody)
+	r.RemoteAddr = remote
+	rec := httptest.NewRecorder()
+	rt.ServeHTTP(rec, r)
+	return rec
+}
+
+func TestMockTrafficIsRateLimitedPerClientAddress(t *testing.T) {
+	t.Parallel()
+	clk := clock.NewFake(time.Unix(1_800_000_000, 0))
+	rt := rateRouter(t, clk, 2, 2)
+	codes := func(remote string, n int) []int {
+		out := make([]int, 0, n)
+		for range n {
+			out = append(out, fromAddr(t, rt, "/anything", remote).Code)
+		}
+		return out
+	}
+	if got := codes("10.0.0.1:1", 3); got[0] == 429 || got[1] == 429 || got[2] != 429 {
+		t.Errorf("three requests at a limit of two together gave %v, want the third refused", got)
+	}
+	if got := codes("10.0.0.2:1", 2); got[0] == 429 || got[1] == 429 {
+		t.Errorf("another address must have its own allowance, got %v", got)
+	}
+	rec := fromAddr(t, rt, "/anything", "10.0.0.1:1")
+	if rec.Code != 429 || rec.Header().Get("Retry-After") == "" || !strings.Contains(rec.Body.String(), "rate_limited") {
+		t.Errorf("a refused request = %d, Retry-After %q, body %s", rec.Code, rec.Header().Get("Retry-After"), rec.Body)
+	}
+	clk.Advance(time.Second)
+	if rec := fromAddr(t, rt, "/anything", "10.0.0.1:1"); rec.Code == 429 {
+		t.Error("after a second the client should be allowed again")
+	}
+}
+
+func TestTheRateLimitDoesNotTouchHealthChecksOrTheAdminAPI(t *testing.T) {
+	t.Parallel()
+	rt := rateRouter(t, clock.NewFake(time.Unix(1_800_000_000, 0)), 1, 1)
+	for i := range 5 {
+		for _, path := range []string{"/__health", "/__ready", "/__admin/version"} {
+			if rec := fromAddr(t, rt, path, "10.0.0.1:1"); rec.Code == 429 {
+				t.Errorf("request %d to %s was rate limited", i, path)
+			}
+		}
+	}
+}
+
+func TestWithNoRateLimitNothingIsRefused(t *testing.T) {
+	t.Parallel()
+	rt := rateRouter(t, clock.NewFake(time.Unix(1_800_000_000, 0)), 0, 0)
+	for i := range 200 {
+		if rec := fromAddr(t, rt, "/anything", "10.0.0.1:1"); rec.Code == 429 {
+			t.Fatalf("request %d was refused with no limit set", i)
+		}
+	}
+}

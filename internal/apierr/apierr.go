@@ -34,6 +34,9 @@ const (
 	ParentNotFound               Code = "parent_not_found"
 	BodyTooLarge                 Code = "body_too_large"
 	AmbiguousSession             Code = "ambiguous_session"
+	RateLimited                  Code = "rate_limited"
+	SessionLimitReached          Code = "session_limit_reached"
+	MappingLimitReached          Code = "mapping_limit_reached"
 )
 
 // Error is an API error with an HTTP status.
