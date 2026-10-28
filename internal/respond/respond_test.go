@@ -457,3 +457,23 @@ func TestWriteDoesNotGuessAContentType(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxDelayShortensADelayAndADribble(t *testing.T) {
+	t.Parallel()
+	r, _, clk := newRenderer(t, true)
+	r.MaxDelay = 500 * time.Millisecond
+	for _, body := range []string{
+		`{"body":"slow","fixedDelayMilliseconds":60000}`,
+		`{"body":"0123456789","chunkedDribbleDelay":{"numberOfChunks":5,"totalDuration":60000}}`,
+	} {
+		start := clk.Now()
+		resp, _ := r.Render(t.Context(), def(t, body), nil, nil)
+		rec := httptest.NewRecorder()
+		if err := r.Write(t.Context(), rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", http.NoBody), resp, nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := clk.Now().Sub(start); got != 500*time.Millisecond {
+			t.Errorf("%s took %v of fake time, want it shortened to 500ms", body, got)
+		}
+	}
+}

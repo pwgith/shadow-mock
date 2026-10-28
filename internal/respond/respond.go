@@ -38,6 +38,8 @@ type Renderer struct {
 	Templating bool
 	// Templates renders response text; NewRenderer sets it.
 	Templates *template.Engine
+	// MaxDelay, when positive, shortens any delay or dribble to this (limits.maxDelay).
+	MaxDelay time.Duration
 
 	mu       sync.RWMutex
 	settings Settings

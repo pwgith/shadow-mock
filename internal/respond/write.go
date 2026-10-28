@@ -22,6 +22,9 @@ const gzipMinBytes = 1024
 // headers and body (gzipped if the client accepts it). It returns the body actually sent, or
 // an error if the client went away during the delay.
 func (r *Renderer) Write(ctx context.Context, w http.ResponseWriter, req *http.Request, resp *Response, beforeSend func()) error {
+	if r.MaxDelay > 0 {
+		resp.Delay = min(resp.Delay, r.MaxDelay)
+	}
 	if resp.Delay > 0 && !r.Clock.Sleep(ctx, resp.Delay) {
 		return fmt.Errorf("delay: %w", ctx.Err())
 	}
@@ -97,7 +100,11 @@ func (r *Renderer) dribble(ctx context.Context, w http.ResponseWriter, status in
 	w.WriteHeader(status)
 	n := d.NumberOfChunks
 	size := (len(body) + n - 1) / max(n, 1)
-	pause := time.Duration(d.TotalDuration) * time.Millisecond / time.Duration(n)
+	total := time.Duration(d.TotalDuration) * time.Millisecond
+	if r.MaxDelay > 0 {
+		total = min(total, r.MaxDelay)
+	}
+	pause := total / time.Duration(n)
 	flusher, canFlush := w.(http.Flusher)
 	for i := 0; i < len(body); i += max(size, 1) {
 		if !r.Clock.Sleep(ctx, pause) { // every chunk waits, so the body takes the whole duration

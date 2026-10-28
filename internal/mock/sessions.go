@@ -44,9 +44,16 @@ func (s *Service) CreateSession(ctx context.Context, t tenant.ID, kind session.K
 		return session.Session{}, apierr.New(http.StatusUnprocessableEntity, apierr.ValidationFailed,
 			"URL-based shadow mocks have no match tokens and cannot be nested.")
 	}
+	if err := s.checkSessionRoom(t); err != nil {
+		return session.Session{}, err
+	}
 	mappings, err := s.seedMappings(req)
 	if err != nil {
 		return session.Session{}, err
+	}
+	if limit := s.Config.Limits.MaxMappingsPerSession; limit > 0 && len(mappings) > limit {
+		return session.Session{}, apierr.New(http.StatusTooManyRequests, apierr.MappingLimitReached,
+			"A shadow mock may hold at most %d mappings, and this one starts with %d.", limit, len(mappings))
 	}
 	if maskErr := s.validateMasks(req.Masks); maskErr != nil {
 		return session.Session{}, maskErr

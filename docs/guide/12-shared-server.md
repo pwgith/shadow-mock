@@ -144,6 +144,34 @@ egress:
 
 Also keep the request body limit (`limits.maxBodyBytes`) at a size you are comfortable with.
 
+## Set quotas
+
+On a server that many teams share, one team can use up what the rest need. Quotas are off until you
+set them; set only the ones you want.
+
+```yaml
+limits:
+  maxSessions: 500            # active shadow mocks
+  maxMappings: 200            # global mappings
+  maxMappingsPerSession: 100  # mappings in one shadow mock
+  maxDelay: 10s               # longest delay or dribble a response may have
+  maxConnections: 1000        # open connections per listener
+  requestsPerSecond: 50       # mock requests per client address
+  burst: 100                  # requests a client may send at once
+```
+
+| Limit | What happens past it |
+|---|---|
+| `maxSessions` | Creating a shadow mock gets `429 session_limit_reached`. Deleting or expiring one frees a place. |
+| `maxMappings`, `maxMappingsPerSession` | Adding mappings gets `429 mapping_limit_reached`. An import that would pass the limit is refused whole, and replacing a mapping adds none. |
+| `maxDelay` | A mapping with a longer delay, delay distribution or dribble is refused with `422` when you create it. One already stored is shortened to the limit when served. |
+| `maxConnections` | Further connections wait until one closes. |
+| `requestsPerSecond`, `burst` | A client over its rate gets `429 rate_limited` with a `Retry-After` header. |
+
+The rate limit counts mock traffic from each client address, so set `server.clientIp` (see above)
+when the server sits behind a load balancer, or every client looks like the balancer. Health checks,
+metrics and the admin API are never rate limited.
+
 ## Health and metrics
 
 | Endpoint | Purpose |

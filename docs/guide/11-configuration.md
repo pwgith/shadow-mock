@@ -87,6 +87,14 @@ egress:
 
 limits:
   maxBodyBytes: 10485760      # largest request body accepted (10 MiB)
+  # The rest are off at 0. See "Set quotas" in the shared server chapter.
+  maxSessions: 0              # active shadow mocks, key-based and URL-based together
+  maxMappings: 0              # global mappings
+  maxMappingsPerSession: 0    # mappings in one shadow mock
+  maxDelay: 0s                # longest response delay or dribble
+  maxConnections: 0           # open connections per listener
+  requestsPerSecond: 0        # mock requests per second from each client address
+  burst: 0                    # requests allowed at once (0 rounds the rate up)
 
 sessions:
   defaultTtl: 1h
@@ -152,6 +160,7 @@ Durations are written as `30s`, `15m`, `1h`, `720h`.
   being used to reach internal addresses.
 * **`storage.journal.hot.maxBytes`** limits the memory the journal may hold. Without it, entries times body size is unbounded, because a request body can be up to `limits.maxBodyBytes`.
 * **`limits.maxBodyBytes`** caps request bodies. Larger ones get `413 body_too_large`.
+* **`limits.maxSessions`, `maxMappings`, `maxMappingsPerSession`, `maxDelay`, `maxConnections`, `requestsPerSecond` and `burst`** are quotas for a shared server. They are all off at `0`, so a standalone server is unrestricted. A negative value is a startup error.
 
 Some options (for example `storage.*.driver` values such as `postgres`, `redis` and `s3`, and
 `auth.driver: jwt`) belong to the planned hosted service. They are rejected at startup

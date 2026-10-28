@@ -725,6 +725,7 @@ sessions:
     maxTtl: 720h            # 30 days
 limits:
   maxBodyBytes: 10485760
+  # Opt-in quotas, all off at 0: maxSessions, maxMappings, maxMappingsPerSession, maxDelay, maxConnections, requestsPerSecond, burst
 templating: { global: false }
 egress: { blockPrivate: false }   # SaaS sets true: no webhooks or proxying to private addresses
 ```

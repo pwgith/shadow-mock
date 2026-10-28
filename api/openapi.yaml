@@ -1579,6 +1579,7 @@ components:
         - rate_limited
         - monthly_request_cap
         - session_limit_reached
+        - mapping_limit_reached
         # mock traffic only
         - ambiguous_session
         - egress_blocked

@@ -693,3 +693,99 @@ func TestJournalEntriesForEmptyBodiesStillHaveBothBodyFields(t *testing.T) {
 		}
 	}
 }
+
+func TestSessionsAreCappedWhenALimitIsSet(t *testing.T) {
+	t.Parallel()
+	a := newAPI(t, func(c *config.Config) { c.Limits.MaxSessions = 2 })
+	first := a.want(201, "POST", "/sessions/key-based", `{}`)
+	a.want(201, "POST", "/sessions/url-based", `{}`)
+	a.wantError(429, "session_limit_reached", "POST", "/sessions/key-based", `{}`)
+	a.wantError(429, "session_limit_reached", "POST", "/sessions/url-based", `{}`)
+	a.want(200, "DELETE", "/sessions/"+first["id"].(string), "")
+	a.want(201, "POST", "/sessions/key-based", `{}`) // a deleted session frees its place
+}
+
+func TestWithNoSessionLimitManyCanBeCreated(t *testing.T) {
+	t.Parallel()
+	a := newAPI(t)
+	for range 25 {
+		a.want(201, "POST", "/sessions/key-based", `{}`)
+	}
+}
+
+func TestMappingsAreCappedPerScopeWhenALimitIsSet(t *testing.T) {
+	t.Parallel()
+	a := newAPI(t, func(c *config.Config) { c.Limits.MaxMappings, c.Limits.MaxMappingsPerSession = 2, 3 })
+	one := func(id, path string) string {
+		return fmt.Sprintf(`{"id":%q,"request":{"urlPath":%q},"response":{"status":200}}`, id, path)
+	}
+	a.want(201, "POST", "/mappings", one(idA, "/a"))
+	a.want(201, "POST", "/mappings", one(idB, "/b"))
+	a.wantError(429, "mapping_limit_reached", "POST", "/mappings", `{"request":{"urlPath":"/c"},"response":{"status":200}}`)
+	a.want(200, "PUT", "/mappings/"+idA, one(idA, "/a2")) // replacing a mapping adds none
+
+	s := a.want(201, "POST", "/sessions/key-based", `{}`)["id"].(string)
+	for i := range 3 {
+		a.want(201, "POST", "/sessions/"+s+"/mappings", fmt.Sprintf(`{"request":{"urlPath":"/s%d"},"response":{"status":200}}`, i))
+	}
+	a.wantError(429, "mapping_limit_reached", "POST", "/sessions/"+s+"/mappings", `{"request":{"urlPath":"/s4"},"response":{"status":200}}`)
+	// The global session's count is separate from the session's.
+	a.want(200, "DELETE", "/mappings/"+idB, "")
+	a.want(201, "POST", "/mappings", one(idB, "/b"))
+}
+
+func TestAnImportThatWouldPassTheLimitIsRefusedWhole(t *testing.T) {
+	t.Parallel()
+	a := newAPI(t, func(c *config.Config) { c.Limits.MaxMappings = 2 })
+	three := `{"mappings":[{"request":{"urlPath":"/1"},"response":{"status":200}},{"request":{"urlPath":"/2"},"response":{"status":200}},{"request":{"urlPath":"/3"},"response":{"status":200}}]}`
+	a.wantError(429, "mapping_limit_reached", "POST", "/mappings/import", three)
+	if ms, _ := a.want(200, "GET", "/mappings", "")["mappings"].([]any); len(ms) != 0 {
+		t.Errorf("a refused import left %d mappings behind", len(ms))
+	}
+	two := `{"mappings":[{"request":{"urlPath":"/1"},"response":{"status":200}},{"request":{"urlPath":"/2"},"response":{"status":200}}]}`
+	a.want(200, "POST", "/mappings/import", two)
+	// Replacing everything is judged by the new total, not the old plus the new.
+	a.want(200, "POST", "/mappings/import", `{"mappings":[{"request":{"urlPath":"/9"},"response":{"status":200}}],"importOptions":{"deleteAllNotInImport":true}}`)
+}
+
+func TestASessionCannotStartWithMoreMappingsThanTheLimit(t *testing.T) {
+	t.Parallel()
+	a := newAPI(t, func(c *config.Config) { c.Limits.MaxMappingsPerSession = 1 })
+	two := `{"mappings":[{"request":{"urlPath":"/1"},"response":{"status":200}},{"request":{"urlPath":"/2"},"response":{"status":200}}]}`
+	a.wantError(429, "mapping_limit_reached", "POST", "/sessions/key-based", two)
+	if ss, _ := a.want(200, "GET", "/sessions", "")["sessions"].([]any); len(ss) != 0 {
+		t.Errorf("a refused create left %d sessions behind", len(ss))
+	}
+}
+
+func TestDelaysLongerThanTheLimitAreRefusedWhenAMappingIsCreated(t *testing.T) {
+	t.Parallel()
+	a := newAPI(t, func(c *config.Config) { c.Limits.MaxDelay = config.Duration(2 * time.Second) })
+	body := func(response string) string { return `{"request":{"urlPath":"/d"},"response":` + response + `}` }
+	for _, tt := range []struct{ name, response string }{
+		{"a fixed delay", `{"status":200,"fixedDelayMilliseconds":2001}`},
+		{"a uniform delay", `{"status":200,"delayDistribution":{"type":"uniform","lower":1,"upper":9000}}`},
+		{"a fixed distribution", `{"status":200,"delayDistribution":{"type":"fixed","milliseconds":9000}}`},
+		{"a capped log-normal delay", `{"status":200,"delayDistribution":{"type":"lognormal","median":100,"sigma":0.1,"maxValue":9000}}`},
+		{"a dribble", `{"status":200,"body":"abcdef","chunkedDribbleDelay":{"numberOfChunks":3,"totalDuration":9000}}`},
+	} {
+		a.wantError(422, "validation_failed", "POST", "/mappings", body(tt.response))
+		if tt.name == "a fixed delay" {
+			_, _, raw := a.do("POST", "/mappings", body(tt.response))
+			if !strings.Contains(raw, "limit of 2s") {
+				t.Errorf("the refusal should name the limit: %s", raw)
+			}
+		}
+	}
+	a.wantError(422, "validation_failed", "POST", "/mappings", `{"request":{"urlPath":"/d"},"response":{"status":200},"callResponses":[{"calls":"2","response":{"status":200,"fixedDelayMilliseconds":9000}}]}`)
+	for _, ok := range []string{
+		`{"status":200,"fixedDelayMilliseconds":2000}`,
+		`{"status":200,"delayDistribution":{"type":"lognormal","median":100,"sigma":0.1}}`, // unbounded, shortened when served
+		`{"status":200}`,
+	} {
+		a.want(201, "POST", "/mappings", body(ok))
+	}
+	if v := a.want(200, "POST", "/mappings/validate", body(`{"status":200,"fixedDelayMilliseconds":9000}`)); v["valid"] != false {
+		t.Errorf("validate should say a too-long delay is not valid: %v", v)
+	}
+}

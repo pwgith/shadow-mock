@@ -178,6 +178,22 @@ type Sessions struct {
 // Limits caps resource use.
 type Limits struct {
 	MaxBodyBytes int64 `yaml:"maxBodyBytes"`
+	// The limits below are off at 0. They protect a shared server from one team using it all up.
+
+	// MaxSessions caps active shadow mocks, key-based and URL-based together.
+	MaxSessions int `yaml:"maxSessions"`
+	// MaxMappings caps the global mappings, and MaxMappingsPerSession the mappings of one shadow mock.
+	MaxMappings           int `yaml:"maxMappings"`
+	MaxMappingsPerSession int `yaml:"maxMappingsPerSession"`
+	// MaxDelay caps how long a response may be delayed or dribbled. A longer delay in a mapping is
+	// refused when the mapping is created over the API, and shortened to this when it is served.
+	MaxDelay Duration `yaml:"maxDelay"`
+	// MaxConnections caps open connections on each listener.
+	MaxConnections int `yaml:"maxConnections"`
+	// RequestsPerSecond limits mock traffic from each client address, with Burst requests allowed
+	// together (the rate rounded up when Burst is 0).
+	RequestsPerSecond float64 `yaml:"requestsPerSecond"`
+	Burst             int     `yaml:"burst"`
 }
 
 // Templating configures response templating (P3).
@@ -422,6 +438,8 @@ func (c *Config) Validate() error {
 		return errors.New("sessions.urlBased.pathPrefix other than /d is not supported yet")
 	case c.Storage.Journal.Hot.MaxBodyBytes < 0 || c.Storage.Journal.Hot.MaxBytes < 0:
 		return errors.New("storage.journal.hot.maxBodyBytes and maxBytes must not be negative")
+	case c.Limits.negative():
+		return errors.New("limits must not be negative; use 0 for no limit")
 	case c.Tracing.SampleRatio < 0 || c.Tracing.SampleRatio > 1:
 		return errors.New("tracing.sampleRatio must be between 0 and 1")
 	case c.Tracing.Endpoint != "" && !strings.HasPrefix(c.Tracing.Endpoint, "http://") && !strings.HasPrefix(c.Tracing.Endpoint, "https://"):
@@ -432,4 +450,10 @@ func (c *Config) Validate() error {
 		return errors.New("storage.journal.hot.maxEntries must not be negative")
 	}
 	return nil
+}
+
+// negative reports whether any limit is below zero.
+func (l Limits) negative() bool {
+	return l.MaxBodyBytes < 0 || l.MaxSessions < 0 || l.MaxMappings < 0 || l.MaxMappingsPerSession < 0 ||
+		time.Duration(l.MaxDelay) < 0 || l.MaxConnections < 0 || l.RequestsPerSecond < 0 || l.Burst < 0
 }
