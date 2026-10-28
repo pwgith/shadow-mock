@@ -52,23 +52,24 @@ func plain(v any) any {
 	}
 }
 
-// formatJSON implements {{formatJson doc format='pretty'|'compact'}}; pretty is the default.
+// formatJSON implements {{formatJson doc format='pretty'|'compact'}}; pretty is the default and
+// matches WireMock's layout. The key order of JSON text is kept.
 func formatJSON(doc any, o *raymond.Options) any {
-	var v any
-	if err := json.Unmarshal([]byte(text(plainText(doc))), &v); err != nil {
-		v = plain(doc)
+	src := text(plainText(doc))
+	if src == "" {
+		src = string(mustJSON(doc))
 	}
+	var out string
+	var err error
 	if o.HashStr("format") == "compact" {
-		return safe(string(mustJSON(v)))
+		out, err = compactJSON(src)
+	} else {
+		out, err = prettyJSON(src)
 	}
-	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
-		fail("formatJson: %v", err)
+	if err != nil {
+		fail("formatJson: the input is not valid JSON: %v", err)
 	}
-	return safe(string(bytes.TrimRight(b.Bytes(), "\n")))
+	return safe(out)
 }
 
 // plainText returns v if it is JSON text, else nil so callers fall back to the value itself.

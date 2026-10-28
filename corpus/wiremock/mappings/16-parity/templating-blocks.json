@@ -1,0 +1,224 @@
+{
+  "mappings": [
+    {
+      "id": "c0180002-0018-4000-8000-000000000001",
+      "name": "templating: assign-block",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/assign-block"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{#assign 'who'}}{{capitalize request.query.name}}{{/assign}}hello {{who}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180002-0018-4000-8000-000000000002",
+      "name": "templating: parsejson-block",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/parsejson-block"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{#parseJson 'order'}}{\"id\":7,\"items\":[{\"sku\":\"A\"}]}{{/parseJson}}{{order.id}}-{{order.items.[0].sku}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180002-0018-4000-8000-000000000003",
+      "name": "templating: formatjson-block",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/formatjson-block"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{#formatJson}}{\"a\":true,\"b\":{\"c\":[1,2,{\"d\":null}]},\"e\":[]}{{/formatJson}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180002-0018-4000-8000-000000000004",
+      "name": "templating: formatjson-compact",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/formatjson-compact"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{#formatJson format='compact'}} { \"a\" : 1, \"b\" : [ 1, 2 ] } {{/formatJson}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180002-0018-4000-8000-000000000005",
+      "name": "templating: formatxml-block",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/formatxml-block"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{#formatXml}}<order id=\"7\"><line>1</line><empty/><!-- note --></order>{{/formatXml}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180002-0018-4000-8000-000000000006",
+      "name": "templating: json-array-add",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/json-array-add"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{#assign 'list'}}[{\"id\":1}]{{/assign}}{{#jsonArrayAdd list maxItems=2}}{\"id\":2}{{/jsonArrayAdd}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180002-0018-4000-8000-000000000007",
+      "name": "templating: json-merge",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/json-merge"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{#assign 'base'}}{\"a\":1,\"nested\":{\"x\":1}}{{/assign}}{{#jsonMerge base removeNulls=true}}{\"nested\":{\"y\":2},\"a\":null}{{/jsonMerge}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180002-0018-4000-8000-000000000008",
+      "name": "templating: val-assign",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/val-assign"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "[{{val request.query.tier.first or='basic' assign='tier'}}]{{#eq tier 'gold'}}GOLD{{else}}NOT-GOLD{{/eq}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180002-0018-4000-8000-000000000009",
+      "name": "templating: comparison-blocks",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/comparison-blocks"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{#lt 1 2}}lt{{/lt}} {{#and true false}}and{{else}}and-else{{/and}} {{#matches 'abc' 'a.c'}}matches{{/matches}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180002-0018-4000-8000-000000000010",
+      "name": "templating: trim-block",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/trim-block"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "[{{#trim}}   padded   {{/trim}}]",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    }
+  ]
+}

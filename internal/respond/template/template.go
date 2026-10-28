@@ -26,12 +26,15 @@ type Engine struct {
 	cache map[string]*compiled
 }
 
-// compiled is a parsed template. assigns is set when it uses the assigning helper forms, which
-// write to the render's data and so need a helper bound to that render.
+// compiled is a parsed template.
 type compiled struct {
-	tpl     *raymond.Template
-	assigns bool
+	tpl *raymond.Template
 }
+
+// varsKey names the private data every render carries: the map that assign, parseJson, val and
+// the other assigning forms write their variables to. It is the render's root context, so a
+// variable set anywhere in the template is read back as an ordinary name.
+const varsKey = "vars"
 
 // New returns an engine whose time helpers read c.
 func New(c clock.Clock) *Engine {
@@ -55,15 +58,9 @@ func (e *Engine) Render(src string, data map[string]any) (out string, err error)
 	if err != nil {
 		return "", err
 	}
-	t := c.tpl
-	if c.assigns {
-		t = t.Clone()
-		t.RegisterHelper("assign", func(name, v any, _ *raymond.Options) any {
-			data[text(name)] = Safe(v)
-			return raymond.SafeString("")
-		})
-	}
-	rendered, err := t.Exec(data)
+	frame := raymond.NewDataFrame()
+	frame.Set(varsKey, data)
+	rendered, err := c.tpl.ExecWith(data, frame)
 	if err != nil {
 		return "", fmt.Errorf("render template: %w", err)
 	}
@@ -78,7 +75,7 @@ func (e *Engine) compile(src string) (*compiled, error) {
 		return c, nil
 	}
 	main, inline := extractInline(src)
-	plain, assigns := rewrite(main)
+	plain := rewrite(main)
 	known := e.helperNames()
 	if err := checkHelpers(plain, known); err != nil {
 		return nil, err
@@ -89,11 +86,10 @@ func (e *Engine) compile(src string) (*compiled, error) {
 	}
 	t.RegisterHelpers(e.helpers())
 	for _, p := range inline {
-		body, a := rewrite(p.body)
+		body := rewrite(p.body)
 		if err := checkHelpers(body, known); err != nil {
 			return nil, fmt.Errorf("partial %q: %w", p.name, err)
 		}
-		assigns = assigns || a
 		pt, perr := raymond.Parse(body)
 		if perr != nil {
 			return nil, fmt.Errorf("parse partial %q: %w", p.name, perr)
@@ -101,7 +97,7 @@ func (e *Engine) compile(src string) (*compiled, error) {
 		pt.RegisterHelpers(e.helpers())
 		t.RegisterPartialTemplate(p.name, pt)
 	}
-	c = &compiled{tpl: t, assigns: assigns}
+	c = &compiled{tpl: t}
 	e.mu.Lock()
 	if len(e.cache) >= maxCached {
 		clear(e.cache)
@@ -182,7 +178,7 @@ func unmark(s string) string {
 
 // helperNames lists the helpers a template may call.
 func (e *Engine) helperNames() map[string]bool {
-	names := map[string]bool{"assign": true}
+	names := map[string]bool{}
 	for name := range e.helpers() {
 		names[name] = true
 	}

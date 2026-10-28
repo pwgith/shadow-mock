@@ -1,0 +1,165 @@
+[
+ {
+  "name": "assign block",
+  "tpl": "{{#assign 'x'}}hi{{/assign}}[{{x}}]",
+  "status": 200,
+  "want": "[hi]"
+ },
+ {
+  "name": "assign block keeps text as written",
+  "tpl": "{{#assign 'x'}} a {{/assign}}[{{x}}]",
+  "status": 200,
+  "want": "[a]"
+ },
+ {
+  "name": "assign block renders its body",
+  "tpl": "{{#assign 'x'}}{{capitalize 'term'}}{{/assign}}{{x}}",
+  "status": 200,
+  "want": "Term"
+ },
+ {
+  "name": "assign prints nothing",
+  "tpl": "[{{#assign 'x'}}hi{{/assign}}]",
+  "status": 200,
+  "want": "[]"
+ },
+ {
+  "name": "parseJson block with a name",
+  "tpl": "{{#parseJson 'o'}}{\"name\":\"n\"}{{/parseJson}}{{o.name}}",
+  "status": 200,
+  "want": "n"
+ },
+ {
+  "name": "parseJson as a value",
+  "tpl": "{{lookup (parseJson '{\"a\":1}') 'a'}}",
+  "status": 200,
+  "want": "1"
+ },
+ {
+  "name": "formatJson block",
+  "tpl": "{{#formatJson}}{\"foo\":true,\"bar\":{\"baz\":false},\"l\":[1,2,{\"a\":1}],\"e\":[],\"o\":{}}{{/formatJson}}",
+  "status": 200,
+  "want": "{\n  \"foo\" : true,\n  \"bar\" : {\n    \"baz\" : false\n  },\n  \"l\" : [ 1, 2, {\n    \"a\" : 1\n  } ],\n  \"e\" : [ ],\n  \"o\" : { }\n}"
+ },
+ {
+  "name": "formatJson block compact",
+  "tpl": "{{#formatJson format='compact'}} { \"foo\" : true, \"bar\" : { \"baz\" : false } } {{/formatJson}}",
+  "status": 200,
+  "want": "{\"foo\":true,\"bar\":{\"baz\":false}}"
+ },
+ {
+  "name": "formatXml block",
+  "tpl": "{{#formatXml}}<foo a=\"1\"><bar >wh</bar><e/><!-- c --><x><y>1</y></x></foo >{{/formatXml}}",
+  "status": 200,
+  "want": "<foo a=\"1\">\n  <bar>wh</bar>\n  <e/>\n  <!-- c -->\n  <x>\n    <y>1</y>\n  </x>\n</foo>\n"
+ },
+ {
+  "name": "formatXml block compact",
+  "tpl": "{{#formatXml format='compact'}} <foo> <bar>wh</bar> </foo> {{/formatXml}}",
+  "status": 200,
+  "want": "<foo><bar>wh</bar></foo>"
+ },
+ {
+  "name": "formatXml helper",
+  "tpl": "{{formatXml '<foo><bar>wh</bar></foo>'}}",
+  "status": 200,
+  "want": "<foo>\n  <bar>wh</bar>\n</foo>\n"
+ },
+ {
+  "name": "trim block",
+  "tpl": "[{{#trim}}  x  {{/trim}}]",
+  "status": 200,
+  "want": "[x]"
+ },
+ {
+  "name": "jsonArrayAdd inline with variables",
+  "tpl": "{{#assign 'a'}}[{\"id\":1}]{{/assign}}{{#assign 'i'}}{\"id\":2}{{/assign}}{{jsonArrayAdd a i}}",
+  "status": 200,
+  "want": "[{\"id\":1},{\"id\":2}]"
+ },
+ {
+  "name": "jsonArrayAdd block",
+  "tpl": "{{#assign 'a'}}[1]{{/assign}}{{#jsonArrayAdd a}}2{{/jsonArrayAdd}}",
+  "status": 200,
+  "want": "[1,2]"
+ },
+ {
+  "name": "jsonArrayAdd block defaults an empty array",
+  "tpl": "{{#jsonArrayAdd (val missing or='[]')}}{\"id\":321}{{/jsonArrayAdd}}",
+  "status": 200,
+  "want": "[{\"id\":321}]"
+ },
+ {
+  "name": "jsonArrayAdd maxItems",
+  "tpl": "{{#assign 'a'}}[1,2]{{/assign}}{{#jsonArrayAdd a maxItems=2}}3{{/jsonArrayAdd}}",
+  "status": 200,
+  "want": "[2,3]"
+ },
+ {
+  "name": "jsonArrayAdd adds an array as one item",
+  "tpl": "{{#assign 'a'}}[1]{{/assign}}{{#jsonArrayAdd a}}[2]{{/jsonArrayAdd}}",
+  "status": 200,
+  "want": "[1,[2]]"
+ },
+ {
+  "name": "jsonArrayAdd flatten",
+  "tpl": "{{#assign 'a'}}[1]{{/assign}}{{#jsonArrayAdd a flatten=true}}[2,3]{{/jsonArrayAdd}}",
+  "status": 200,
+  "want": "[1,2,3]"
+ },
+ {
+  "name": "jsonMerge block",
+  "tpl": "{{#assign 'o'}}{\"a\":1,\"b\":{\"c\":1}}{{/assign}}{{#jsonMerge o}}{\"b\":{\"d\":2}}{{/jsonMerge}}",
+  "status": 200,
+  "want": "{\"a\":1,\"b\":{\"c\":1,\"d\":2}}"
+ },
+ {
+  "name": "jsonMerge block removeNulls",
+  "tpl": "{{#assign 'o'}}{\"keepMe\":1,\"removeMe\":2}{{/assign}}{{#jsonMerge o removeNulls=true}}{\"removeMe\":null}{{/jsonMerge}}",
+  "status": 200,
+  "want": "{\"keepMe\":1}"
+ },
+ {
+  "name": "jsonRemove with a variable",
+  "tpl": "{{#assign 'o'}}{\"a\":1,\"b\":2}{{/assign}}{{jsonRemove o '$.a'}}",
+  "status": 200,
+  "want": "{\"b\":2}"
+ },
+ {
+  "name": "val assigns and prints nothing",
+  "tpl": "[{{val 10 assign='v'}}]{{#lt v 20}}Less{{else}}More{{/lt}}",
+  "status": 200,
+  "want": "[]Less"
+ },
+ {
+  "name": "val default assigned",
+  "tpl": "{{val missing or='dflt' assign='v'}}{{v}}",
+  "status": 200,
+  "want": "dflt"
+ },
+ {
+  "name": "contains block",
+  "tpl": "{{#contains 'abcde' 'abc'}}YES{{else}}NO{{/contains}} {{#contains (array 'a' 'b') 'z'}}YES{{else}}NO{{/contains}}",
+  "skip": "WireMock renders nothing for the else part of a contains block; Shadow Mock renders it",
+  "status": 200,
+  "want": "YES "
+ },
+ {
+  "name": "matches block",
+  "tpl": "{{#matches '123' '[0-9]+'}}YES{{/matches}}",
+  "status": 200,
+  "want": "YES"
+ },
+ {
+  "name": "comparison blocks",
+  "tpl": "{{#eq 'a' 'a'}}eq{{/eq}} {{#gt 3 2}}gt{{/gt}} {{#neq 1 1}}x{{else}}neq-else{{/neq}} {{#and true false}}x{{else}}and-else{{/and}} {{#or false true}}or{{/or}} {{#not false}}not{{/not}}",
+  "status": 200,
+  "want": "eq gt neq-else and-else or not"
+ },
+ {
+  "name": "assigned variable is read inside a block",
+  "tpl": "{{#assign 'v'}}z{{/assign}}{{#if v}}{{v}}{{/if}}",
+  "status": 200,
+  "want": "z"
+ }
+]

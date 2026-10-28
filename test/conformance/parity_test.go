@@ -39,5 +39,15 @@ func parityCases() []tc {
 		{want: "c018000117", call: j("/wm/parity/jsonunit/ignore-element", `{ "id": 1, "note": "anything" }`)},
 		{want: "c018000117", call: j("/wm/parity/jsonunit/ignore-element", `{ "id": 1 }`)},
 		{call: j("/wm/parity/jsonunit/ignore-element", `{ "id": 1, "extra": true }`)},
+		{want: "c018000201", call: get("/wm/parity/template/assign-block?name=ada")},
+		{want: "c018000202", call: get("/wm/parity/template/parsejson-block")},
+		{want: "c018000203", call: get("/wm/parity/template/formatjson-block")},
+		{want: "c018000204", call: get("/wm/parity/template/formatjson-compact")},
+		{want: "c018000205", call: get("/wm/parity/template/formatxml-block")},
+		{want: "c018000206", call: get("/wm/parity/template/json-array-add")},
+		{want: "c018000207", call: get("/wm/parity/template/json-merge")},
+		{want: "c018000208", call: get("/wm/parity/template/val-assign?tier=gold")},
+		{want: "c018000209", call: get("/wm/parity/template/comparison-blocks")},
+		{want: "c018000210", call: get("/wm/parity/template/trim-block")},
 	}
 }

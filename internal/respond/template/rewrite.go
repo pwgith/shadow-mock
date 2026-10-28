@@ -22,8 +22,15 @@ var (
 	quoted     = regexp.MustCompile(`'[^']*'|"[^"]*"`)
 	numericSeg = regexp.MustCompile(`([A-Za-z_\]])\.(\d+)\b`)
 
-	// {{#matches text regex}}…{{/matches}} is a block form of the matches helper; it becomes an if.
-	matchesOpen = regexp.MustCompile(`^\{\{#matches\s+(.+?)\s*\}\}$`)
+	// {{#eq a b}}…{{else}}…{{/eq}} and the other comparison helpers also work as blocks; each becomes
+	// an if over the same call.
+	condOpen  = regexp.MustCompile(`^\{\{#(eq|neq|gt|gte|lt|lte|and|or|not|contains|matches)\s+(.+?)\s*\}\}$`)
+	condClose = regexp.MustCompile(`^\{\{/(eq|neq|gt|gte|lt|lte|and|or|not|contains|matches)\}\}$`)
+
+	// Helpers that take the text between their tags as input are separate helpers, because raymond
+	// fixes a helper's number of parameters: {{#assign 'x'}}…{{/assign}} is assignBlock.
+	blockOpen  = regexp.MustCompile(`^\{\{#(assign|parseJson|formatJson|formatXml|trim|jsonArrayAdd|jsonMerge)((?:\s.*)?)\}\}$`)
+	blockClose = regexp.MustCompile(`^\{\{/(assign|parseJson|formatJson|formatXml|trim|jsonArrayAdd|jsonMerge)\}\}$`)
 
 	// {{formData body 'name' urlDecode=true}} assigns the fields of a url-encoded form.
 	assignForm = regexp.MustCompile(`^\{\{\s*formData\s+(` + argument + `)\s+'(\w+)'(?:\s+urlDecode=(true|false))?\s*\}\}$`)
@@ -32,10 +39,9 @@ var (
 	assignRegex = regexp.MustCompile(`^\{\{\s*regexExtract\s+(` + argument + `)\s+(` + argument + `)\s+'(\w+)'\s*\}\}$`)
 )
 
-// rewrite returns src in plain Handlebars, and whether it assigns variables.
-func rewrite(src string) (string, bool) {
-	assigns := false
-	out := mustache.ReplaceAllStringFunc(src, func(m string) string {
+// rewrite returns src in plain Handlebars.
+func rewrite(src string) string {
+	return mustache.ReplaceAllStringFunc(src, func(m string) string {
 		// {{x}}} is the tag {{x}} followed by a literal brace, as in {"a": {{x}}}. raymond reads three
 		// braces as the end of an unescaped tag and fails, so each literal brace becomes a tag of its own.
 		core := tagCore
@@ -48,27 +54,38 @@ func rewrite(src string) (string, bool) {
 			m = c
 		}
 		switch {
-		case matchesOpen.MatchString(m):
-			return matchesOpen.ReplaceAllString(m, "{{#if (matches $1)}}") + tail
-		case m == "{{/matches}}":
+		case condOpen.MatchString(m):
+			return condOpen.ReplaceAllString(m, "{{#if ($1 $2)}}") + tail
+		case condClose.MatchString(m):
 			return "{{/if}}" + tail
+		case blockOpen.MatchString(m):
+			return blockForm(m) + tail
+		case blockClose.MatchString(m):
+			return blockClose.ReplaceAllString(m, "{{/${1}Block}}") + tail
 		case assignForm.MatchString(m):
-			assigns = true
 			decode := "false"
 			if sub := assignForm.FindStringSubmatch(m); sub[3] == "true" {
 				decode = "true"
 			}
 			return assignForm.ReplaceAllString(m, "{{assign '$2' (formFields $1 "+decode+")}}") + tail
 		case assignParse.MatchString(m):
-			assigns = true
 			return assignParse.ReplaceAllString(m, "{{assign '$2' (parseJson $1)}}") + tail
 		case assignRegex.MatchString(m):
-			assigns = true
 			return assignRegex.ReplaceAllString(m, "{{assign '$3' (regexGroups $1 $2)}}") + tail
 		}
 		return indexSegments(m) + tail
 	})
-	return out, assigns
+}
+
+// blockForm renames an opening block tag to its Block helper. A parseJson block with no name gets an
+// empty one, so that helper always has the same number of parameters.
+func blockForm(tag string) string {
+	sub := blockOpen.FindStringSubmatch(tag)
+	name, args := sub[1], strings.TrimSpace(sub[2])
+	if name == "parseJson" && !strings.HasPrefix(args, "'") && !strings.HasPrefix(args, "\"") {
+		args = "'' " + args
+	}
+	return "{{#" + name + "Block " + strings.TrimSpace(indexSegments(args)) + "}}"
 }
 
 // indexSegments turns .0 into .[0] outside string literals.

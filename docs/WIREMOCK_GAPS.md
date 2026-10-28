@@ -40,7 +40,7 @@ Also: JsonUnit's `${json-unit.ignore-element}` in `equalToJson` does not match i
 
 ## 3. Response templating (verified)
 
-### Block forms that return nothing or an error
+### Block forms that return nothing or an error (closed by workstream 2, FR-10.3)
 
 `{{#assign 'x'}}...{{/assign}}` assigns nothing, so every example that builds on it (`jsonArrayAdd`,
 `jsonMerge`, `jsonRemove`, `jsonSort`, `formatJson`) breaks. Also broken: `{{#parseJson 'x'}}...{{/parseJson}}`,
