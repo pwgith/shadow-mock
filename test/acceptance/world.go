@@ -132,6 +132,7 @@ type world struct {
 	matchers       []extension.RequestMatcher
 	sendErr        error  // the last request failed on the wire
 	scrape         string // the last metrics scrape
+	adminToken     string // sent as a bearer token on admin calls and scrapes, when not empty
 	sessionNumbers map[string][]int
 
 	createdSession map[string]any

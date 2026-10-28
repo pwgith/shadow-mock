@@ -123,6 +123,9 @@ func (w *world) adminCall(method, path, body string, header http.Header) (*reply
 			r.header.Set("Content-Type", "application/json")
 		}
 	}
+	if w.adminToken != "" && header.Get("Authorization") == "" {
+		r.header.Set("Authorization", "Bearer "+w.adminToken)
+	}
 	for k, vs := range header {
 		for _, v := range vs {
 			r.header.Add(k, v)

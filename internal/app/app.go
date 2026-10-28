@@ -162,19 +162,32 @@ func (a *App) routers(cfg config.Config, o Options) error {
 	if err != nil {
 		return fmt.Errorf("server.clientIp.trustedProxies: %w", err)
 	}
-	adminAPI := admin.New(a.svc, auth.NoopAuthenticator{}, auth.RoleAuthorizer{DenyGlobalWrites: cfg.Admin.GlobalWrites == "deny"},
+	var authn auth.Authenticator = auth.NoopAuthenticator{}
+	var guard auth.Authenticator // set when the admin API and the metrics need a token
+	if cfg.Auth.Driver == "token" {
+		tokens := make([]auth.Token, len(cfg.Auth.Tokens))
+		for i, t := range cfg.Auth.Tokens {
+			tokens[i] = auth.Token{Name: t.Name, Role: auth.Role(t.Role), Hash: t.Hash}
+		}
+		authn = auth.NewTokenAuthenticator(tokens)
+		guard = authn
+	}
+	adminAPI := admin.New(a.svc, authn, auth.RoleAuthorizer{DenyGlobalWrites: cfg.Admin.GlobalWrites == "deny"},
 		admin.Config{Version: o.Version, PublicBaseURL: cfg.Server.PublicBaseURL, MaxBodyBytes: cfg.Limits.MaxBodyBytes, Shutdown: o.Shutdown}, o.Logger)
 	route := server.Router{
-		Directory:   tenant.NewStatic(&tenant.Org{ID: tenant.Local, Handle: string(tenant.Local), Allowlist: allow}),
-		LocalOrg:    string(tenant.Local),
-		AdminPrefix: cfg.AdminPrefix,
-		Admin:       adminAPI,
-		Service:     a.svc,
-		Stats:       a.svc.Stats,
-		ClientIP:    server.ClientIP{Header: cfg.Server.ClientIP.Header, TrustedHops: cfg.Server.ClientIP.TrustedHops, TrustedProxies: proxies},
-		ServeMock:   true,
-		ServeAdmin:  cfg.Listen.Admin == "",
-		Metrics:     a.metrics.Handler(),
+		Directory:    tenant.NewStatic(&tenant.Org{ID: tenant.Local, Handle: string(tenant.Local), Allowlist: allow, AllowlistAdmin: cfg.Tenancy.Local.AllowlistAdmin}),
+		LocalOrg:     string(tenant.Local),
+		AdminPrefix:  cfg.AdminPrefix,
+		Admin:        adminAPI,
+		Service:      a.svc,
+		Stats:        a.svc.Stats,
+		ClientIP:     server.ClientIP{Header: cfg.Server.ClientIP.Header, TrustedHops: cfg.Server.ClientIP.TrustedHops, TrustedProxies: proxies},
+		ServeMock:    true,
+		ServeAdmin:   cfg.Listen.Admin == "",
+		Metrics:      a.metrics.Handler(),
+		MetricsAuth:  guard,
+		AdminHosts:   cfg.Admin.AllowedHosts,
+		AdminOrigins: cfg.Admin.AllowedOrigins,
 	}
 	a.mockRoute = &route
 	if cfg.Listen.Admin != "" {

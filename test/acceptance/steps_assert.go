@@ -166,6 +166,16 @@ func (w *world) initResponseAsserts(sc *godog.ScenarioContext) {
 		}
 		return nil
 	})
+	sc.Step(`^the response header "([^"]*)" contains "([^"]*)"$`, func(name, part string) error {
+		r, err := w.needLast()
+		if err != nil {
+			return err
+		}
+		if got := r.header.Get(name); !strings.Contains(got, part) {
+			return fmt.Errorf("header %s = %q, want it to contain %q", name, got, part)
+		}
+		return nil
+	})
 	sc.Step(`^the response header "([^"]*)" is absent$`, func(name string) error {
 		r, err := w.needLast()
 		if err != nil {

@@ -63,6 +63,12 @@ func newLogger(c config.Log) *slog.Logger {
 func serve(cfg config.Config, logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	for _, w := range cfg.Warnings() {
+		logger.WarnContext(ctx, "configuration", "warning", w)
+	}
+	if cfg.Auth.Driver == "token" {
+		logger.InfoContext(ctx, "admin authentication is on", "tokens", len(cfg.Auth.Tokens), "mode", cfg.Mode)
+	}
 	a, err := app.New(cfg, app.Options{Logger: logger, Clock: clock.Real{}, Shutdown: stop, Version: version})
 	if err != nil {
 		return err
