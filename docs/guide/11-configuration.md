@@ -82,6 +82,7 @@ respond:
 
 templating:
   global: false               # template every response
+  permittedSystemKeys: []     # environment variables the systemValue helper may read
 
 egress:
   blockPrivate: false         # refuse proxy and webhook calls to private addresses

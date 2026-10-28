@@ -110,18 +110,30 @@ func formatTime(t time.Time, format string) string {
 	}
 }
 
-// parseTime parses text with a Java pattern, falling back to RFC 3339.
+// parseTime parses text with a Java pattern, or with unix (seconds) or epoch (milliseconds). Without
+// a format it reads ISO 8601, then the RFC 1123 and asctime forms of HTTP dates.
 func parseTime(text, format string) (time.Time, error) {
-	if format != "" {
-		t, err := time.Parse(javaLayout(format), text)
-		if err != nil {
-			return time.Time{}, fmt.Errorf("parse date %q with %q: %w", text, format, err)
+	switch format {
+	case "":
+		for _, layout := range []string{time.RFC3339Nano, time.RFC1123, time.RFC1123Z, time.ANSIC} {
+			if t, err := time.Parse(layout, text); err == nil {
+				return t, nil
+			}
 		}
-		return t, nil
+		return time.Time{}, fmt.Errorf("parse date %q: not an ISO 8601, RFC 1123 or asctime date", text)
+	case "unix", "epoch":
+		n, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("parse date %q as %s: %w", text, format, err)
+		}
+		if format == "unix" {
+			return time.Unix(n, 0).UTC(), nil
+		}
+		return time.UnixMilli(n).UTC(), nil
 	}
-	t, err := time.Parse(time.RFC3339Nano, text)
+	t, err := time.Parse(javaLayout(format), text)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("parse date %q: %w", text, err)
+		return time.Time{}, fmt.Errorf("parse date %q with %q: %w", text, format, err)
 	}
 	return t, nil
 }
@@ -172,49 +184,47 @@ func zone(name string) (*time.Location, error) {
 	return loc, nil
 }
 
-// truncate implements WireMock's truncateDate specs, such as "first day of month" (the start
-// of the month) and "last day of month" (the start of the month's last day).
-func truncate(t time.Time, spec string) (time.Time, error) {
-	f := strings.Fields(spec)
-	if len(f) != 4 || f[2] != "of" || (f[0] != "first" && f[0] != "last") {
-		return t, fmt.Errorf("cannot truncate to %q; use for example \"first day of month\"", spec)
+// truncations returns the specs WireMock's truncateDate accepts, in lower case. The "last" ones give
+// the start of the last day.
+func truncations() map[string]func(time.Time) time.Time {
+	return map[string]func(time.Time) time.Time{
+		"first second of minute": func(t time.Time) time.Time { return t.Truncate(time.Minute) },
+		"first minute of hour":   func(t time.Time) time.Time { return t.Truncate(time.Hour) },
+		"first hour of day":      startOfDay,
+		"first day of month":     startOfMonth,
+		"first day of next month": func(t time.Time) time.Time {
+			return startOfMonth(t).AddDate(0, 1, 0)
+		},
+		"last day of month": func(t time.Time) time.Time {
+			return startOfMonth(t).AddDate(0, 1, -1)
+		},
+		"first day of year": startOfYear,
+		"first day of next year": func(t time.Time) time.Time {
+			return startOfYear(t).AddDate(1, 0, 0)
+		},
+		"last day of year": func(t time.Time) time.Time {
+			return startOfYear(t).AddDate(1, 0, -1)
+		},
 	}
-	unit, container := f[1], f[3]
-	start, err := floor(t, container)
-	if err != nil {
-		return t, err
-	}
-	if f[0] == "first" {
-		return floor(start, unit)
-	}
-	var next time.Time
-	switch container {
-	case "hour":
-		next = start.Add(time.Hour)
-	case "day":
-		next = start.AddDate(0, 0, 1)
-	case "month":
-		next = start.AddDate(0, 1, 0)
-	default: // year
-		next = start.AddDate(1, 0, 0)
-	}
-	return floor(next.Add(-time.Nanosecond), unit)
 }
 
-// floor rounds t down to the start of a unit.
-func floor(t time.Time, unit string) (time.Time, error) {
-	switch unit {
-	case "minute":
-		return t.Truncate(time.Minute), nil
-	case "hour":
-		return t.Truncate(time.Hour), nil
-	case "day":
-		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location()), nil
-	case "month":
-		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location()), nil
-	case "year":
-		return time.Date(t.Year(), time.January, 1, 0, 0, 0, 0, t.Location()), nil
-	default:
-		return t, fmt.Errorf("unknown time unit %q", unit)
+func startOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+func startOfMonth(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
+}
+
+func startOfYear(t time.Time) time.Time {
+	return time.Date(t.Year(), time.January, 1, 0, 0, 0, 0, t.Location())
+}
+
+// truncate implements truncateDate: spec is one of the keys of truncations(), in any case.
+func truncate(t time.Time, spec string) (time.Time, error) {
+	f, ok := truncations()[strings.ToLower(strings.Join(strings.Fields(spec), " "))]
+	if !ok {
+		return t, fmt.Errorf("cannot truncate to %q; use for example \"first day of month\"", spec)
 	}
+	return f(t), nil
 }

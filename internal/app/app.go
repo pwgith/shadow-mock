@@ -127,6 +127,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	a.metrics = mx
 	renderer := respond.NewRenderer(files, o.Clock, cfg.Respond.Gzip != "off")
 	renderer.Templating = cfg.Templating.Global
+	renderer.Templates.PermitSystemKeys(cfg.Templating.PermittedSystemKeys)
 	renderer.MaxDelay = time.Duration(cfg.Limits.MaxDelay)
 	client := egress.New(egress.Options{BlockPrivate: cfg.Egress.BlockPrivate})
 	hooks := webhook.New(client, renderer.Templates, o.Clock, o.Logger)

@@ -162,7 +162,7 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 		}
 	}
 	sv.entry.Definition = def
-	in := &respond.Input{Request: req, PathParams: res.Stub.Matcher.PathParams(req), CallNumber: callNumber}
+	in := &respond.Input{ID: sv.entry.ID, Request: req, PathParams: res.Stub.Matcher.PathParams(req), CallNumber: callNumber}
 	if def.ProxyBaseURL != "" {
 		s.forward(ctx, w, r, req, def, in, nil, sv)
 		return

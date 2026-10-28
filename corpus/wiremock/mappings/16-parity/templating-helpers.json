@@ -1,0 +1,246 @@
+{
+  "mappings": [
+    {
+      "id": "c0180003-0018-4000-8000-000000000001",
+      "name": "templating: number-format",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/number-format"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{numberFormat 1234.5678}}|{{numberFormat 0.256 'percent'}}|{{numberFormat 12.5 '$#,##0.00'}}|{{numberFormat 1234.5 'currency' 'de_DE'}}|{{numberFormat 1234567.891 groupingUsed=false}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000002",
+      "name": "templating: string-helpers",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/string-helpers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{abbreviate 'Handlebars is great' 10}}|{{center 'ab' size=6}}|{{ljust 'ab' size=5 pad='.'}}|{{slugify 'Hello World, It is Me!'}}|{{capitalizeFirst 'hello world'}}|{{wordWrap 'aaa bbb ccc ddd eee' 8}}|{{stripTags '<b>x</b>'}}|{{stringFormat 'Hi %s %05d' 'Bob' 42}}|{{yesno true}}|{{cut 'a-b' '-'}}|{{defaultIfEmpty '' 'd'}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000003",
+      "name": "templating: small-helpers",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/small-helpers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{isOdd 3}}-{{isEven 3}}|{{stripes 3 'o' 'e'}}{{stripes 4 'o' 'e'}}|{{systemValue type='ENVIRONMENT' key='PATH'}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000004",
+      "name": "templating: list-rendering",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/list-rendering"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{array 1 'a'}}|{{range 1 4}}|{{arrayAdd (array 1 2) 9 position='start'}}|{{arrayRemove (array 1 2 3)}}|{{arrayJoin ',' (array 1 2) prefix='[' suffix=']'}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000005",
+      "name": "templating: math",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/math"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{math 7 '/' 2}}|{{math 7.5 '/' 2}}|{{math 1 '/' 3}}|{{math 0.1 '+' 0.2}}|{{math 7 '%' 3}}|{{math 3 '*' 2.5}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000006",
+      "name": "templating: jsonpath-values",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/template/jsonpath-values"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{jsonPath request.body '$.items[*].id'}}|{{jsonPath request.body '$.o'}}|{{jsonPath request.body '$.s'}}|[{{jsonPath request.body '$.zz'}}]",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000007",
+      "name": "templating: xpath-values",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/template/xpath-values"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{xPath request.body '/a/b'}}|{{xPath request.body '/a/b/text()'}}|{{xPath request.body 'count(/a/b)'}}|{{xPath request.body '/a/b/@x'}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000008",
+      "name": "templating: url-encode",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/url-encode"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{urlEncode 'a b&c'}}|{{urlEncode 'a%20b' decode=true}}|{{urlEncode 'a~b*'}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000009",
+      "name": "templating: dates",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPath": "/wm/parity/template/dates"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{date (parseDate 'Tue, 15 Nov 1994 08:12:31 GMT') format='yyyy-MM-dd HH:mm:ss' timezone='UTC'}}|{{date (parseDate 'Tue Nov 15 08:12:31 1994') format='yyyy-MM-dd' timezone='UTC'}}|{{truncateDate (parseDate '2020-03-04T05:06:07Z') 'first day of next month'}}|{{truncateDate (parseDate '2020-03-04T05:06:07Z') 'last day of year'}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000010",
+      "name": "templating: request-model",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/wm/parity/template/request-model/.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{request.path.[1]}}|{{request.path.2}}|{{request.requestLine.method}}|{{request.requestLine.path}}|{{request.query.x.[last]}}|{{lookup request.query 'ids[].1'}}|{{size request.query.x}}|{{request.query.x}}|{{#if (matches request.id '[0-9a-f-]{36}')}}uuid{{/if}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "id": "c0180003-0018-4000-8000-000000000011",
+      "name": "templating: multipart",
+      "metadata": {
+        "corpus": "parity",
+        "feature": "templating"
+      },
+      "request": {
+        "method": "POST",
+        "urlPath": "/wm/parity/template/multipart"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{request.multipart}}|{{request.parts.f.body}}|{{request.parts.f.bodyAsBase64}}|{{request.parts.f.headers.Content-Type}}|{{request.parts.f.binary}}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package respond
 import (
 	"encoding/base64"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"slices"
@@ -22,6 +23,8 @@ const ResponseTemplate = "response-template"
 // Input is what templates may read about the request being answered. A nil Input means
 // the response is not templated.
 type Input struct {
+	// ID identifies the request in the journal; request.id shows it. A new one is made when empty.
+	ID         string
 	Request    *match.Request
 	PathParams map[string]string
 	// CallNumber is the stub's call number for this request scope, or 0 when it has none.
@@ -60,12 +63,25 @@ func (m multiValue) Plain() any {
 	return out
 }
 
-// pathValue is request.path: it prints as the path and, for a urlPathTemplate, also exposes
-// the path parameters as fields. The path is held under the empty key.
+// pathValue is request.path: it prints as the path, exposes the segments as fields 0, 1 and so on,
+// and, for a urlPathTemplate, the path parameters too. The path is held under the empty key.
 type pathValue map[string]any
 
 // String implements fmt.Stringer.
 func (p pathValue) String() string { return template.Mark(fmt.Sprint(p[""])) }
+
+// Plain implements the engine's hook for JSON output.
+func (p pathValue) Plain() any { return fmt.Sprint(p[""]) }
+
+// requestLine is request.requestLine: it prints as the request line, and has the fields of the
+// request that WireMock's request line has.
+type requestLine map[string]any
+
+// String implements fmt.Stringer.
+func (l requestLine) String() string { return template.Mark(fmt.Sprint(l[""])) }
+
+// Plain implements the engine's hook for JSON output.
+func (l requestLine) Plain() any { return fmt.Sprint(l[""]) }
 
 // values returns the values of a header, query parameter or cookie. One value prints as itself and
 // can still be reached as .first, .last or .[0], as in WireMock.
@@ -119,13 +135,12 @@ func RequestModel(in *Input) map[string]any {
 			segments = append(segments, raymond.SafeString(unescape(s)))
 		}
 	}
-	var path any = raymond.SafeString(r.Path)
-	if len(in.PathParams) > 0 {
-		pv := pathValue{"": raymond.SafeString(r.Path)}
-		for k, v := range in.PathParams {
-			pv[k] = raymond.SafeString(v)
-		}
-		path = pv
+	pv := pathValue{"": raymond.SafeString(r.Path)}
+	for i, s := range segments {
+		pv[strconv.Itoa(i)] = s
+	}
+	for k, v := range in.PathParams {
+		pv[k] = raymond.SafeString(v)
 	}
 	host := r.Host
 	baseURL := r.Scheme + "://" + host
@@ -133,10 +148,16 @@ func RequestModel(in *Input) map[string]any {
 	if r.Port != 0 && !defaultPort {
 		baseURL += ":" + strconv.Itoa(r.Port)
 	}
-	return map[string]any{
+	id := in.ID
+	if id == "" {
+		id = template.UUID()
+	}
+	parts, isMultipart := r.Multipart()
+	rm := map[string]any{
+		"id":           raymond.SafeString(id),
 		"url":          raymond.SafeString(r.URL()),
 		"absoluteUrl":  raymond.SafeString(baseURL + r.URL()),
-		"path":         path,
+		"path":         pv,
 		"pathSegments": segments,
 		"method":       raymond.SafeString(r.Method),
 		"query":        query,
@@ -150,11 +171,58 @@ func RequestModel(in *Input) map[string]any {
 		"baseUrl":      raymond.SafeString(baseURL),
 		"clientIp":     raymond.SafeString(r.ClientIP),
 		"callNumber":   in.CallNumber,
-		"requestLine":  raymond.SafeString(r.Method + " " + r.URL() + " HTTP/1.1"),
 		"queryString":  raymond.SafeString(r.RawQuery),
 		"contentType":  raymond.SafeString(r.Header.Get("Content-Type")),
 		"hasBody":      len(r.Body) > 0,
+		"multipart":    isMultipart,
+		"parts":        multipartParts(parts),
 	}
+	line := requestLine{"": raymond.SafeString(r.Method + " " + r.URL() + " HTTP/1.1")}
+	for _, k := range []string{"method", "path", "url", "host", "port", "scheme", "baseUrl", "query", "pathSegments"} {
+		line[k] = rm[k]
+	}
+	rm["requestLine"] = line
+	return rm
+}
+
+// multipartParts is request.parts: each part of a multipart body by its name, with its body, its
+// body as base64, whether it is binary, and its headers (the first part wins when names repeat).
+func multipartParts(parts []match.MultipartPart) map[string]any {
+	out := make(map[string]any, len(parts))
+	for _, p := range parts {
+		_, params, err := mime.ParseMediaType(p.Header.Get("Content-Disposition"))
+		name := params["name"]
+		if _, dup := out[name]; err != nil || dup {
+			continue
+		}
+		headers := make(template.Headers, 2*len(p.Header))
+		for k, vs := range p.Header {
+			headers[k] = values(vs)
+			headers[strings.ToLower(k)] = values(vs)
+		}
+		out[name] = map[string]any{
+			"name":         raymond.SafeString(name),
+			"body":         raymond.SafeString(string(p.Body)),
+			"bodyAsBase64": raymond.SafeString(base64.StdEncoding.EncodeToString(p.Body)),
+			"binary":       isBinaryType(p.Header.Get("Content-Type")),
+			"headers":      headers,
+		}
+	}
+	return out
+}
+
+// isBinaryType reports whether a part's content type is not text. A part with no type is binary.
+func isBinaryType(contentType string) bool {
+	mt, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return true
+	}
+	for _, text := range []string{"text/", "json", "xml", "javascript", "yaml", "x-www-form-urlencoded"} {
+		if strings.HasPrefix(mt, text) || !strings.HasSuffix(text, "/") && strings.Contains(mt, text) {
+			return false
+		}
+	}
+	return true
 }
 
 func unescape(s string) string {

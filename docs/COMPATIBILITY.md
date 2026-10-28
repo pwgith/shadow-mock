@@ -83,6 +83,19 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | `{{x}}}` (a tag followed by a closing brace, as in `{"a": {{x}}}`) | A syntax error. Write `{{x}} }` | Accepted |
 | A helper given a missing value, for example `{{capitalize request.query.name}}` with no `name` | A 500 (a `NullPointerException`) | Renders an empty string |
 | `eq`, `neq` and `contains` on request values, for example `(eq request.method 'GET')` or `(eq request.query.plan 'gold')` | False, because WireMock compares the request-model object with a string. Use `.first`, as in `request.query.plan.first` | True when the text is equal |
+| The `else` part of `{{#isOdd}}` and `{{#isEven}}` blocks | Not rendered | Rendered, as for every other block helper |
+| A decimal written with a zero fraction in the template, such as `7.0` outside `math` | Keeps the zero (`1.0` in a list) | Prints as a whole number (`1`) |
+| Numbers read from JSON | Whole numbers and decimals are kept apart, so `2.0` prints as `2.0` | JSON numbers are doubles, so `2.0` prints as `2` |
+| `dateFormat` styles `full`, `long`, `medium`, `short` | The host's locale | US English |
+| `parseDate` of text it cannot read | The current time, or nothing | The response fails |
+| `unix` and `epoch` dates, and dates with an offset, passed to `date` with `timezone=` | Printed in the host's zone, or as written | Converted to the zone asked for |
+| `numberFormat` locales | All of the JDK's | The common ones: en, de, fr, es, it, nl, pt_BR, ja, ko, zh, sv, ru, pl and some regions. Others use English |
+| `systemValue type='PROPERTY'` | Reads a Java system property | Prints nothing, because there are none; `ENVIRONMENT` works |
+| Negative indexes such as `request.query.x.[-1]` | One before the last value | Not supported; use `[last]` |
+| A multipart body with two parts of the same name | The response fails | The first part is read |
+| `{{#each request.path}}` | Lists the segments | Also lists the path itself, first |
+| `stringFormat '%.1f' 5` | Fails (an int is not a double) | Prints `5.0` |
+| A string literal that spans lines | Allowed | Not allowed |
 | The `else` part of `{{#contains}}…{{else}}…{{/contains}}` | Not rendered | Rendered, as for every other block helper |
 | `this.size` (or another name that is also a Java `Map` property) on an object | The number of entries in the object | The field named `size`, if there is one |
 

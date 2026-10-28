@@ -30,8 +30,8 @@ func moreHelpers() map[string]any {
 // pickRandom implements {{pickRandom 'a' 'b' 'c'}} and {{pickRandom (array 'a' 'b')}}.
 func pickRandom(items ...any) any {
 	if len(items) == 1 {
-		if list, ok := items[0].([]any); ok {
-			items = list
+		if l, ok := plain(items[0]).([]any); ok {
+			items = l
 		}
 	}
 	if len(items) == 0 {

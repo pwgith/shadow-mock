@@ -1,8 +1,13 @@
 package template
 
 import (
+	"fmt"
+	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
+
+	"github.com/mailgun/raymond/v2"
 )
 
 // WireMock templates use forms raymond does not parse: numeric path segments
@@ -24,8 +29,8 @@ var (
 
 	// {{#eq a b}}…{{else}}…{{/eq}} and the other comparison helpers also work as blocks; each becomes
 	// an if over the same call.
-	condOpen  = regexp.MustCompile(`^\{\{#(eq|neq|gt|gte|lt|lte|and|or|not|contains|matches)\s+(.+?)\s*\}\}$`)
-	condClose = regexp.MustCompile(`^\{\{/(eq|neq|gt|gte|lt|lte|and|or|not|contains|matches)\}\}$`)
+	condOpen  = regexp.MustCompile(`^\{\{#(eq|neq|gt|gte|lt|lte|and|or|not|contains|matches|isOdd|isEven)\s+(.+?)\s*\}\}$`)
+	condClose = regexp.MustCompile(`^\{\{/(eq|neq|gt|gte|lt|lte|and|or|not|contains|matches|isOdd|isEven)\}\}$`)
 
 	// Helpers that take the text between their tags as input are separate helpers, because raymond
 	// fixes a helper's number of parameters: {{#assign 'x'}}…{{/assign}} is assignBlock.
@@ -40,7 +45,7 @@ var (
 )
 
 // rewrite returns src in plain Handlebars.
-func rewrite(src string) string {
+func rewrite(src string, known map[string]bool) string {
 	return mustache.ReplaceAllStringFunc(src, func(m string) string {
 		// {{x}}} is the tag {{x}} followed by a literal brace, as in {"a": {{x}}}. raymond reads three
 		// braces as the end of an unescaped tag and fails, so each literal brace becomes a tag of its own.
@@ -73,7 +78,7 @@ func rewrite(src string) string {
 		case assignRegex.MatchString(m):
 			return assignRegex.ReplaceAllString(m, "{{assign '$3' (regexGroups $1 $2)}}") + tail
 		}
-		return indexSegments(m) + tail
+		return wrapPrint(adaptTag(mathFloats(indexSegments(m))), known) + tail
 	})
 }
 
@@ -122,4 +127,189 @@ func extractInline(src string) (string, []partial) {
 		return ""
 	})
 	return main, found
+}
+
+var (
+	mathCall   = regexp.MustCompile(`(?:\{\{\s*|\()math\s`)
+	decimalLit = regexp.MustCompile(`-?\d+\.\d+`)
+)
+
+// mathFloats quotes the decimal numbers written in a math call. raymond reads 1.0 as the whole
+// number 1, and math needs to know the number has a fraction: WireMock's 1.0 / 4 is 0.3 and its
+// 1 / 4 is 0. The quoted number is written as Java would print the double, so 2.50 becomes 2.5.
+func mathFloats(m string) string {
+	if !mathCall.MatchString(m) {
+		return m
+	}
+	var b strings.Builder
+	last := 0
+	for _, loc := range decimalLit.FindAllStringIndex(m, -1) {
+		if !numberBoundary(m, loc[0]-1) || !numberBoundary(m, loc[1]) || insideQuotes(m, loc[0]) {
+			continue
+		}
+		f, err := strconv.ParseFloat(m[loc[0]:loc[1]], 64)
+		if err != nil {
+			continue
+		}
+		lit := strconv.FormatFloat(f, 'f', -1, 64)
+		if !strings.Contains(lit, ".") {
+			lit += ".0"
+		}
+		b.WriteString(m[last:loc[0]] + "'" + lit + "'")
+		last = loc[1]
+	}
+	b.WriteString(m[last:])
+	return b.String()
+}
+
+// numberBoundary reports whether the character at i (or the start or end of the tag) separates a
+// number from its neighbours.
+func numberBoundary(m string, i int) bool {
+	if i < 0 || i >= len(m) {
+		return true
+	}
+	return strings.ContainsRune(" (){}", rune(m[i]))
+}
+
+func insideQuotes(m string, at int) bool {
+	for _, loc := range quoted.FindAllStringIndex(m, -1) {
+		if at >= loc[0] && at < loc[1] {
+			return true
+		}
+	}
+	return false
+}
+
+var (
+	outputTag = regexp.MustCompile(`^\{\{(~?)\s*([^#/>!^&*{}~\s'"][^{}]*?)\s*(~?)\}\}$`)
+	bracketed = regexp.MustCompile(`\[[^\]]*\]|'[^']*'|"[^"]*"`)
+)
+
+// printValue is what every plain output tag passes its value through. raymond prints a list by
+// printing each item in turn, ignoring its String method, so a list is turned into its text here:
+// [1, 2] for a list from array, and the first value for a request value that occurs more than once.
+func printValue(v any, _ *raymond.Options) any {
+	if _, ok := v.(fmt.Stringer); ok && reflect.TypeOf(v).Kind() == reflect.Slice {
+		return safe(text(v))
+	}
+	return v
+}
+
+// wrapPrint passes the value of an output tag such as {{request.query.tag}} or {{jsonPath a b}} through
+// printValue. Tags that are blocks, partials, comments or the else keyword are left as they are.
+func wrapPrint(m string, known map[string]bool) string {
+	sub := outputTag.FindStringSubmatch(m)
+	if sub == nil {
+		return m
+	}
+	expr := sub[2]
+	head, _, _ := strings.Cut(expr, " ")
+	switch head {
+	case "else", "printValue", "closeBrace":
+		return m
+	}
+	if strings.ContainsAny(bracketed.ReplaceAllString(expr, ""), " \t\n\r") || known[expr] {
+		expr = "(" + expr + ")"
+	}
+	return "{{" + sub[1] + "printValue " + expr + sub[3] + "}}"
+}
+
+// A few helpers take optional parameters or options, and raymond fixes the number of parameters a
+// helper has, so the rewrite step picks the variant by how many parameters the call has, as
+// {{numberFormat 5 'integer'}} to numberFormat__2. WireMock ignores parameters a helper does not
+// use, so those are dropped: {{yesno flag 'Y' 'N'}} is {{yesno flag}}.
+type arity struct {
+	max      int            // parameters beyond this are dropped
+	variants map[int]string // the helper to call for a number of parameters
+}
+
+func arities() map[string]arity {
+	return map[string]arity{
+		"numberFormat": {3, map[int]string{0: "numberFormat__0", 1: "numberFormat__1", 2: "numberFormat__2", 3: "numberFormat__3"}},
+		"dateFormat":   {2, map[int]string{1: "dateFormat__1"}},
+		"yesno":        {1, nil},
+		"arrayRemove":  {1, nil},
+	}
+}
+
+var hashPair = regexp.MustCompile(`^[A-Za-z_]\w*=`)
+
+// adaptTag applies arities to the helper calls in one tag.
+func adaptTag(tag string) string {
+	inner := strings.TrimSuffix(strings.TrimPrefix(tag, "{{"), "}}")
+	lead := inner[:len(inner)-len(strings.TrimLeft(inner, "~#"))]
+	if strings.HasPrefix(inner, "{") || strings.HasPrefix(strings.TrimLeft(inner, "~"), "/") {
+		return tag
+	}
+	body := inner[len(lead):]
+	trail := body[len(strings.TrimRight(body, "~")):]
+	body = strings.TrimSuffix(body, trail)
+	return "{{" + lead + adaptCall(body) + trail + "}}"
+}
+
+// adaptCall rewrites one call, such as "numberFormat 5 'integer'", and the calls nested in it.
+func adaptCall(call string) string {
+	tokens := splitTop(call)
+	for i, t := range tokens {
+		if strings.HasPrefix(t, "(") && strings.HasSuffix(t, ")") {
+			tokens[i] = "(" + adaptCall(t[1:len(t)-1]) + ")"
+		}
+	}
+	if len(tokens) == 0 {
+		return call
+	}
+	a, ok := arities()[tokens[0]]
+	if !ok {
+		return strings.Join(tokens, " ")
+	}
+	var params, hash []string
+	for _, t := range tokens[1:] {
+		if hashPair.MatchString(t) {
+			hash = append(hash, t)
+		} else {
+			params = append(params, t)
+		}
+	}
+	params = params[:min(len(params), a.max)]
+	head := tokens[0]
+	if v, ok := a.variants[len(params)]; ok {
+		head = v
+	}
+	return strings.Join(append(append([]string{head}, params...), hash...), " ")
+}
+
+// splitTop splits a call at the white space that is outside quotes, brackets and parentheses.
+func splitTop(s string) []string {
+	var out []string
+	depth, start := 0, -1
+	var quote byte
+	flush := func(end int) {
+		if start >= 0 {
+			out = append(out, s[start:end])
+			start = -1
+		}
+	}
+	for i := range len(s) {
+		c := s[i]
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+		case c == '\'' || c == '"':
+			quote = c
+		case c == '(' || c == '[':
+			depth++
+		case c == ')' || c == ']':
+			depth--
+		case (c == ' ' || c == '\t' || c == '\n' || c == '\r') && depth == 0:
+			flush(i)
+			continue
+		}
+		if start < 0 {
+			start = i
+		}
+	}
+	flush(len(s))
+	return out
 }

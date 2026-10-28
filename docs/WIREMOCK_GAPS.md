@@ -47,13 +47,17 @@ Also: JsonUnit's `${json-unit.ignore-element}` in `equalToJson` does not match i
 `{{#formatJson}}`, `{{#formatXml}}`, `{{#contains a b}}Y{{/contains}}` (prints `true`), `{{#trim}}`,
 `{{val 10 assign='v'}}{{#lt v 20}}`, `{{jsonArrayAdd}}` and `{{jsonMerge}}` with an assigned variable.
 
-### Helpers that do not exist
+### Helpers that do not exist (closed by workstream 3, FR-10.4; `jsonSort` is 4.x only and stays out)
 
 `numberFormat`, `arrayRemove`, `isOdd`, `isEven`, `stripes`, `systemValue`, `formatXml`, and the string
 helpers `abbreviate`, `capitalizeFirst`, `center`, `cut`, `defaultIfEmpty`, `ljust`, `rjust`, `slugify`,
 `stringFormat`, `wordWrap`, `yesno`, `stripTags`, `dateFormat`. WireMock also ships `jsonSort` (4.x beta only).
 
-### Helpers that behave differently
+### Helpers that behave differently (closed by workstream 3, FR-10.5)
+
+The probe of WireMock 3.13.2 for workstream 3 corrected this table: `parseDate` does not read RFC 1036 dates and
+only some `truncateDate` names exist (the list is in the user guide), `math` divides at the scale of the first
+number (`6 / 4` is `2`, `7.0 / 2` is `3.5`), and negative indexes are off by one, so they are not copied.
 
 | Helper | Shadow Mock | WireMock |
 |---|---|---|
@@ -70,7 +74,7 @@ helpers `abbreviate`, `capitalizeFirst`, `center`, `cut`, `defaultIfEmpty`, `lju
 | `{{truncateDate x 'first day of next month'}}`, `'first second of minute'` | error | works |
 | `{{lookup request.query 'ids[].1'}}`, `request.query.x.[-1]` | empty, error | `222`, last value |
 
-### Request model
+### Request model (closed by workstream 3, FR-10.6)
 
 Missing: `request.id`, `request.path.N` (the path as segments), `request.requestLine.*`, and for multipart
 requests `request.multipart`, `request.parts.<name>.body`, `.bodyAsBase64`, `.binary`, `.headers.<key>`.
