@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -40,6 +41,12 @@ type env struct {
 // an engine over it. Delays complete instantly because the clock is fake.
 func start(t *testing.T, tree string) *env {
 	t.Helper()
+	return startWith(t, tree, nil)
+}
+
+// startWith is start with a change to the configuration.
+func startWith(t *testing.T, tree string, change func(*config.Config)) *env {
+	t.Helper()
 	root := t.TempDir()
 	if err := os.CopyFS(root, os.DirFS(filepath.Join(contract.RepoRoot(), "corpus", tree))); err != nil {
 		t.Fatalf("copy corpus/%s: %v", tree, err)
@@ -47,6 +54,9 @@ func start(t *testing.T, tree string) *env {
 	cfg := config.Default()
 	cfg.Root = root
 	cfg.Storage.Global.Watch = false
+	if change != nil {
+		change(&cfg)
+	}
 	clk := clock.NewFake(epoch)
 	a, err := app.New(cfg, app.Options{Logger: slog.New(slog.DiscardHandler), Clock: clk, Version: "conformance"})
 	if err != nil {
@@ -85,8 +95,10 @@ type call struct {
 // reply is what came back.
 type reply struct {
 	status int
-	header http.Header
-	body   []byte
+	// statusText is the reason phrase, as the client read it.
+	statusText string
+	header     http.Header
+	body       []byte
 }
 
 func (e *env) send(c call) (*reply, error) {
@@ -113,7 +125,7 @@ func (e *env) send(c call) (*reply, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read %s %s: %w", c.method, c.target, err)
 	}
-	return &reply{status: resp.StatusCode, header: resp.Header, body: b}, nil
+	return &reply{status: resp.StatusCode, statusText: strings.TrimPrefix(resp.Status, strconv.Itoa(resp.StatusCode)+" "), header: resp.Header, body: b}, nil
 }
 
 // mustSend sends and fails the test on a transport error.

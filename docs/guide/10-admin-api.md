@@ -143,7 +143,7 @@ Codes you may meet:
 | 409 | `token_in_use`, `recording_in_progress`, `ambiguous_session` |
 | 413 | `body_too_large` |
 | 422 | `validation_failed`, `scenarios_not_supported`, `ttl_must_be_positive`, `ttl_exceeds_maximum`, `token_too_short`, `parent_not_found` |
-| 502 | `bad_gateway`, `egress_blocked` on mock traffic |
+| 502 | `egress_blocked` on mock traffic |
 | 500 | `template_error` on mock traffic |
 
 Some codes in the OpenAPI file belong to the planned hosted service (authentication,

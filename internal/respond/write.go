@@ -15,9 +15,6 @@ import (
 	"github.com/pwgith/shadow-mock/internal/model"
 )
 
-// gzipMinBytes is the smallest body worth compressing (DESIGN.md §9).
-const gzipMinBytes = 1024
-
 // Write sends the response: it waits for the delay, simulates a fault, or writes the status,
 // headers and body (gzipped if the client accepts it). It returns the body actually sent, or
 // an error if the client went away during the delay.
@@ -45,12 +42,17 @@ func (r *Renderer) Write(ctx context.Context, w http.ResponseWriter, req *http.R
 	if _, set := h["Content-Type"]; !set {
 		h["Content-Type"] = nil
 	}
-	if r.Gzip && !resp.GzipDisabled && len(body) >= gzipMinBytes && h.Get("Content-Encoding") == "" &&
+	// WireMock compresses a body of any size when the client accepts gzip, and adds no Vary header.
+	if r.Gzip && !resp.GzipDisabled && resp.Dribble == nil && len(body) > 0 && bodyAllowed(resp.Status) && h.Get("Content-Encoding") == "" &&
 		acceptsGzip(req.Header.Get("Accept-Encoding")) {
 		if z, err := compress(body); err == nil {
 			body = z
 			h.Set("Content-Encoding", "gzip")
-			h.Add("Vary", "Accept-Encoding")
+		}
+	}
+	if resp.StatusMessage != "" && resp.Dribble == nil {
+		if sent, err := writeWithReason(w, req, resp.Status, resp.StatusMessage, body); sent || err != nil {
+			return err
 		}
 	}
 	if resp.Dribble != nil && resp.Dribble.NumberOfChunks > 0 {
@@ -62,6 +64,43 @@ func (r *Renderer) Write(ctx context.Context, w http.ResponseWriter, req *http.R
 		return fmt.Errorf("write body: %w", err)
 	}
 	return nil
+}
+
+// bodyAllowed reports whether a response with this status may have a body.
+func bodyAllowed(status int) bool {
+	return status >= 200 && status != http.StatusNoContent && status != http.StatusNotModified
+}
+
+// writeWithReason sends the response with a reason phrase of its own. Go's server always writes the
+// standard phrase, so the reply is written on the hijacked connection, which is then closed. It
+// reports false, having sent nothing, when the connection cannot be taken over (HTTP/2).
+func writeWithReason(w http.ResponseWriter, req *http.Request, status int, reason string, body []byte) (bool, error) {
+	conn, buf, err := http.NewResponseController(w).Hijack()
+	if err != nil {
+		return false, nil // HTTP/2 and test recorders cannot hijack; the standard phrase is sent
+	}
+	defer conn.Close()
+	h := w.Header().Clone()
+	h.Set("Content-Length", strconv.Itoa(len(body)))
+	h.Set("Connection", "close")
+	// A line break in the phrase would let a mapping inject headers.
+	reason = strings.NewReplacer("\r", " ", "\n", " ").Replace(reason)
+	var b bytes.Buffer
+	fmt.Fprintf(&b, "HTTP/1.1 %d %s\r\n", status, reason)
+	if err := h.Write(&b); err != nil {
+		return true, fmt.Errorf("write headers: %w", err)
+	}
+	b.WriteString("\r\n")
+	if req.Method != http.MethodHead {
+		b.Write(body)
+	}
+	if _, err := buf.Write(b.Bytes()); err != nil {
+		return true, fmt.Errorf("write response: %w", err)
+	}
+	if err := buf.Flush(); err != nil {
+		return true, fmt.Errorf("write response: %w", err)
+	}
+	return true, nil
 }
 
 // acceptsGzip reports whether an Accept-Encoding header allows gzip: it names gzip with a

@@ -61,11 +61,23 @@ func (s *Service) ServeMock(w http.ResponseWriter, r *http.Request, tr Traffic) 
 	done := s.trackInFlight(tr.Path)
 	defer done()
 
+	if s.Config.StubCORS && stubCORS(w, r) {
+		sv.entry.Request = nil // a preflight request is not journalled
+		return
+	}
+	if s.Config.ServeFiles && tr.URLMockID == "" && strings.HasPrefix(tr.Path, filesPrefix) {
+		sv.entry.Request = nil // files are not mock traffic, so they are not journalled
+		if !s.serveFile(ctx, w, r, tr, strings.TrimPrefix(tr.Path, filesPrefix)) {
+			notFoundFile(w)
+		}
+		return
+	}
 	body, err := readBody(w, r, s.Config.MaxBodyBytes)
 	if err != nil {
 		s.fail(w, sv, match.NewRequest(r, nil, tr.Path), err)
 		return
 	}
+	body = gunzipBody(r.Header, body, s.Config.MaxBodyBytes)
 	req := match.NewRequest(r, body, tr.Path)
 	if tr.ClientIP != "" {
 		req.ClientIP = tr.ClientIP
@@ -79,6 +91,10 @@ func (s *Service) ServeMock(w http.ResponseWriter, r *http.Request, tr Traffic) 
 	}
 	res := engine.Resolve(req, stack)
 	if res.Stub == nil {
+		if s.Config.ServeFiles && tr.URLMockID == "" && s.serveFile(ctx, w, r, tr, tr.Path) {
+			sv.entry.Request = nil
+			return
+		}
 		if rec := s.recordingFor(stack); rec != nil {
 			s.forward(ctx, w, r, req, &model.ResponseDefinition{ProxyBaseURL: rec.Spec.TargetBaseURL}, nil, rec, sv)
 			return
@@ -172,6 +188,7 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 		s.fail(w, sv, req, err)
 		return
 	}
+	markMatched(out.Header, stub)
 	if s.Config.MatchedHeader {
 		out.Header.Set("X-Shadow-Mock-Matched", layerLabel(res.Layer.Scope)+";layer="+string(res.Layer.Kind))
 	}

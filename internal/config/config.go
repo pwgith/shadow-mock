@@ -142,6 +142,12 @@ type ClientIP struct {
 type Server struct {
 	ClientIP      ClientIP `yaml:"clientIp"`
 	PublicBaseURL string   `yaml:"publicBaseUrl"`
+	// StubCORS adds the Access-Control-* headers to mock traffic and answers CORS preflight
+	// requests, as WireMock does with --enable-stub-cors (FR-10.11).
+	StubCORS bool `yaml:"stubCors"`
+	// ServeFiles serves the files in __files over HTTP: at /__files/<path>, and at /<path> when no
+	// mapping matches (FR-10.11).
+	ServeFiles bool `yaml:"serveFiles"`
 }
 
 // Detect configures key-based session detection.
@@ -273,6 +279,7 @@ func Default() Config {
 		},
 		Respond:  Respond{Gzip: "auto"},
 		Mappings: Mappings{UnknownFields: "reject"},
+		Server:   Server{ServeFiles: true},
 		Auth:     Auth{Driver: "noop"},
 		Tenancy:  Tenancy{Directory: "static"},
 		Sessions: Sessions{

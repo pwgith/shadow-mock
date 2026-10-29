@@ -129,6 +129,8 @@ tenancy:
 
 server:
   publicBaseUrl: ""           # used to build baseUrl in responses
+  stubCors: false             # answer CORS preflight requests and add Access-Control-* headers to mock traffic
+  serveFiles: true            # serve __files at /__files/<path>, and at /<path> when no mapping matches
   clientIp:
     header: ""                # a forwarding header such as X-Forwarded-For; empty uses the connection address
     trustedHops: 0
@@ -164,6 +166,14 @@ Durations are written as `30s`, `15m`, `1h`, `720h`.
   default `memory` loses them.
 * **`sessions.detect.contentTypes`** limits which bodies are scanned for session keys.
   `maxScanBytes` bounds how much of each is read.
+* **`server.stubCors`** does what WireMock's `--enable-stub-cors` does for mock traffic and `__files`: a
+  preflight request (`OPTIONS` with `Origin` and `Access-Control-Request-Method`) is answered 200 with the
+  allowed methods and headers, and any request with an `Origin` gets `Access-Control-Allow-Origin` and
+  `Access-Control-Allow-Credentials: true`. A header a mapping sets itself replaces the one added. The
+  admin API is not covered: it refuses requests from other web sites on purpose.
+* **`server.serveFiles`** serves the files in `__files/` over HTTP, as WireMock does: at `/__files/<path>`,
+  and at `/<path>` when no mapping matches. A folder is a 403, and a name that climbs out of `__files/`
+  is not served. Turn it off on a server whose files should only be reached through mappings.
 * **`server.publicBaseUrl`** sets the address returned as `baseUrl` for URL-based shadow mocks.
   Set it when Shadow Mock is behind a proxy, so the URLs it hands out are ones clients can use.
 * **`egress.blockPrivate`** is meant for shared and hosted servers. It stops proxying and webhooks

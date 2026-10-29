@@ -60,6 +60,10 @@ func (s *Service) forward(ctx context.Context, w http.ResponseWriter, r *http.Re
 		if errors.As(err, &pe) {
 			code = pe.Code
 		}
+		if code == proxy.CodeBadGateway {
+			s.proxyFailure(w, sv, target, err)
+			return
+		}
 		s.fail(w, sv, req, apierr.New(http.StatusBadGateway, apierr.Code(code), "The upstream server could not be reached."))
 		return
 	}
@@ -67,6 +71,7 @@ func (s *Service) forward(ctx context.Context, w http.ResponseWriter, r *http.Re
 		rec.Add(record.Exchange{Request: req, Status: res.Status, Header: res.Header.Clone(), Body: res.Body})
 	}
 	out := s.Renderer.FromUpstream(def, res.Status, res.Header, res.Body)
+	markMatched(out.Header, sv.entry.Stub)
 	sv.entry.Response = journal.Response{Status: out.Status, Header: out.Header.Clone(), Body: out.Body}
 	sv.entry.AddedDelay = out.Delay.Milliseconds()
 	if err := s.Renderer.Write(ctx, w, r, out, func() { s.finish(sv) }); err != nil {

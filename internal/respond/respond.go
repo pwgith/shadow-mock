@@ -71,10 +71,12 @@ func (r *Renderer) SetSettings(s Settings) {
 // Response is a rendered response, ready to write.
 type Response struct {
 	Status int
-	Header http.Header
-	Body   []byte
-	Fault  string
-	Delay  time.Duration
+	// StatusMessage is the reason phrase to send; empty means the standard one.
+	StatusMessage string
+	Header        http.Header
+	Body          []byte
+	Fault         string
+	Delay         time.Duration
 	// Dribble sends the body in chunks over a duration.
 	Dribble      *model.ChunkedDribbleDelay
 	GzipDisabled bool
@@ -95,12 +97,13 @@ func (r *Renderer) Render(ctx context.Context, def *model.ResponseDefinition, fi
 		data = Data(in, def.TransformerParameters)
 	}
 	out := &Response{
-		Status:       def.StatusOrDefault(),
-		Header:       http.Header{},
-		Fault:        def.Fault,
-		Delay:        r.delay(def),
-		Dribble:      def.ChunkedDribbleDelay,
-		GzipDisabled: def.GzipDisabled,
+		Status:        def.StatusOrDefault(),
+		StatusMessage: def.StatusMessage,
+		Header:        http.Header{},
+		Fault:         def.Fault,
+		Delay:         r.delay(def),
+		Dribble:       def.ChunkedDribbleDelay,
+		GzipDisabled:  def.GzipDisabled,
 	}
 	for k, vs := range def.Headers {
 		for _, v := range vs {

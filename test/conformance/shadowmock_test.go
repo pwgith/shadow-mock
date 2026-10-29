@@ -159,8 +159,8 @@ func TestGzipResponses(t *testing.T) {
 		t.Parallel()
 		se, m := e.with(t), byShort("5d02000101")
 		r := se.mustSend(call{method: "GET", target: "/sm/gzip/claims", header: gz})
-		if r.header.Get("Content-Encoding") != "gzip" || !strings.Contains(r.header.Get("Vary"), "Accept-Encoding") {
-			t.Errorf("headers = %v, want Content-Encoding gzip and Vary Accept-Encoding", r.header)
+		if r.header.Get("Content-Encoding") != "gzip" || r.header.Get("Vary") != "" {
+			t.Errorf("headers = %v, want Content-Encoding gzip and no Vary", r.header)
 		}
 		se.expectResponse("claims", m.Response, r, 0) // inflates the body, then compares with the file
 	})
@@ -182,12 +182,12 @@ func TestGzipResponses(t *testing.T) {
 		}
 		se.expectResponse("claims-uncompressed", m.Response, r, 0)
 	})
-	t.Run("a small response is never compressed", func(t *testing.T) {
+	t.Run("a small response is compressed too", func(t *testing.T) {
 		t.Parallel()
 		se, m := e.with(t), byShort("5d02000103")
 		r := se.mustSend(call{method: "GET", target: "/sm/gzip/tiny", header: gz})
-		if r.header.Get("Content-Encoding") != "" {
-			t.Errorf("Content-Encoding = %q, want none", r.header.Get("Content-Encoding"))
+		if r.header.Get("Content-Encoding") != "gzip" {
+			t.Errorf("Content-Encoding = %q, want gzip", r.header.Get("Content-Encoding"))
 		}
 		se.expectResponse("tiny", m.Response, r, 0)
 	})
