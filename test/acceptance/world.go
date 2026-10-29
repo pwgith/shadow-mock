@@ -188,7 +188,7 @@ func (w *world) start() error {
 	// The test client stands in for a proxy, so a step can say which address a request comes from.
 	cfg.Server.ClientIP = config.ClientIP{Header: "X-Forwarded-For", TrustedProxies: []string{"127.0.0.0/8", "::1/128"}}
 	for _, y := range w.yamls {
-		if err := config.Merge(&cfg, []byte(y)); err != nil {
+		if err := config.Merge(&cfg, []byte(w.sub(y))); err != nil {
 			return fmt.Errorf("configuration: %w", err)
 		}
 	}

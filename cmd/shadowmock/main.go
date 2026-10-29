@@ -52,7 +52,11 @@ func run(args []string, lookup func(string) (string, bool), stdout io.Writer) er
 	if flags.HealthCheck {
 		return healthCheck(context.Background(), cfg.Listen.Mock, &http.Client{})
 	}
-	return serve(cfg, newLogger(cfg.Log))
+	logger := newLogger(cfg.Log)
+	for _, w := range flags.Warnings {
+		logger.Warn("command line", "warning", w)
+	}
+	return serve(cfg, logger)
 }
 
 // healthCheck asks the server listening on addr for /__health. It exists so a container, which has

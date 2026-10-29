@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -26,6 +27,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/match"
 	"github.com/pwgith/shadow-mock/internal/metrics"
 	"github.com/pwgith/shadow-mock/internal/mock"
+	"github.com/pwgith/shadow-mock/internal/model"
 	"github.com/pwgith/shadow-mock/internal/proxy"
 	"github.com/pwgith/shadow-mock/internal/ratelimit"
 	"github.com/pwgith/shadow-mock/internal/record"
@@ -87,12 +89,9 @@ func New(cfg config.Config, o Options) (*App, error) {
 }
 
 func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
-	custom := make(map[string]extension.RequestMatcher, len(o.Matchers))
-	for _, m := range o.Matchers {
-		if _, dup := custom[m.Name()]; dup {
-			return nil, fmt.Errorf("two custom matchers are named %q", m.Name())
-		}
-		custom[m.Name()] = m
+	custom, err := customMatchers(o.Matchers)
+	if err != nil {
+		return nil, err
 	}
 	global, globalFiles, err := a.globalStores(cfg, o.Logger)
 	if err != nil {
@@ -125,11 +124,14 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	mx := metrics.New(func() int { return len(registry.All()) })
 	detector.Observe(o.Clock.Now, mx.Rebuilt)
 	a.metrics = mx
-	renderer := respond.NewRenderer(files, o.Clock, cfg.Respond.Gzip != "off")
-	renderer.Templating = cfg.Templating.Global
-	renderer.Templates.PermitSystemKeys(cfg.Templating.PermittedSystemKeys)
-	renderer.MaxDelay = time.Duration(cfg.Limits.MaxDelay)
-	client := egress.New(egress.Options{BlockPrivate: cfg.Egress.BlockPrivate})
+	renderer := newRenderer(cfg, files, o.Clock)
+	client, forwarder, err := newForwarder(cfg, tel)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.nameFiles(cfg.Storage.Global.FilenameTemplate, renderer); err != nil {
+		return nil, err
+	}
 	hooks := webhook.New(client, renderer.Templates, o.Clock, o.Logger)
 	a.closers = append(a.closers, func() error { hooks.Close(); return nil })
 	jrnl := journal.NewMemory(cfg.Storage.Journal.Hot.MaxEntries)
@@ -145,7 +147,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Journal:   jrnl,
 		Renderer:  renderer,
 		Webhooks:  hooks,
-		Proxy:     proxyWithTrace(client, tel),
+		Proxy:     forwarder,
 		Recorder:  record.NewRecorder(),
 		Stats:     stats.New(),
 		Metrics:   mx,
@@ -191,16 +193,7 @@ func (a *App) routers(cfg config.Config, o Options) error {
 	if cfg.Limits.RequestsPerSecond > 0 {
 		limiter = ratelimit.New(o.Clock, cfg.Limits.RequestsPerSecond, cfg.Limits.Burst)
 	}
-	var authn auth.Authenticator = auth.NoopAuthenticator{}
-	var guard auth.Authenticator // set when the admin API and the metrics need a token
-	if cfg.Auth.Driver == "token" {
-		tokens := make([]auth.Token, len(cfg.Auth.Tokens))
-		for i, t := range cfg.Auth.Tokens {
-			tokens[i] = auth.Token{Name: t.Name, Role: auth.Role(t.Role), Hash: t.Hash}
-		}
-		authn = auth.NewTokenAuthenticator(tokens)
-		guard = authn
-	}
+	authn, guard := newAuthenticators(cfg)
 	adminAPI := admin.New(a.svc, authn, auth.RoleAuthorizer{DenyGlobalWrites: cfg.Admin.GlobalWrites == "deny"},
 		admin.Config{Version: o.Version, PublicBaseURL: cfg.Server.PublicBaseURL, MaxBodyBytes: cfg.Limits.MaxBodyBytes, Shutdown: o.Shutdown}, o.Logger)
 	route := server.Router{
@@ -278,6 +271,57 @@ func (a *App) Start(ctx context.Context) error {
 		}
 	}
 	go a.svc.Reap(ctx, time.Second)
+	return a.startProxyAll(ctx)
+}
+
+// nameFiles gives the global mappings store a filename template, after checking it renders.
+func (a *App) nameFiles(tpl string, r *respond.Renderer) error {
+	if tpl == "" || a.globalFS == nil {
+		return nil
+	}
+	namer := func(data map[string]any) (string, error) { return r.Templates.Render(tpl, data) }
+	if _, err := namer(fs.FilenameData(model.StubMapping{ID: "00000000-0000-4000-8000-000000000000"})); err != nil {
+		return fmt.Errorf("storage.global.filenameTemplate: %w", err)
+	}
+	a.globalFS.SetNamer(namer)
+	return nil
+}
+
+// proxyAllID is the id of the mapping --proxy-all adds.
+const proxyAllID = "00000000-0000-4000-8000-0000000000a1"
+
+// startProxyAll adds the mapping that sends every unmatched request to proxy.all, and with
+// proxy.record starts recording what comes back. Each new request is written to mappings/ as soon
+// as it has been proxied.
+func (a *App) startProxyAll(ctx context.Context) error {
+	if a.cfg.Proxy.All == "" {
+		return nil
+	}
+	local := store.Global(tenant.Local)
+	def, err := json.Marshal(map[string]any{
+		"id": proxyAllID, "priority": 10,
+		"request": map[string]any{"method": "ANY"}, "response": map[string]any{"proxyBaseUrl": a.cfg.Proxy.All},
+	})
+	if err != nil {
+		return fmt.Errorf("proxy.all: %w", err)
+	}
+	m, err := a.svc.DecodeAndValidate(def)
+	if err != nil {
+		return fmt.Errorf("proxy.all: %w", err)
+	}
+	if _, err := a.svc.PutMapping(ctx, local, m); err != nil {
+		return fmt.Errorf("proxy.all: %w", err)
+	}
+	if !a.cfg.Proxy.Record {
+		return nil
+	}
+	spec := record.Spec{TargetBaseURL: a.cfg.Proxy.All, CaptureHeaders: map[string]record.CaptureHeader{}}
+	for _, h := range a.cfg.Proxy.MatchHeaders {
+		spec.CaptureHeaders[h] = record.CaptureHeader{}
+	}
+	if err := a.svc.StartLiveRecording(ctx, local, spec); err != nil {
+		return fmt.Errorf("proxy.record: %w", err)
+	}
 	return nil
 }
 
@@ -318,6 +362,70 @@ func (a *App) Handlers() map[string]http.Handler {
 }
 
 // proxyWithTrace returns a forwarder whose upstream calls continue the caller's trace.
+// customMatchers indexes the custom matchers by name.
+func customMatchers(matchers []extension.RequestMatcher) (map[string]extension.RequestMatcher, error) {
+	custom := make(map[string]extension.RequestMatcher, len(matchers))
+	for _, m := range matchers {
+		if _, dup := custom[m.Name()]; dup {
+			return nil, fmt.Errorf("two custom matchers are named %q", m.Name())
+		}
+		custom[m.Name()] = m
+	}
+	return custom, nil
+}
+
+// newAuthenticators picks the admin authenticator. guard is set when the admin API and the metrics
+// need a login.
+func newAuthenticators(cfg config.Config) (authn, guard auth.Authenticator) {
+	switch cfg.Auth.Driver {
+	case "basic":
+		authn = auth.NewBasicAuthenticator(cfg.Auth.Basic.Username, cfg.Auth.Basic.Password)
+		return authn, authn
+	case "token":
+		tokens := make([]auth.Token, len(cfg.Auth.Tokens))
+		for i, t := range cfg.Auth.Tokens {
+			tokens[i] = auth.Token{Name: t.Name, Role: auth.Role(t.Role), Hash: t.Hash}
+		}
+		authn = auth.NewTokenAuthenticator(tokens)
+		return authn, authn
+	}
+	return auth.NoopAuthenticator{}, nil
+}
+
+// newRenderer builds the response renderer under the respond, templating and proxy settings.
+func newRenderer(cfg config.Config, files store.FileRepository, clk clock.Clock) *respond.Renderer {
+	renderer := respond.NewRenderer(files, clk, cfg.Respond.Gzip != "off")
+	renderer.Templating = cfg.Templating.Global
+	renderer.TemplatingDisabled = cfg.Templating.Disabled
+	if cfg.Proxy.PassThrough != nil {
+		renderer.SetSettings(respond.Settings{ProxyPassThrough: *cfg.Proxy.PassThrough})
+	}
+	renderer.Templates.PermitSystemKeys(cfg.Templating.PermittedSystemKeys)
+	renderer.MaxDelay = time.Duration(cfg.Limits.MaxDelay)
+	return renderer
+}
+
+// newForwarder builds the outbound client, and the forwarder that proxies through it under the
+// proxy settings.
+func newForwarder(cfg config.Config, tel *telemetry.Telemetry) (*http.Client, *proxy.Forwarder, error) {
+	opts := egress.Options{BlockPrivate: cfg.Egress.BlockPrivate, Timeout: time.Duration(cfg.Proxy.Timeout)}
+	if cfg.Proxy.Via != "" {
+		via, err := egress.ViaProxy(cfg.Proxy.Via)
+		if err != nil {
+			return nil, nil, fmt.Errorf("proxy.via: %w", err)
+		}
+		opts.Proxy = via
+	}
+	targets, err := egress.ParseTargets(cfg.Proxy.AllowTargets, cfg.Proxy.DenyTargets)
+	if err != nil {
+		return nil, nil, fmt.Errorf("proxy targets: %w", err)
+	}
+	client := egress.New(opts)
+	forwarder := proxyWithTrace(client, tel)
+	forwarder.Targets, forwarder.PreserveHost = targets, cfg.Proxy.PreserveHostHeader
+	return client, forwarder, nil
+}
+
 func proxyWithTrace(client *http.Client, tel *telemetry.Telemetry) *proxy.Forwarder {
 	f := proxy.New(client)
 	f.Inject = tel.Inject

@@ -23,6 +23,52 @@ Unknown keys in the file are an error, so typos fail at startup instead of being
 | `--version` | Print the version and exit |
 | `--healthcheck` | Ask a running server on this configuration for `/__health`, then exit 0 (healthy) or 1. Used by the Docker health check |
 
+### WireMock's flags
+
+Every flag in WireMock 3.13's `--help` is accepted, with a value after a space or after `=`, so a command
+line or a Docker `command:` copied from a WireMock setup starts. Each flag does one of three things.
+
+**Sets a configuration key.** The key can be set in the file as well.
+
+| Flag | Setting |
+|---|---|
+| `--global-response-templating`, `--local-response-templating` | `templating.global` |
+| `--disable-response-templating` | `templating.disabled`. Even a mapping that asks for a template is sent as written |
+| `--enable-stub-cors` | `server.stubCors` |
+| `--disable-gzip` | `respond.gzip: off` |
+| `--no-request-journal` | `storage.journal.hot.maxEntries: 0` |
+| `--max-request-journal-entries` | `storage.journal.hot.maxEntries` |
+| `--logged-response-body-size-limit` | `storage.journal.hot.maxBodyBytes` |
+| `--bind-address` | `listen.bindAddress`, put in front of a listener address that names only a port |
+| `--disable-request-logging`, `--print-all-network-traffic` | `log.requests` |
+| `--permitted-system-keys` | `templating.permittedSystemKeys` |
+| `--filename-template` | `storage.global.filenameTemplate` |
+| `--admin-api-basic-auth user:password` | `auth.driver: basic` and `auth.basic`. Every admin call, and the metrics, then need HTTP Basic authentication; mock traffic does not |
+| `--proxy-all <url>` | `proxy.all`. Adds a mapping of priority 10 that sends every request no other mapping matches to the URL |
+| `--record-mappings` | `proxy.record`. With `--proxy-all`, records what is proxied: each new request is written to `mappings/` as soon as it has been proxied, and a repeat of one already recorded is not written again |
+| `--match-headers a,b` | `proxy.matchHeaders` |
+| `--preserve-host-header` | `proxy.preserveHostHeader` |
+| `--proxy-via host:port` | `proxy.via` |
+| `--proxy-timeout <ms>` | `proxy.timeout` |
+| `--allow-proxy-targets`, `--deny-proxy-targets` | `proxy.allowTargets`, `proxy.denyTargets`. Addresses, ranges written `a-b`, CIDR blocks and names with `*`. The allowed list is looked at first. A refused target is a 500 |
+| `--proxy-pass-through` | `proxy.passThrough`, the starting value of the `proxyPassThrough` setting |
+| `--disable-banner`, `--preserve-user-agent-proxy-header` | Nothing to change: Shadow Mock prints no banner and always passes the client's `User-Agent` on |
+
+**Accepted with a warning at start-up, and ignored,** because they tune WireMock's Java server:
+`--container-threads`, `--jetty-*`, `--async-response-enabled`, `--async-response-threads`,
+`--max-http-client-connections`, `--disable-connection-reuse`, `--disable-extensions-scanning`,
+`--disable-optimize-xml-factories-loading`, `--disable-strict-http-headers`, `--extensions`,
+`--supported-proxy-encodings`, `--use-chunked-encoding`, `--timeout`, `--webhook-threadpool-size`,
+`--max-template-cache-entries` and `--load-resources-from-classpath`.
+
+**Refused for now,** with "is not supported yet": the TLS, HTTP/2 and browser-proxy flags
+(`--https-*`, `--keystore-*`, `--key-manager-password`, `--truststore-*`, `--disable-http`,
+`--disable-http2-*`, `--admin-api-require-https`, `--enable-browser-proxying`, `--ca-keystore*`,
+`--trust-all-proxy-targets`, `--trust-proxy-target`). They are on the
+[parity plan](../PARITY_PLAN.md).
+
+`--port`, `--root-dir`, `--verbose`, `--version` and `--help` are as in the table above.
+
 ## Environment variables
 
 | Variable | Setting |
@@ -75,16 +121,33 @@ storage:
   blobs:
     driver: fs                # fs | memory
     dir: ./blobs
+  global:
+    filenameTemplate: ""     # names new mapping files, for example "{{{lower method}}}-{{{id}}}.json"
 
 respond:
   gzip: auto                  # auto | off
   matchedHeader: false        # add X-Shadow-Mock-Matched to responses
+
+listen:
+  bindAddress: ""          # put in front of a listener address that names only a port
+
+proxy:
+  all: ""                    # send every request no mapping matches to this URL
+  record: false               # with all: record what is proxied; each new request is written to mappings/ at once
+  matchHeaders: []            # request headers a recording matches on
+  preserveHostHeader: false   # send the client's Host header upstream
+  via: ""                     # a proxy server to go through, host:port or a URL
+  timeout: 0s                 # one proxied call; 0 means 30 seconds
+  allowTargets: []            # addresses, a-b ranges, CIDR blocks and *.names that may be proxied to
+  denyTargets: []             # the same, that may not (looked at after allowTargets)
+  passThrough: true           # starting value of the proxyPassThrough setting
 
 mappings:
   unknownFields: reject       # reject | keep. reject answers 422 for a field a mapping may not have, as WireMock does
 
 templating:
   global: false               # template every response
+  disabled: false             # send every response as written, even one that asks for a template
   permittedSystemKeys: []     # environment variables the systemValue helper may read
 
 egress:

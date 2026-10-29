@@ -294,3 +294,65 @@ func TestAdminPrefixAndPersistedSessions(t *testing.T) {
 		t.Errorf("persisted session after restart: %d %q", rec.Code, rec.Body)
 	}
 }
+
+func TestProxyAllWithRecordingWritesEachMappingAsItArrives(t *testing.T) {
+	t.Parallel()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "from upstream "+r.URL.Path)
+	}))
+	t.Cleanup(upstream.Close)
+	root := t.TempDir()
+	cfg := config.Default()
+	cfg.Root = root
+	cfg.Storage.Global.Watch = false
+	cfg.Proxy.All, cfg.Proxy.Record = upstream.URL, true
+	a, err := New(cfg, Options{Logger: slog.New(slog.DiscardHandler), Clock: clock.NewFake(time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)), Shutdown: func() {}, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = a.Close() })
+	if startErr := a.Start(t.Context()); startErr != nil {
+		t.Fatal(startErr)
+	}
+	srv := httptest.NewServer(a.Handler())
+	t.Cleanup(srv.Close)
+
+	get := func(path string) string {
+		t.Helper()
+		res, err := http.Get(srv.URL + path) //nolint:noctx // a local test server
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		return string(body)
+	}
+	files := func() []string {
+		entries, _ := os.ReadDir(filepath.Join(root, "mappings"))
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		return names
+	}
+
+	if got := get("/orders/7"); got != "from upstream /orders/7" {
+		t.Fatalf("body = %q, want the upstream's answer", got)
+	}
+	names := files()
+	if len(names) != 1 || !strings.HasPrefix(names[0], "get-orders7-") {
+		t.Fatalf("after the first request: %v, want the recorded mapping at once", names)
+	}
+	saved, _ := os.ReadFile(filepath.Join(root, "mappings", names[0]))
+	if !strings.Contains(string(saved), "/orders/7") || !strings.Contains(string(saved), "from upstream") {
+		t.Errorf("recorded mapping = %s", saved)
+	}
+	get("/orders/7")
+	if got := files(); len(got) != 1 {
+		t.Errorf("a repeat of a request must not be written again: %v", got)
+	}
+	get("/orders/8")
+	if got := files(); len(got) != 2 {
+		t.Errorf("a new request must be written: %v", got)
+	}
+}

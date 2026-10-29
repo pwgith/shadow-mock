@@ -5,7 +5,11 @@ classes on `master`) and a real WireMock 3.13.2. "Verified" means the same reque
 servers and the answers differed. "Docs" means the WireMock documentation says it works and it has not
 been run. Scenarios are left out on purpose.
 
-## 1. Command-line flags (docs, and every flag below fails on Shadow Mock)
+## 1. Command-line flags (closed by workstream 6, FR-10.13, except the TLS, HTTP/2 and browser-proxy flags)
+
+All the flags below are now accepted. The ones in the TLS, HTTP/2 and browser-proxy rows are refused with "not supported yet" until workstreams 8 and 9. What each flag does is in [the configuration guide](guide/11-configuration.md).
+
+What it was:
 
 Shadow Mock accepts `--port`, `--root-dir`, `--verbose`, `--version`, `--help` and its own flags. Every
 other WireMock flag stops the server at startup with "flag provided but not defined". A command line

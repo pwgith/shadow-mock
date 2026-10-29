@@ -40,6 +40,8 @@ type Renderer struct {
 	Gzip bool
 	// Templating renders every response as a template, not only those that ask for it.
 	Templating bool
+	// TemplatingDisabled sends every response as written, even one that asks for a template.
+	TemplatingDisabled bool
 	// Templates renders response text; NewRenderer sets it.
 	Templates *template.Engine
 	// MaxDelay, when positive, shortens any delay or dribble to this (limits.maxDelay).

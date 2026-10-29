@@ -22,6 +22,7 @@ const maxResponseBytes = 64 << 20
 // Error codes the service reports for failed forwards.
 const (
 	CodeBlocked    = "egress_blocked"
+	CodeDenied     = "target_denied"
 	CodeBadGateway = "bad_gateway"
 )
 
@@ -57,6 +58,10 @@ type Result struct {
 // Forwarder sends requests upstream through an egress client.
 type Forwarder struct {
 	client *http.Client
+	// Targets, when set, refuses upstream hosts its rules do not allow.
+	Targets *egress.Targets
+	// PreserveHost sends the client's Host header upstream instead of the target's.
+	PreserveHost bool
 	// Inject, when set, adds the caller's trace context to the upstream request, so a proxied call
 	// continues the trace.
 	Inject func(ctx context.Context, h http.Header)
@@ -82,6 +87,12 @@ func (f *Forwarder) Forward(ctx context.Context, req *match.Request, base string
 	out, err := http.NewRequestWithContext(ctx, req.Method, target, bytes.NewReader(req.Body))
 	if err != nil {
 		return nil, &Error{Code: CodeBadGateway, Err: fmt.Errorf("build upstream request: %w", err)}
+	}
+	if denied := f.Targets.Check(ctx, out.URL.Hostname()); denied != nil {
+		return nil, &Error{Code: CodeDenied, Err: denied}
+	}
+	if host := req.Header.Get("Host"); f.PreserveHost && host != "" {
+		out.Host = host
 	}
 	for k, vs := range req.Header {
 		out.Header[k] = append([]string(nil), vs...)

@@ -247,7 +247,7 @@ func (rt *Router) metricsAllowed(w http.ResponseWriter, r *http.Request) bool {
 	}
 	p, err := rt.MetricsAuth.Authenticate(r)
 	if err != nil {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="shadowmock"`)
+		w.Header().Set("WWW-Authenticate", auth.Challenge(rt.MetricsAuth))
 		apierr.WriteError(w, err)
 		return false
 	}

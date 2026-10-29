@@ -180,7 +180,8 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 	sv.entry.Definition = def
 	in := &respond.Input{ID: sv.entry.ID, Request: req, PathParams: res.Stub.Matcher.PathParams(req), CallNumber: callNumber}
 	if def.ProxyBaseURL != "" {
-		s.forward(ctx, w, r, req, def, in, nil, sv)
+		// A recording that is running also records what a mapping proxies, as WireMock's does.
+		s.forward(ctx, w, r, req, def, in, s.recordingFor(stack), sv)
 		return
 	}
 	out, err := s.Renderer.Render(ctx, def, fileScopes(stack), in)

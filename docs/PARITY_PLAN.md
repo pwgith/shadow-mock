@@ -189,6 +189,25 @@ The plan as first written:
 
 ### 6. Command-line flags (FR-10.13)
 
+**Status: done.** What the probes of WireMock 3.13.2 changed from the list below:
+
+* The flag list is checked against WireMock's own `--help` by a test, so a flag WireMock adds fails it.
+* `--use-chunked-encoding`, `--timeout`, `--webhook-threadpool-size` and `--max-template-cache-entries` are in the ignored
+  group, not the implemented one: Shadow Mock always sends Content-Length, has no global timeout to set, and caches
+  nothing that needs a limit. `--timeout` and the `[String]` flags may be given without a value.
+* `--filename-template` is a Handlebars template over `id`, `name`, `method` and `url` (also under `request`); the result is
+  cleaned like any other file name. A template that does not render stops start-up.
+* `--admin-api-basic-auth` guards every admin path (health and version too), and mock traffic is not guarded. Shadow Mock
+  adds a `WWW-Authenticate: Basic` header on the 401, which WireMock does not send.
+* `--proxy-all` adds a mapping with priority 10, `request.method: ANY` and no URL, as WireMock does. `--record-mappings` records
+  what any mapping proxies while it runs, and writes each new request's mapping at once, as WireMock does. A repeat of a
+  request already recorded adds nothing (WireMock's behaviour, checked), so the flag has no call-response recording.
+* A proxy target refused by `--allow-proxy-targets` or `--deny-proxy-targets` is a 500 with WireMock's wording.
+* With no journal, `POST /requests/count` answers `-1` and `requestJournalDisabled: true`, as WireMock does. Listing the journal
+  answers an empty list, where WireMock answers a 500.
+
+The plan as first written:
+
 Accept every WireMock flag so a copied command line starts. Each flag is in one of three groups:
 
 * **Implemented:** `--global-response-templating`, `--local-response-templating`,

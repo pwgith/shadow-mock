@@ -84,7 +84,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var ae *apierr.Error
 		if errors.As(err, &ae) && ae.Status == http.StatusUnauthorized {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="shadowmock"`)
+			w.Header().Set("WWW-Authenticate", auth.Challenge(h.authn))
 		}
 		apierr.WriteError(w, err)
 		return

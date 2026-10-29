@@ -201,7 +201,9 @@ func TestActiveFilterAndExchanges(t *testing.T) {
 	if !a.Accepts(in.Request) || a.Accepts(out.Request) {
 		t.Error("the filter did not separate /claims/1 from /other")
 	}
-	a.Add(in)
+	if err := a.Add(in); err != nil {
+		t.Fatal(err)
+	}
 	if got := a.Exchanges(); len(got) != 1 {
 		t.Errorf("Exchanges = %d, want 1", len(got))
 	}
@@ -211,5 +213,42 @@ func TestActiveFilterAndExchanges(t *testing.T) {
 	off := false
 	if (&record.Spec{Persist: &off}).PersistOrDefault() {
 		t.Error("persist=false was ignored")
+	}
+}
+
+func TestALiveRecordingHandsOverEachNewRequestOnce(t *testing.T) {
+	t.Parallel()
+	r := record.NewRecorder()
+	sc := store.Global(tenant.Local)
+	var got []model.StubMapping
+	failNext := false
+	err := r.StartLive(sc, record.Spec{TargetBaseURL: "http://up", CaptureHeaders: map[string]record.CaptureHeader{"X-Key": {}}}, nil, func(m model.StubMapping) error {
+		if failNext {
+			return http.ErrAbortHandler
+		}
+		got = append(got, m)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := r.Find([]store.Scope{sc})
+	add := func(path, key string) error {
+		return a.Add(exchange(t, http.MethodGet, path, "", 200, jsonHeader(), `{"a":1}`, "X-Key", key))
+	}
+	for _, c := range [][2]string{{"/a", "k1"}, {"/a", "k1"}, {"/a", "k2"}, {"/b", "k1"}} {
+		if err := add(c[0], c[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(got) != 3 {
+		t.Fatalf("handed over %d mappings, want 3: one for each request that differs by path or by a captured header", len(got))
+	}
+	failNext = true
+	if err := add("/c", "k1"); err == nil {
+		t.Error("an error from the callback must come back")
+	}
+	if n := len(a.Exchanges()); n != 5 {
+		t.Errorf("Exchanges = %d, want all 5 kept even when writing one failed", n)
 	}
 }

@@ -137,6 +137,18 @@ func (m StubMapping) WithID(id string) StubMapping {
 	return m
 }
 
+// WithPersistent returns a copy of the mapping marked persistent, so a store that keeps files writes it.
+func (m StubMapping) WithPersistent() StubMapping {
+	m.Persistent = true
+	raw := maps.Clone(m.raw)
+	if raw == nil {
+		raw = map[string]json.RawMessage{}
+	}
+	raw["persistent"] = json.RawMessage("true")
+	m.raw = raw
+	return m
+}
+
 // MarshalJSON returns the mapping as received, including unknown fields.
 func (m StubMapping) MarshalJSON() ([]byte, error) {
 	if m.raw == nil {

@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"slices"
 	"strconv"
@@ -36,6 +37,9 @@ func (d *Duration) UnmarshalYAML(n *yaml.Node) error {
 type Listen struct {
 	Mock  string `yaml:"mock"`
 	Admin string `yaml:"admin"` // empty: admin shares the mock listener under AdminPrefix
+	// BindAddress is the address to listen on when listen.mock and listen.admin name only a port
+	// (WireMock's --bind-address).
+	BindAddress string `yaml:"bindAddress"`
 }
 
 // Admin controls the admin API.
@@ -58,6 +62,10 @@ type Driver struct {
 type GlobalStorage struct {
 	Driver string `yaml:"driver"` // fs | memory
 	Watch  bool   `yaml:"watch"`
+	// FilenameTemplate names the files mappings are written to, as a template over id, name,
+	// method and url (WireMock's --filename-template). Empty means the name, or the method and URL,
+	// then the id.
+	FilenameTemplate string `yaml:"filenameTemplate"`
 }
 
 // HotJournal sizes the hot journal (DESIGN.md §5.2).
@@ -97,10 +105,19 @@ type Respond struct {
 
 // Auth selects the authenticator.
 type Auth struct {
-	Driver  string           `yaml:"driver"` // noop | token | jwt (SaaS)
+	Driver string `yaml:"driver"` // noop | token | basic | jwt (SaaS)
+	// Basic is the one username and password of auth.driver: basic (WireMock's --admin-api-basic-auth).
+	Basic   BasicAuth        `yaml:"basic"`
 	Issuers []map[string]any `yaml:"issuers"`
 	// Tokens are the admin tokens when driver is token.
 	Tokens []AdminToken `yaml:"tokens"`
+}
+
+// BasicAuth is a username and password for the admin API.
+type BasicAuth struct {
+	Username    string `yaml:"username"`
+	Password    string `yaml:"password,omitempty"`
+	PasswordEnv string `yaml:"passwordEnv,omitempty"` // the name of an environment variable holding the password
 }
 
 // AdminToken is one admin token. Give exactly one of Token, TokenEnv or TokenSHA256; the last keeps
@@ -209,9 +226,33 @@ type Mappings struct {
 	UnknownFields string `yaml:"unknownFields"`
 }
 
+// Proxy configures the proxying WireMock's command line sets up (FR-10.13).
+type Proxy struct {
+	// All sends every request no mapping matches to this URL (--proxy-all).
+	All string `yaml:"all"`
+	// Record records what is proxied as mappings, written when the server stops (--record-mappings).
+	Record bool `yaml:"record"`
+	// MatchHeaders are request headers a recording matches on (--match-headers).
+	MatchHeaders []string `yaml:"matchHeaders"`
+	// PreserveHostHeader sends the client's Host header upstream instead of the target's.
+	PreserveHostHeader bool `yaml:"preserveHostHeader"`
+	// Via is a proxy server to send proxied requests through, host:port or a URL (--proxy-via).
+	Via string `yaml:"via"`
+	// Timeout caps one proxied call; 0 means 30 seconds (--proxy-timeout).
+	Timeout Duration `yaml:"timeout"`
+	// AllowTargets and DenyTargets list the addresses (a, a-b ranges and *.domain names) that may
+	// and may not be proxied to or recorded from. The allowed list is looked at first.
+	AllowTargets []string `yaml:"allowTargets"`
+	DenyTargets  []string `yaml:"denyTargets"`
+	// PassThrough is the starting value of the proxyPassThrough setting; true when not set.
+	PassThrough *bool `yaml:"passThrough"`
+}
+
 // Templating configures response templating (P3).
 type Templating struct {
 	Global bool `yaml:"global"`
+	// Disabled turns templating off altogether, so even a mapping that asks for it is sent as written.
+	Disabled bool `yaml:"disabled"`
 	// PermittedSystemKeys lists the environment variables the systemValue helper may read.
 	PermittedSystemKeys []string `yaml:"permittedSystemKeys"`
 }
@@ -256,6 +297,7 @@ type Config struct {
 	Sessions    Sessions   `yaml:"sessions"`
 	Limits      Limits     `yaml:"limits"`
 	Mappings    Mappings   `yaml:"mappings"`
+	Proxy       Proxy      `yaml:"proxy"`
 	Templating  Templating `yaml:"templating"`
 	Egress      Egress     `yaml:"egress"`
 	Log         Log        `yaml:"log"`
@@ -301,6 +343,8 @@ func Default() Config {
 
 // Flags are the command-line options that are not configuration.
 type Flags struct {
+	// Warnings are things to tell the operator at start-up, such as a WireMock flag that is ignored.
+	Warnings    []string
 	ShowVersion bool
 	// HealthCheck asks a running server on this configuration whether it is healthy, and exits.
 	HealthCheck bool
@@ -317,6 +361,8 @@ func Resolve(args []string, lookup func(string) (string, bool)) (Config, Flags, 
 	port := fl.Int("port", 0, "mock listener port; shorthand for --listen-mock :<port>")
 	root := fl.String("root-dir", "", "directory holding mappings/ and __files/ (overrides root)")
 	verbose := fl.Bool("verbose", false, "log at debug level")
+	applyWireMock := wmFlags(fl)
+	args = optionalArgs(args)
 	var f Flags
 	fl.BoolVar(&f.ShowVersion, "version", false, "print the version and exit")
 	fl.BoolVar(&f.HealthCheck, "healthcheck", false, "check that a server on this configuration is healthy, then exit 0 or 1")
@@ -341,10 +387,28 @@ func Resolve(args []string, lookup func(string) (string, bool)) (Config, Flags, 
 	if *verbose {
 		cfg.Log.Level = "debug"
 	}
+	warnings, err := applyWireMock(&cfg)
+	if err != nil {
+		return Config{}, f, err
+	}
+	f.Warnings = warnings
+	cfg.applyBindAddress()
 	if err := cfg.Validate(); err != nil {
 		return Config{}, f, err
 	}
 	return cfg, f, nil
+}
+
+// applyBindAddress puts listen.bindAddress in front of a listener address that names only a port.
+func (c *Config) applyBindAddress() {
+	if c.Listen.BindAddress == "" {
+		return
+	}
+	for _, a := range []*string{&c.Listen.Mock, &c.Listen.Admin} {
+		if strings.HasPrefix(*a, ":") {
+			*a = net.JoinHostPort(c.Listen.BindAddress, strings.TrimPrefix(*a, ":"))
+		}
+	}
 }
 
 // Load reads the YAML file at path (if not empty) over the defaults, then applies
@@ -368,6 +432,7 @@ func Load(path string, lookup func(string) (string, bool)) (Config, error) {
 			return Config{}, err
 		}
 	}
+	cfg.applyBindAddress()
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -441,7 +506,7 @@ func (c *Config) Validate() error {
 		oneOf("storage.journal.warm.driver", c.Storage.Journal.Warm.Driver, "none"),
 		oneOf("storage.counters.driver", c.Storage.Counters.Driver, "memory"),
 		oneOf("storage.blobs.driver", c.Storage.Blobs.Driver, "fs", "memory"),
-		oneOf("auth.driver", c.Auth.Driver, "noop", "token"),
+		oneOf("auth.driver", c.Auth.Driver, "noop", "token", "basic"),
 		oneOf("tenancy.directory", c.Tenancy.Directory, "static"),
 		oneOf("respond.gzip", c.Respond.Gzip, "auto", "off"),
 		oneOf("mappings.unknownFields", c.Mappings.UnknownFields, "reject", "keep"),

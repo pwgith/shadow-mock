@@ -6,6 +6,22 @@ import (
 	"github.com/pwgith/shadow-mock/internal/model"
 )
 
+// Namer renders a filename template (--filename-template) for a mapping, given FilenameData.
+type Namer func(data map[string]any) (string, error)
+
+// FilenameData is what a filename template can use: id, name, method and url, also under request.
+func FilenameData(m model.StubMapping) map[string]any {
+	method := m.Request.Method
+	if method == "" {
+		method = "ANY"
+	}
+	url := urlOf(&m.Request)
+	return map[string]any{
+		"id": m.ID, "name": m.Name, "method": method, "url": url,
+		"request": map[string]any{"method": method, "url": url},
+	}
+}
+
 // fileName is the name WireMock gives the file of a mapping it writes: the mapping's name, or the
 // method and URL when it has none, then the id (FR-10.8).
 func fileName(m model.StubMapping) string {
