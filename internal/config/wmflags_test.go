@@ -34,13 +34,17 @@ var wireMockFlags = map[string]string{ // name -> a value, or "" for a flag with
 	"webhook-threadpool-size": "5",
 }
 
-// notYet are the flags that belong to the TLS, HTTP/2 and browser-proxy workstreams.
+// notYet are the flags that belong to the browser-proxy workstream.
 var notYet = map[string]bool{
-	"https-port": true, "disable-http": true, "https-keystore": true, "keystore-type": true, "keystore-password": true,
-	"key-manager-password": true, "https-truststore": true, "truststore-type": true, "truststore-password": true,
-	"https-require-client-cert": true, "disable-http2-plain": true, "disable-http2-tls": true, "admin-api-require-https": true,
 	"enable-browser-proxying": true, "ca-keystore": true, "ca-keystore-password": true, "ca-keystore-type": true,
 	"trust-all-proxy-targets": true, "trust-proxy-target": true,
+}
+
+// needsHTTPSPort are the flags that mean something only with an HTTPS listener.
+var needsHTTPSPort = map[string]bool{
+	"disable-http": true, "https-keystore": true, "keystore-type": true, "keystore-password": true,
+	"key-manager-password": true, "https-truststore": true, "truststore-type": true, "truststore-password": true,
+	"admin-api-require-https": true, "https-require-client-cert": true,
 }
 
 func resolve(t *testing.T, args ...string) (config.Config, config.Flags, error) {
@@ -54,6 +58,12 @@ func TestEveryWireMockFlagIsAccepted(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			args := []string{"--" + name}
+			if needsHTTPSPort[name] {
+				args = append([]string{"--https-port", "8443"}, args...)
+			}
+			if name == "https-require-client-cert" {
+				args = append(args, "--https-truststore", "t")
+			}
 			if value != "" {
 				args = append(args, value)
 			}
@@ -111,6 +121,12 @@ func TestWireMockFlagsSetTheConfiguration(t *testing.T) {
 		{"pass through", []string{"--proxy-pass-through", "false"}, func(c config.Config) bool { return c.Proxy.PassThrough != nil && !*c.Proxy.PassThrough }},
 		{"a flag with an optional value, alone", []string{"--timeout", "--port", "9002"}, func(c config.Config) bool { return c.Listen.Mock == ":9002" }},
 		{"a flag with an optional value, given", []string{"--timeout", "5000", "--port", "9003"}, func(c config.Config) bool { return c.Listen.Mock == ":9003" }},
+		{"https", []string{"--https-port", "8443", "--https-keystore", "k.p12", "--keystore-password", "pw", "--disable-http"}, func(c config.Config) bool {
+			return c.TLS.Port == 8443 && c.TLS.Keystore == "k.p12" && c.TLS.KeystorePassword == "pw" && c.TLS.DisableHTTP
+		}},
+		{"http2 off", []string{"--https-port", "8443", "--disable-http2-plain", "--disable-http2-tls", "--admin-api-require-https"}, func(c config.Config) bool {
+			return c.TLS.DisableHTTP2Plain && c.TLS.DisableHTTP2TLS && c.TLS.AdminRequireHTTPS
+		}},
 		{"the last flag wins", []string{"--global-response-templating", "--local-response-templating"}, func(c config.Config) bool { return !c.Templating.Global }},
 	}
 	for _, tt := range tests {

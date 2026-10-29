@@ -21,6 +21,7 @@ import (
 // layer, matcher, the journal and the detector (DESIGN.md §6.2).
 type Request struct {
 	Method   string
+	Protocol string // HTTP/1.1, or HTTP/2.0 as WireMock names it
 	Scheme   string
 	Host     string
 	Port     int
@@ -49,11 +50,16 @@ func NewRequest(r *http.Request, body []byte, path string) *Request {
 	}
 	host, port := splitHostPort(r.Host, scheme)
 	header := r.Header.Clone()
-	if header.Get("Host") == "" && r.Host != "" {
-		header.Set("Host", r.Host) // Go moves it out of Header; WireMock keeps it there
+	if header.Get("Host") == "" && r.Host != "" && r.ProtoMajor < 2 {
+		header.Set("Host", r.Host) // Go moves it out of Header; WireMock keeps it there, but HTTP/2 has no Host header
+	}
+	protocol := r.Proto
+	if protocol == "" {
+		protocol = "HTTP/1.1"
 	}
 	return &Request{
 		Method:   r.Method,
+		Protocol: protocol,
 		Scheme:   scheme,
 		Host:     host,
 		Port:     port,
@@ -90,6 +96,7 @@ func FromSample(s *model.SampleRequest) *Request {
 	host, port := splitHostPort(h.Get("Host"), "http")
 	return &Request{
 		Method:   strings.ToUpper(s.Method),
+		Protocol: "HTTP/1.1",
 		Scheme:   "http",
 		Host:     host,
 		Port:     port,

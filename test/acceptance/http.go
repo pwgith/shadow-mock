@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,6 +52,10 @@ func (w *world) resolve(target string) (string, error) {
 		return w.srv.URL + target, nil
 	case strings.HasPrefix(target, "http://localhost:8080"):
 		return w.srv.URL + strings.TrimPrefix(target, "http://localhost:8080"), nil
+	case w.tlsSrv != nil && strings.HasPrefix(target, "https://localhost:"+strconv.Itoa(w.tlsPort)):
+		return w.tlsSrv.URL + strings.TrimPrefix(target, "https://localhost:"+strconv.Itoa(w.tlsPort)), nil
+	case w.tlsSrv != nil && strings.HasPrefix(target, w.tlsSrv.URL):
+		return target, nil
 	case w.adminSrv != nil && strings.HasPrefix(target, "http://localhost:9090"):
 		return w.adminSrv.URL + strings.TrimPrefix(target, "http://localhost:9090"), nil
 	case w.adminSrv != nil && strings.HasPrefix(target, w.adminSrv.URL):
@@ -80,8 +85,11 @@ func (w *world) send(r *request) (*reply, error) {
 			req.Header.Add(k, w.sub(v))
 		}
 	}
-	if r.host != "" {
+	switch {
+	case r.host != "":
 		req.Host = w.sub(r.host)
+	case w.tlsSrv != nil && strings.HasPrefix(w.sub(r.target), "https://localhost:"):
+		req.Host = strings.SplitN(strings.TrimPrefix(w.sub(r.target), "https://"), "/", 2)[0] // so the port matches what the step names
 	}
 	if r.basic != [2]string{} {
 		req.SetBasicAuth(r.basic[0], r.basic[1])

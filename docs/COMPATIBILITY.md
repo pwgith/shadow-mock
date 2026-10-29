@@ -128,6 +128,11 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | `--admin-api-basic-auth` | 401 with no `WWW-Authenticate` header | 401 with `WWW-Authenticate: Basic` |
 | Listing the journal when it is off | 500 `RequestJournalDisabledException` | 200 with an empty list and `requestJournalDisabled: true` (a count is `-1` on both) |
 | WireMock flags that tune the Java server (`--jetty-*`, `--container-threads` and the like) | Take effect | Accepted, with a warning at start-up, and ignored |
+| The certificate when no keystore is given | WireMock's own built-in keystore, the same on every start | A self-signed ECDSA certificate for `localhost`, `127.0.0.1` and `::1`, made on each start. A client that pins WireMock's certificate must be given the new one, or told not to verify |
+| `--keystore-type` | `JKS` unless told otherwise | `JKS` or `PKCS12`. With no type a file is read as JKS if it is one, and as PKCS12 if not |
+| `--https-require-client-cert` with no `--https-truststore` | Starts, and then no client can connect | Refused at start-up, naming the missing truststore |
+| The admin listener of `listen.admin` | (WireMock has no second listener) | Plain HTTP. HTTPS serves what the mock listener serves |
+| A TLS handshake that fails | Logged at debug | Logged by Go's HTTP server on standard error |
 | Journal `clientIp` | Written as `[0:0:0:0:0:0:0:1]` for IPv6 | Written as the plain address |
 
 ### Behaviour that matches WireMock on purpose

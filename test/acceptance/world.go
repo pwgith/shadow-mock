@@ -12,6 +12,7 @@ package acceptance
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -31,6 +32,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/app"
 	"github.com/pwgith/shadow-mock/internal/config"
 	"github.com/pwgith/shadow-mock/internal/telemetry"
+	"github.com/pwgith/shadow-mock/internal/tlsconf"
 	"github.com/pwgith/shadow-mock/pkg/extension"
 )
 
@@ -116,6 +118,8 @@ type world struct {
 	app      *app.App
 	srv      *httptest.Server
 	adminSrv *httptest.Server // set when listen.admin gives the admin API its own listener
+	tlsSrv   *httptest.Server // set when tls.port gives the engine an HTTPS listener
+	tlsPort  int
 	cancel   context.CancelFunc
 	stopOnce sync.Once
 	stopped  chan struct{}
@@ -176,6 +180,7 @@ func newWorld() (*world, error) {
 		client: &http.Client{
 			Timeout:       60 * time.Second,
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+			Transport:     tlsTransport(),
 		},
 	}, nil
 }
@@ -217,9 +222,27 @@ func (w *world) start() error {
 	if cfg.Listen.Admin != "" {
 		w.adminSrv = httptest.NewServer(a.Handlers()[cfg.Listen.Admin])
 	}
+	if cfg.TLS.Enabled() {
+		tc, err := tlsconf.Config(cfg.TLS, w.clk)
+		if err != nil {
+			return errors.Join(fmt.Errorf("tls: %w", err), a.Close())
+		}
+		w.tlsSrv = httptest.NewUnstartedServer(a.Handler())
+		w.tlsSrv.TLS, w.tlsSrv.EnableHTTP2 = tc, !cfg.TLS.DisableHTTP2TLS
+		w.tlsSrv.StartTLS()
+		w.tlsPort = cfg.TLS.Port
+	}
 	w.stopOnce = sync.Once{}
 	w.stopped = make(chan struct{})
 	return nil
+}
+
+// tlsTransport is the default transport, made to accept the engine's self-signed certificate and to
+// speak HTTP/2 when the server offers it.
+func tlsTransport() *http.Transport {
+	t := &http.Transport{Proxy: http.ProxyFromEnvironment, ForceAttemptHTTP2: true}
+	t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	return t
 }
 
 func (w *world) markStopped() { w.stopOnce.Do(func() { close(w.stopped) }) }
@@ -230,6 +253,10 @@ func (w *world) stop() error {
 		return nil
 	}
 	w.srv.Close()
+	if w.tlsSrv != nil {
+		w.tlsSrv.Close()
+		w.tlsSrv = nil
+	}
 	if w.adminSrv != nil {
 		w.adminSrv.Close()
 		w.adminSrv = nil

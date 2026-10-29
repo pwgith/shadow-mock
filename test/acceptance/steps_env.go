@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,9 @@ func (w *world) initEnv(sc *godog.ScenarioContext) {
 	})
 	sc.Step(`^Shadow Mock is running with ambiguity policy "([^"]*)"$`, func(p string) error {
 		return w.reconfigure("sessions: { detect: { ambiguity: " + p + " } }")
+	})
+	sc.Step(`^Shadow Mock is listening on http port (\d+) and https port (\d+)$`, func(_, https int) error {
+		return w.reconfigure("tls: { port: " + strconv.Itoa(https) + " }")
 	})
 	sc.Step(`^Shadow Mock restarts$`, func() error { return w.restart(true) })
 	sc.Step(`^the mock root directory "([^"]*)" is empty$`, func(string) error { return clearDir(w.root) })

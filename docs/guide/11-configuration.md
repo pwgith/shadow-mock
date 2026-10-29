@@ -52,6 +52,12 @@ line or a Docker `command:` copied from a WireMock setup starts. Each flag does 
 | `--proxy-timeout <ms>` | `proxy.timeout` |
 | `--allow-proxy-targets`, `--deny-proxy-targets` | `proxy.allowTargets`, `proxy.denyTargets`. Addresses, ranges written `a-b`, CIDR blocks and names with `*`. The allowed list is looked at first. A refused target is a 500 |
 | `--proxy-pass-through` | `proxy.passThrough`, the starting value of the `proxyPassThrough` setting |
+| `--https-port` | `tls.port`. Adds an HTTPS listener that serves what the mock listener serves; see "HTTPS and HTTP/2" below |
+| `--disable-http` | `tls.disableHttp`. The mock listener is not opened. Needs `--https-port` |
+| `--https-keystore`, `--keystore-type`, `--keystore-password`, `--key-manager-password` | `tls.keystore`, `tls.keystoreType`, `tls.keystorePassword`, `tls.keyManagerPassword` |
+| `--https-truststore`, `--truststore-type`, `--truststore-password`, `--https-require-client-cert` | `tls.truststore`, `tls.truststoreType`, `tls.truststorePassword`, `tls.requireClientCert` |
+| `--disable-http2-plain`, `--disable-http2-tls` | `tls.disableHttp2Plain`, `tls.disableHttp2Tls` |
+| `--admin-api-require-https` | `tls.adminRequireHttps` |
 | `--disable-banner`, `--preserve-user-agent-proxy-header` | Nothing to change: Shadow Mock prints no banner and always passes the client's `User-Agent` on |
 
 **Accepted with a warning at start-up, and ignored,** because they tune WireMock's Java server:
@@ -61,10 +67,8 @@ line or a Docker `command:` copied from a WireMock setup starts. Each flag does 
 `--supported-proxy-encodings`, `--use-chunked-encoding`, `--timeout`, `--webhook-threadpool-size`,
 `--max-template-cache-entries` and `--load-resources-from-classpath`.
 
-**Refused for now,** with "is not supported yet": the TLS, HTTP/2 and browser-proxy flags
-(`--https-*`, `--keystore-*`, `--key-manager-password`, `--truststore-*`, `--disable-http`,
-`--disable-http2-*`, `--admin-api-require-https`, `--enable-browser-proxying`, `--ca-keystore*`,
-`--trust-all-proxy-targets`, `--trust-proxy-target`). They are on the
+**Refused for now,** with "is not supported yet": the browser-proxy flags (`--enable-browser-proxying`,
+`--ca-keystore*`, `--trust-all-proxy-targets`, `--trust-proxy-target`). They are on the
 [parity plan](../PARITY_PLAN.md).
 
 `--port`, `--root-dir`, `--verbose`, `--version` and `--help` are as in the table above.
@@ -97,6 +101,23 @@ adminPrefix: /__admin         # where the admin API lives
 listen:
   mock: ":8080"
   admin: ""                   # set to serve the admin API on its own port
+
+tls:                          # HTTPS and HTTP/2 (see "HTTPS and HTTP/2" below)
+  port: 0                     # the HTTPS port; 0 means no HTTPS listener
+  certFile: ""                # certificate chain in PEM, with keyFile
+  keyFile: ""                 # private key in PEM
+  keystore: ""                # or a PKCS12 or JKS file holding the certificate and key
+  keystoreType: ""            # JKS | PKCS12. Empty reads a file as JKS if it is one, else as PKCS12
+  keystorePassword: ""        # empty means "password", as in WireMock
+  keyManagerPassword: ""      # the password of the key inside a JKS keystore; empty means the keystore's
+  truststore: ""              # certificates of the clients to trust
+  truststoreType: ""
+  truststorePassword: ""
+  requireClientCert: false    # refuse a client without a certificate the truststore vouches for
+  disableHttp: false          # serve HTTPS only
+  disableHttp2Plain: false    # no HTTP/2 without TLS (h2c)
+  disableHttp2Tls: false      # no HTTP/2 over TLS
+  adminRequireHttps: false    # answer admin calls made over plain HTTP with 403
 
 admin:
   globalWrites: allow         # allow | deny
@@ -214,6 +235,19 @@ tracing:
 Durations are written as `30s`, `15m`, `1h`, `720h`.
 
 ### Notes on some settings
+
+* **HTTPS and HTTP/2.** With `tls.port` the server also listens for HTTPS on that port, at the address
+  `listen.bindAddress` gives, and answers there what the mock listener answers (the admin API too, unless
+  `listen.admin` gives it a listener of its own, which stays plain). The certificate comes from
+  `certFile` and `keyFile`, or from `keystore` (PKCS12 or JKS), or, when neither is set, is made when the
+  server starts: a self-signed certificate for `localhost`, `127.0.0.1` and `::1`, so a client has to be
+  told to accept it. Setting `truststore` asks every client for a certificate and checks the ones that
+  present one against it; `requireClientCert` turns away the rest. Over TLS the server speaks HTTP/2 as
+  well as HTTP/1.1 (the client chooses by ALPN), and on the plain port it accepts HTTP/2 from a client
+  that starts with it (h2c, "prior knowledge"); `disableHttp2Tls` and `disableHttp2Plain` turn each
+  off. `adminRequireHttps` answers an admin call that arrived over plain HTTP with 403 and WireMock's
+  error body `{"errors":[{"code":40,"title":"HTTPS is required for accessing the admin API"}]}`.
+  The journal records `HTTP/2.0` as the protocol of an HTTP/2 request, as WireMock does.
 
 * **`root`** is where `mappings/` and `__files/` live. Mapping sets for seeding sessions live in
   `<root>/mapping-sets`, and persisted sessions in `<root>/sessions`.

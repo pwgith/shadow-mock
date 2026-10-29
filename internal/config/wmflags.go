@@ -13,7 +13,7 @@ import (
 // command copied from a WireMock setup starts. Each is one of three kinds: implemented, by setting
 // the configuration key that does the same; accepted with a warning, because it tunes the Java
 // server and has nothing to tune here; or refused with a clear message, because it belongs to
-// the TLS, HTTP/2 and browser-proxy workstreams that are not built yet.
+// the browser-proxy workstream that is not built yet.
 
 // wmFlag is one WireMock flag.
 type wmFlag struct {
@@ -108,6 +108,20 @@ func wireMockFlags() []wmFlag {
 		{name: "deny-proxy-targets", apply: func(c *Config, v string) error { c.Proxy.DenyTargets = list(v); return nil }},
 		{name: "proxy-pass-through", apply: setBool(func(c *Config, on bool) { c.Proxy.PassThrough = &on })},
 
+		{name: "https-port", apply: setInt(func(c *Config, n int) { c.TLS.Port = n })},
+		{name: "disable-http", bool: true, apply: func(c *Config, _ string) error { c.TLS.DisableHTTP = true; return nil }},
+		{name: "https-keystore", apply: func(c *Config, v string) error { c.TLS.Keystore = v; return nil }},
+		{name: "keystore-type", apply: func(c *Config, v string) error { c.TLS.KeystoreType = v; return nil }},
+		{name: "keystore-password", apply: func(c *Config, v string) error { c.TLS.KeystorePassword = v; return nil }},
+		{name: "key-manager-password", apply: func(c *Config, v string) error { c.TLS.KeyManagerPassword = v; return nil }},
+		{name: "https-truststore", apply: func(c *Config, v string) error { c.TLS.Truststore = v; return nil }},
+		{name: "truststore-type", apply: func(c *Config, v string) error { c.TLS.TruststoreType = v; return nil }},
+		{name: "truststore-password", apply: func(c *Config, v string) error { c.TLS.TruststorePassword = v; return nil }},
+		{name: "https-require-client-cert", bool: true, apply: func(c *Config, _ string) error { c.TLS.RequireClientCert = true; return nil }},
+		{name: "disable-http2-plain", bool: true, apply: func(c *Config, _ string) error { c.TLS.DisableHTTP2Plain = true; return nil }},
+		{name: "disable-http2-tls", bool: true, apply: func(c *Config, _ string) error { c.TLS.DisableHTTP2TLS = true; return nil }},
+		{name: "admin-api-require-https", bool: true, apply: func(c *Config, _ string) error { c.TLS.AdminRequireHTTPS = true; return nil }},
+
 		// Accepted with a warning: they tune the Java server.
 		{name: "container-threads", why: ignored},
 		{name: "jetty-accept-queue-size", why: ignored},
@@ -132,20 +146,7 @@ func wireMockFlags() []wmFlag {
 		{name: "max-template-cache-entries", optional: true, why: ignored},
 		{name: "load-resources-from-classpath", why: ignored},
 
-		// Refused until the TLS, HTTP/2 and browser-proxy workstreams are built.
-		{name: "https-port", why: notYet},
-		{name: "disable-http", bool: true, why: notYet},
-		{name: "https-keystore", why: notYet},
-		{name: "keystore-type", why: notYet},
-		{name: "keystore-password", why: notYet},
-		{name: "key-manager-password", why: notYet},
-		{name: "https-truststore", why: notYet},
-		{name: "truststore-type", why: notYet},
-		{name: "truststore-password", why: notYet},
-		{name: "https-require-client-cert", bool: true, why: notYet},
-		{name: "disable-http2-plain", bool: true, why: notYet},
-		{name: "disable-http2-tls", bool: true, why: notYet},
-		{name: "admin-api-require-https", bool: true, why: notYet},
+		// Refused until the browser-proxy workstream is built.
 		{name: "enable-browser-proxying", bool: true, why: notYet},
 		{name: "ca-keystore", why: notYet},
 		{name: "ca-keystore-password", why: notYet},

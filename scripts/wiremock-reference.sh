@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # Starts real WireMock servers to compare Shadow Mock against.
 #
-#   scripts/wiremock-reference.sh start   downloads WireMock (once), then starts three servers:
+#   scripts/wiremock-reference.sh start   downloads WireMock (once), then starts four servers:
 #                                           :18080  root = a copy of corpus/wiremock
 #                                           :18081  no stubs, for the client suite
 #                                           :18082  root = a copy of corpus/wiremock, with --enable-stub-cors
+#                                           :18083  no stubs, with HTTPS on :18443 and --admin-api-require-https
 #   scripts/wiremock-reference.sh stop    stops them
 #
 # Then, from the repository root:
 #
 #   SHADOWMOCK_WIREMOCK_URL=http://localhost:18080 SHADOWMOCK_WIREMOCK_CORS_URL=http://localhost:18082 \
-#     go test ./test/conformance -run 'TestDifferentialAgainstRealWireMock|TestAdminAPIMatchesWireMock|TestWireBehaviourMatchesWireMock|TestRecordingMatchesWireMock'
+#   SHADOWMOCK_WIREMOCK_TLS_PLAIN_URL=http://localhost:18083 SHADOWMOCK_WIREMOCK_TLS_URL=https://localhost:18443 \
+#     go test ./test/conformance -run 'TestDifferentialAgainstRealWireMock|TestAdminAPIMatchesWireMock|TestWireBehaviourMatchesWireMock|TestRecordingMatchesWireMock|TestTLSMatchesWireMock'
 #   BASE_URL=http://localhost:18081 node --test test/client/compat.test.mjs
 #
 # Needs Java 11 or later and curl. The jar is checked against the SHA-1 Maven Central publishes
@@ -44,7 +46,8 @@ launch() { # name port root [extra WireMock flags]
   java -jar "$JAR" --port "$port" --root-dir "$root" "$@" >"$HOME_DIR/$name.log" 2>&1 &
   echo $! >"$HOME_DIR/$name.pid"
   for _ in $(seq 1 60); do
-    if curl -fs "http://localhost:$port/__admin/version" >/dev/null 2>&1; then
+    # Any answer will do: a server that requires HTTPS for its admin API answers this with a 403.
+    if curl -s -o /dev/null "http://localhost:$port/__admin/version" 2>/dev/null; then
       echo "$name is up on :$port (WireMock $VERSION)"
       return
     fi
@@ -58,18 +61,19 @@ launch() { # name port root [extra WireMock flags]
 start() {
   fetch
   stop
-  rm -rf "$HOME_DIR/corpus-root" "$HOME_DIR/cors-root" "$HOME_DIR/empty-root"
+  rm -rf "$HOME_DIR/corpus-root" "$HOME_DIR/cors-root" "$HOME_DIR/empty-root" "$HOME_DIR/tls-root"
   cp -r "$REPO/corpus/wiremock" "$HOME_DIR/corpus-root"
   cp -r "$REPO/corpus/wiremock" "$HOME_DIR/cors-root"
-  mkdir -p "$HOME_DIR/empty-root"
+  mkdir -p "$HOME_DIR/empty-root" "$HOME_DIR/tls-root"
   launch corpus 18080 "$HOME_DIR/corpus-root"
   launch empty 18081 "$HOME_DIR/empty-root"
   launch cors 18082 "$HOME_DIR/cors-root" --enable-stub-cors
+  launch tls 18083 "$HOME_DIR/tls-root" --https-port 18443 --admin-api-require-https
 }
 
 stop() {
   local f
-  for f in "$HOME_DIR"/corpus.pid "$HOME_DIR"/empty.pid "$HOME_DIR"/cors.pid; do
+  for f in "$HOME_DIR"/corpus.pid "$HOME_DIR"/empty.pid "$HOME_DIR"/cors.pid "$HOME_DIR"/tls.pid; do
     [[ -f "$f" ]] || continue
     kill "$(cat "$f")" 2>/dev/null || true
     rm -f "$f"

@@ -280,7 +280,7 @@ func miscCases() []tc {
 // wiremockUnsupported lists mappings the engine cannot serve yet, with the reason. They are
 // stored (the corpus loads in full) but never compiled into the serving snapshot.
 var wiremockUnsupported = map[string]string{
-	"c003000403": "scheme and port matching needs an HTTPS listener on 8443",
+	"c003000403": "scheme and port matching needs an HTTPS listener on 8443; TestTLSMatchesWireMock compares it",
 	"c013000101": "proxies to an upstream on 8089; the acceptance suite covers proxying", "c013000103": "proxies to an upstream on 8089; the acceptance suite covers proxying",
 	"c013000104": "proxies to an upstream on 8089; the acceptance suite covers proxying", "c013000105": "proxies to a templated host; the acceptance suite covers proxying",
 }
