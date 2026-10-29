@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
@@ -122,6 +123,22 @@ type snapshotResult struct {
 	Mappings []model.StubMapping `json:"mappings"`
 }
 
+type snapshotIDs struct {
+	IDs []string `json:"ids"`
+}
+
+// writeSnapshot answers with the mappings, or with only their ids when the spec asks for IDS.
+func writeSnapshot(w http.ResponseWriter, spec *record.Spec, ms []model.StubMapping) error {
+	if strings.EqualFold(spec.OutputFormat, "IDS") {
+		out := snapshotIDs{IDs: make([]string, len(ms))}
+		for i := range ms {
+			out.IDs[i] = ms[i].ID
+		}
+		return writeJSON(w, http.StatusOK, out)
+	}
+	return writeJSON(w, http.StatusOK, snapshotResult{Mappings: ms})
+}
+
 func (h *Handler) startRecording(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
 	var spec record.Spec
 	if err := h.decode(r, &spec); err != nil {
@@ -154,5 +171,5 @@ func (h *Handler) snapshot(w http.ResponseWriter, r *http.Request, sc store.Scop
 	if err != nil {
 		return err
 	}
-	return writeJSON(w, http.StatusOK, snapshotResult{Mappings: ms})
+	return writeSnapshot(w, &spec, ms)
 }

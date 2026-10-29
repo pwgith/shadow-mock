@@ -30,7 +30,7 @@ func jsonHeader() http.Header {
 
 func TestBuildBodiesAndHeaders(t *testing.T) {
 	t.Parallel()
-	ms, err := record.Build(&record.Spec{}, []record.Exchange{
+	ms, _, err := record.Build(&record.Spec{}, []record.Exchange{
 		exchange(t, http.MethodGet, "/json?a=1", "", 200, jsonHeader(), `{"id":2}`),
 		exchange(t, http.MethodGet, "/text", "", 200, http.Header{"Content-Type": {"text/plain"}}, "hello"),
 		exchange(t, http.MethodGet, "/bin", "", 200, http.Header{"Content-Type": {"image/png"}}, "\x89PNG\x00"),
@@ -43,7 +43,7 @@ func TestBuildBodiesAndHeaders(t *testing.T) {
 		t.Fatalf("got %d mappings, want 4", len(ms))
 	}
 	want := []string{
-		`"jsonBody":{"id":2}`,
+		`"body":"{\"id\":2}"`,
 		`"body":"hello"`,
 		`"base64Body":"iVBORwA="`,
 		`"status":204`,
@@ -58,12 +58,12 @@ func TestBuildBodiesAndHeaders(t *testing.T) {
 		}
 	}
 	first, _ := ms[0].MarshalJSON()
-	for _, s := range []string{`"url":"/json?a=1"`, `"method":"GET"`, `"X-Keep":"1"`} {
+	for _, s := range []string{`"urlPath":"/json"`, `"queryParameters":{"a":{"hasExactly":[{"equalTo":"1"}]}}`, `"name":"json"`, `"method":"GET"`, `"X-Keep":"1"`} {
 		if !strings.Contains(string(first), s) {
 			t.Errorf("first mapping %s lacks %s", first, s)
 		}
 	}
-	for _, s := range []string{"Content-Length", "Date"} {
+	for _, s := range []string{"Content-Length"} {
 		if strings.Contains(string(first), s) {
 			t.Errorf("first mapping records the transfer header %s: %s", s, first)
 		}
@@ -76,7 +76,7 @@ func TestBuildCapturesHeadersAndBodies(t *testing.T) {
 		CaptureHeaders:     map[string]record.CaptureHeader{"Accept": {CaseInsensitive: true}, "X-Absent": {}},
 		RequestBodyPattern: &record.BodyPattern{Matcher: "auto", IgnoreArrayOrder: true},
 	}
-	ms, err := record.Build(spec, []record.Exchange{
+	ms, _, err := record.Build(spec, []record.Exchange{
 		exchange(t, http.MethodPost, "/j", `{"a":[1,2]}`, 200, nil, "", "Accept", "text/plain", "Content-Type", "application/json"),
 		exchange(t, http.MethodPost, "/x", `<a/>`, 200, nil, "", "Content-Type", "text/xml"),
 		exchange(t, http.MethodPost, "/t", `raw`, 200, nil, ""),
@@ -92,7 +92,7 @@ func TestBuildCapturesHeadersAndBodies(t *testing.T) {
 	for i, want := range []string{
 		`"bodyPatterns":[{"equalToJson":"{\"a\":[1,2]}","ignoreArrayOrder":true,"ignoreExtraElements":false}]`,
 		`"bodyPatterns":[{"equalToXml":"`,
-		`"bodyPatterns":[{"equalTo":"raw"}]`,
+		`"bodyPatterns":[{"caseInsensitive":false,"equalTo":"raw"}]`,
 	} {
 		if !strings.Contains(got[i], want) {
 			t.Errorf("mapping %d = %s, want it to contain %s", i, got[i], want)
@@ -101,13 +101,17 @@ func TestBuildCapturesHeadersAndBodies(t *testing.T) {
 	if !strings.Contains(got[0], `"Accept":{"caseInsensitive":true,"equalTo":"text/plain"}`) || strings.Contains(got[0], "X-Absent") {
 		t.Errorf("captured headers wrong: %s", got[0])
 	}
-	// Without a requestBodyPattern the body is not part of the request pattern.
-	plain, err := record.Build(&record.Spec{}, []record.Exchange{exchange(t, http.MethodPost, "/p", "data", 200, nil, "")})
+	// Without a requestBodyPattern the body is matched as WireMock does: by its content type, and JSON
+	// ignoring array order and extra elements.
+	plain, _, err := record.Build(&record.Spec{}, []record.Exchange{
+		exchange(t, http.MethodPost, "/p", "data", 200, nil, ""),
+		exchange(t, http.MethodPost, "/q", "{}", 200, nil, "", "Content-Type", "application/json"),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b, _ := plain[0].MarshalJSON(); strings.Contains(string(b), "bodyPatterns") {
-		t.Errorf("mapping = %s, want no body pattern", b)
+	if b, _ := plain[1].MarshalJSON(); !strings.Contains(string(b), `{"equalToJson":"{}","ignoreArrayOrder":true,"ignoreExtraElements":true}`) {
+		t.Errorf("mapping = %s, want the default JSON body pattern", b)
 	}
 }
 
@@ -118,14 +122,14 @@ func TestBuildRepeats(t *testing.T) {
 		exchange(t, http.MethodGet, "/other", "", 200, nil, "o"),
 		exchange(t, http.MethodGet, "/jobs/1", "", 200, nil, "COMPLETE"),
 	}
-	once, err := record.Build(&record.Spec{}, repeats)
+	once, _, err := record.Build(&record.Spec{}, repeats)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(once) != 2 || once[0].HasCallResponses() || once[0].Response.Status != 202 {
-		t.Errorf("without repeats: %d mappings, first = %+v; want 2 with the first response kept", len(once), once[0].Response)
+	if len(once) != 2 || once[0].HasCallResponses() || once[0].Response.Status != 200 {
+		t.Errorf("without repeats: %d mappings, first = %+v; want 2 with the last response kept", len(once), once[0].Response)
 	}
-	many, err := record.Build(&record.Spec{RepeatsAsCallResponses: true}, repeats)
+	many, _, err := record.Build(&record.Spec{RepeatsAsCallResponses: true}, repeats)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +226,7 @@ func TestALiveRecordingHandsOverEachNewRequestOnce(t *testing.T) {
 	sc := store.Global(tenant.Local)
 	var got []model.StubMapping
 	failNext := false
-	err := r.StartLive(sc, record.Spec{TargetBaseURL: "http://up", CaptureHeaders: map[string]record.CaptureHeader{"X-Key": {}}}, nil, func(m model.StubMapping) error {
+	err := r.StartLive(sc, record.Spec{TargetBaseURL: "http://up", CaptureHeaders: map[string]record.CaptureHeader{"X-Key": {}}}, nil, func(m model.StubMapping, _ []record.File) error {
 		if failNext {
 			return http.ErrAbortHandler
 		}
@@ -250,5 +254,34 @@ func TestALiveRecordingHandsOverEachNewRequestOnce(t *testing.T) {
 	}
 	if n := len(a.Exchanges()); n != 5 {
 		t.Errorf("Exchanges = %d, want all 5 kept even when writing one failed", n)
+	}
+}
+
+func TestBuildKeepsLargeBodiesInFiles(t *testing.T) {
+	t.Parallel()
+	spec := &record.Spec{ExtractBodyCriteria: &record.ExtractBody{TextSizeThreshold: "1 kb", BinarySizeThreshold: "0 kb"}}
+	ms, files, err := record.Build(spec, []record.Exchange{
+		exchange(t, http.MethodGet, "/big/doc", "", 200, http.Header{"Content-Type": {"application/json"}}, strings.Repeat("x", 2048)),
+		exchange(t, http.MethodGet, "/small", "", 200, http.Header{"Content-Type": {"text/plain"}}, "hi"),
+		exchange(t, http.MethodGet, "/bin", "", 200, http.Header{"Content-Type": {"image/png"}}, "\x89PNG\x00"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 || !strings.HasPrefix(files[0].Name, "big_doc-"+ms[0].ID) || !strings.HasSuffix(files[0].Name, ".json") || len(files[0].Body) != 2048 {
+		t.Fatalf("files = %+v", files)
+	}
+	if ms[0].Response.BodyFileName != files[0].Name || ms[1].Response.BodyFileName != "" || ms[2].Response.BodyFileName != files[1].Name {
+		t.Errorf("bodyFileName = %q, %q, %q", ms[0].Response.BodyFileName, ms[1].Response.BodyFileName, ms[2].Response.BodyFileName)
+	}
+}
+
+func TestSpecValidateRefusesWhatWireMockRefuses(t *testing.T) {
+	t.Parallel()
+	for size, ok := range map[string]bool{"100 kb": true, "1KB": true, "2 Mb": true, "": true, "100 b": false, "100 bytes": false, "kb": false} {
+		spec := record.Spec{ExtractBodyCriteria: &record.ExtractBody{TextSizeThreshold: size}}
+		if err := spec.Validate(); (err == nil) != ok {
+			t.Errorf("size %q: error %v, want ok=%v", size, err, ok)
+		}
 	}
 }

@@ -81,7 +81,8 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-10.10 | `01_wiremock_parity/responses/response_framing.feature`, `01_wiremock_parity/responses/gzip.feature` |
 | FR-10.11 | `01_wiremock_parity/responses/server_behaviours.feature`, `01_wiremock_parity/responses/proxying.feature` |
 | FR-10.13 | `03_standalone/wiremock_flags.feature` (and `internal/config/wmflags_test.go`, which checks every flag in WireMock's `--help`) |
-| FR-10.12, FR-10.14 to FR-10.16 | planned, see [PARITY_PLAN.md](../docs/PARITY_PLAN.md); each gets a feature as its workstream is built |
+| FR-10.12 | `01_wiremock_parity/record_playback/snapshot.feature` (and `test/conformance/recording_differential_test.go`) |
+| FR-10.14 to FR-10.16 | planned, see [PARITY_PLAN.md](../docs/PARITY_PLAN.md); each gets a feature as its workstream is built |
 | NFR-1.1 | `06_non_functional/compatibility.feature` |
 | NFR-1.2 | `02_shadow_mocks/key_based/session_scoped_admin.feature`, `06_non_functional/compatibility.feature` |
 | NFR-2.1 | `06_non_functional/performance.feature` |

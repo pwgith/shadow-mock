@@ -66,7 +66,7 @@ jobs:
         run: WIREMOCK_HOME="$RUNNER_TEMP/wiremock" bash scripts/wiremock-reference.sh start
       - name: Replay the corpus, the admin API and the wire behaviour against Shadow Mock and WireMock and compare
         run: |
-          SHADOWMOCK_WIREMOCK_URL=http://localhost:18080 SHADOWMOCK_WIREMOCK_CORS_URL=http://localhost:18082             go test ./test/conformance -run 'TestDifferentialAgainstRealWireMock|TestAdminAPIMatchesWireMock|TestWireBehaviourMatchesWireMock' -count=1
+          SHADOWMOCK_WIREMOCK_URL=http://localhost:18080 SHADOWMOCK_WIREMOCK_CORS_URL=http://localhost:18082             go test ./test/conformance -run 'TestDifferentialAgainstRealWireMock|TestAdminAPIMatchesWireMock|TestWireBehaviourMatchesWireMock|TestRecordingMatchesWireMock' -count=1
       - name: Client suite against WireMock (every expectation in it must hold there)
         run: BASE_URL=http://localhost:18081 node --test test/client/compat.test.mjs
       - name: Client suite against Shadow Mock

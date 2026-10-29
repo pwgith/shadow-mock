@@ -230,6 +230,14 @@ settings. The `--help` text lists them.
 
 ### 7. Recording and snapshots (FR-10.12)
 
+**Status: done.** `TestRecordingMatchesWireMock` snapshots the same traffic on both servers and compares the mappings (request pattern, name, body, headers, order) and the `IDS` output. What the probes changed from the list below:
+
+* A snapshot lists the newest request first. A repeat keeps the last response, not the first. Without `requestBodyPattern` the body is matched by content type (`equalToJson` ignoring array order and extra elements, `equalToXml`, `equalTo` with `caseInsensitive: false`), where Shadow Mock used to record no body pattern.
+* `name` is the path with `/` as `_`; a query string becomes `urlPath` plus `queryParameters` with `hasExactly`; every response body is text in `body` (JSON too), `base64Body` for binary; `Date` and `Keep-Alive` stay in the headers.
+* `extractBodyCriteria` (`textSizeThreshold`, `binarySizeThreshold`, in `kb`, `mb` or `gb`; a bare `b` is a 422) keeps bodies from that size in `__files` as `<name>-<id>.<ext>`.
+* `--record-mappings` has an older shape in WireMock (`url` with the query, no `name`, bodies in `body-<name>-<id>.txt`); Shadow Mock matches it.
+* Not done: `repeatsAsScenarios`, because Shadow Mock has no scenarios (`repeatsAsCallResponses` is the replacement).
+
 Recorded mappings match WireMock's shape: `urlPath` plus `queryParameters`, a `name`, text bodies as
 `body`, and `outputFormat: IDS` returns `{"ids": [...]}`. `repeatsAsCallResponses` stays. The recorded
 mapping shape is covered by a differential test of `snapshot` against both servers.

@@ -344,8 +344,12 @@ func TestProxyAllWithRecordingWritesEachMappingAsItArrives(t *testing.T) {
 		t.Fatalf("after the first request: %v, want the recorded mapping at once", names)
 	}
 	saved, _ := os.ReadFile(filepath.Join(root, "mappings", names[0]))
-	if !strings.Contains(string(saved), "/orders/7") || !strings.Contains(string(saved), "from upstream") {
+	if !strings.Contains(string(saved), "/orders/7") || !strings.Contains(string(saved), "bodyFileName") {
 		t.Errorf("recorded mapping = %s", saved)
+	}
+	bodies, _ := os.ReadDir(filepath.Join(root, "__files"))
+	if len(bodies) != 1 || !strings.HasPrefix(bodies[0].Name(), "body-orders_7-") {
+		t.Errorf("recorded bodies = %v, want one file kept in __files", bodies)
 	}
 	get("/orders/7")
 	if got := files(); len(got) != 1 {

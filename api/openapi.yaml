@@ -2208,8 +2208,9 @@ components:
         extractBodyCriteria:
           type: object
           properties:
-            textSizeThreshold: { type: string, examples: [2kb] }
-            binarySizeThreshold: { type: string, examples: [10kb] }
+            textSizeThreshold: { type: string, examples: [2 kb], description: "A number and kb, mb or gb. Text bodies of at least this size are kept in __files." }
+            binarySizeThreshold: { type: string, examples: [10 kb], description: "As textSizeThreshold, for binary bodies." }
+        outputFormat: { type: string, enum: [FULL, IDS], description: "IDS answers with only the ids of the mappings. Default FULL." }
         persist: { type: boolean }
         repeatsAsCallResponses: { type: boolean, description: "Identical requests that got different responses become one mapping with callResponses (replaces WireMock repeatsAsScenarios)." }
         transformers: { type: array, items: { type: string } }
@@ -2225,6 +2226,10 @@ components:
     SnapshotResult:
       type: object
       properties:
+        ids:
+          type: array
+          description: Only with outputFormat IDS, instead of mappings.
+          items: { type: string, format: uuid }
         mappings:
           type: array
           items: { $ref: '#/components/schemas/StubMapping' }

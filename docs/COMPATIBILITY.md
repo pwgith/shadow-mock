@@ -121,7 +121,10 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | CORS on the admin API | Applied | Not applied: the admin API refuses requests from other web sites (see "Where Shadow Mock is stricter or safer") |
 | A reply with a `statusMessage` | Kept alive | Followed by `Connection: close`, because it is written on a connection taken over from Go's server. Over HTTP/2 the standard phrase is sent |
 | Files in `__files` | `Last-Modified` and `Accept-Ranges` headers | Not sent |
-| `--record-mappings` | Each new request is written as a mapping at once; the body goes to a file in `__files` | The same, but the body stays in the mapping. A repeat of a request is not written, so `repeatsAsCallResponses` has no effect with the flag. See also the recording shape differences in WIREMOCK_GAPS.md |
+| `--record-mappings` | Each new request is written as a mapping at once; the body goes to a file `body-<name>-<id>` in `__files` | The same, with Shadow Mock's own file names and ids. A repeat of a request is not written, so `repeatsAsCallResponses` has no effect with the flag |
+| Repeats of a request in a snapshot or recording | `repeatsAsScenarios` (on by default) makes a chain of mappings with scenario states; off keeps the last response | Keeps the last response, or with `repeatsAsCallResponses` one mapping with a response for each call. `repeatsAsScenarios` is ignored, because Shadow Mock has no scenarios |
+| Recorded mapping files and body files | Named with a random five-character suffix | Named with the mapping's id |
+| `transformers` and `transformerParameters` in a snapshot | Accepted | Ignored |
 | `--admin-api-basic-auth` | 401 with no `WWW-Authenticate` header | 401 with `WWW-Authenticate: Basic` |
 | Listing the journal when it is off | 500 `RequestJournalDisabledException` | 200 with an empty list and `requestJournalDisabled: true` (a count is `-1` on both) |
 | WireMock flags that tune the Java server (`--jetty-*`, `--container-threads` and the like) | Take effect | Accepted, with a warning at start-up, and ignored |

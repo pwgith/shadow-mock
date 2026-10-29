@@ -315,7 +315,12 @@ func (a *App) startProxyAll(ctx context.Context) error {
 	if !a.cfg.Proxy.Record {
 		return nil
 	}
-	spec := record.Spec{TargetBaseURL: a.cfg.Proxy.All, CaptureHeaders: map[string]record.CaptureHeader{}}
+	// Like WireMock, every recorded body goes to a file in __files.
+	spec := record.Spec{
+		TargetBaseURL:       a.cfg.Proxy.All,
+		CaptureHeaders:      map[string]record.CaptureHeader{},
+		ExtractBodyCriteria: &record.ExtractBody{TextSizeThreshold: "0 kb", BinarySizeThreshold: "0 kb"},
+	}
 	for _, h := range a.cfg.Proxy.MatchHeaders {
 		spec.CaptureHeaders[h] = record.CaptureHeader{}
 	}

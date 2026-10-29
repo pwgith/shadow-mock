@@ -22,15 +22,21 @@ import (
 // filesPrefix is where the files in __files are served (FR-10.11).
 const filesPrefix = "/__files/"
 
+// matchedStubHeader and matchedNameHeader are the headers markMatched adds.
+const (
+	matchedStubHeader = "Matched-Stub-Id"
+	matchedNameHeader = "Matched-Stub-Name"
+)
+
 // markMatched adds the headers WireMock puts on every reply a mapping produced: the id of the
 // mapping, and its name when it has one (FR-10.10).
 func markMatched(h http.Header, stub *model.StubMapping) {
 	if stub == nil {
 		return
 	}
-	h.Set("Matched-Stub-Id", stub.ID)
+	h.Set(matchedStubHeader, stub.ID)
 	if stub.Name != "" {
-		h.Set("Matched-Stub-Name", stub.Name)
+		h.Set(matchedNameHeader, stub.Name)
 	}
 }
 

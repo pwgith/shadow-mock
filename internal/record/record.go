@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
@@ -31,6 +34,65 @@ type Spec struct {
 	RequestBodyPattern     *BodyPattern             `json:"requestBodyPattern"`
 	Persist                *bool                    `json:"persist"`
 	RepeatsAsCallResponses bool                     `json:"repeatsAsCallResponses"`
+	// OutputFormat is FULL (the default) to return the mappings, or IDS to return only their ids.
+	OutputFormat string `json:"outputFormat"`
+	// ExtractBodyCriteria moves response bodies of at least a size into files in __files.
+	ExtractBodyCriteria *ExtractBody `json:"extractBodyCriteria"`
+
+	// live is set for a recording that writes as it goes (--record-mappings), whose mappings have
+	// WireMock's older shape: the URL with its query, and no name.
+	live bool
+}
+
+// ExtractBody holds the sizes, such as "100 kb", from which a body is kept in a file.
+type ExtractBody struct {
+	TextSizeThreshold   string `json:"textSizeThreshold"`
+	BinarySizeThreshold string `json:"binarySizeThreshold"`
+}
+
+var sizePattern = regexp.MustCompile(`(?i)^\s*(\d+)\s*(kb|mb|gb)\s*$`)
+
+// bytes reads a size such as "10 kb". An empty size is no limit.
+func sizeBytes(s string) (size int, set, valid bool) {
+	if strings.TrimSpace(s) == "" {
+		return 0, false, true
+	}
+	m := sizePattern.FindStringSubmatch(s)
+	if m == nil {
+		return 0, false, false
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false, false
+	}
+	unit := map[string]int{"kb": 1 << 10, "mb": 1 << 20, "gb": 1 << 30}[strings.ToLower(m[2])]
+	return n * unit, true, true
+}
+
+// extracts reports whether a body of n bytes is kept in a file.
+func (c *ExtractBody) extracts(n int, binary bool) bool {
+	if c == nil {
+		return false
+	}
+	limit := c.TextSizeThreshold
+	if binary {
+		limit = c.BinarySizeThreshold
+	}
+	size, set, valid := sizeBytes(limit)
+	return valid && set && n >= size
+}
+
+// Validate refuses a spec WireMock would refuse.
+func (s *Spec) Validate() error {
+	if s.ExtractBodyCriteria == nil {
+		return nil
+	}
+	for _, v := range []string{s.ExtractBodyCriteria.TextSizeThreshold, s.ExtractBodyCriteria.BinarySizeThreshold} {
+		if _, _, valid := sizeBytes(v); !valid {
+			return apierr.Invalid("/extractBodyCriteria", "Invalid size string: %q", v)
+		}
+	}
+	return nil
 }
 
 // CaptureHeader says how a captured request header is matched.
@@ -64,7 +126,7 @@ type Active struct {
 	filter *match.RequestMatcher
 	// onNew, when set, is called with the mapping for each request the recording has not seen
 	// before, as the exchange arrives (WireMock's --record-mappings).
-	onNew func(model.StubMapping) error
+	onNew func(model.StubMapping, []File) error
 
 	mu        sync.Mutex
 	exchanges []Exchange
@@ -87,7 +149,7 @@ func (a *Active) Add(e Exchange) error {
 	if onNew == nil {
 		return nil
 	}
-	built, err := Build(&a.Spec, []Exchange{e})
+	built, files, err := Build(&a.Spec, []Exchange{e})
 	if err != nil || len(built) == 0 {
 		return err
 	}
@@ -105,7 +167,7 @@ func (a *Active) Add(e Exchange) error {
 	if repeat {
 		return nil
 	}
-	return onNew(built[0])
+	return onNew(built[0], files)
 }
 
 // Exchanges returns what has been recorded so far.
@@ -133,7 +195,7 @@ func (r *Recorder) Start(sc store.Scope, spec Spec, filter *match.RequestMatcher
 }
 
 // StartLive is Start for a recording that hands each new request's mapping to onNew as it arrives.
-func (r *Recorder) StartLive(sc store.Scope, spec Spec, filter *match.RequestMatcher, onNew func(model.StubMapping) error) error {
+func (r *Recorder) StartLive(sc store.Scope, spec Spec, filter *match.RequestMatcher, onNew func(model.StubMapping, []File) error) error {
 	if spec.TargetBaseURL == "" {
 		return apierr.Invalid("/targetBaseUrl", "targetBaseUrl is required")
 	}
@@ -142,6 +204,7 @@ func (r *Recorder) StartLive(sc store.Scope, spec Spec, filter *match.RequestMat
 	if r.active[sc] != nil {
 		return apierr.New(http.StatusConflict, apierr.RecordingInProgress, "A recording is already running in this scope.")
 	}
+	spec.live = onNew != nil
 	r.active[sc] = &Active{Spec: spec, filter: filter, onNew: onNew}
 	r.status[sc] = StatusRecording
 	return nil

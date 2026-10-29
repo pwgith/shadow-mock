@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/engine"
@@ -87,6 +88,9 @@ func (s *Service) forward(ctx context.Context, w http.ResponseWriter, r *http.Re
 
 // StartRecording begins recording unmatched traffic in a scope.
 func (s *Service) StartRecording(sc store.Scope, spec record.Spec) error {
+	if err := spec.Validate(); err != nil {
+		return err
+	}
 	var filter *match.RequestMatcher
 	if spec.Filters != nil {
 		var err error
@@ -100,6 +104,9 @@ func (s *Service) StartRecording(sc store.Scope, spec record.Spec) error {
 // StartLiveRecording is StartRecording for a recording that writes each new request's mapping to the
 // scope's store, as a persistent mapping, as soon as the request has been proxied.
 func (s *Service) StartLiveRecording(ctx context.Context, sc store.Scope, spec record.Spec) error {
+	if err := spec.Validate(); err != nil {
+		return err
+	}
 	var filter *match.RequestMatcher
 	if spec.Filters != nil {
 		var err error
@@ -107,8 +114,12 @@ func (s *Service) StartLiveRecording(ctx context.Context, sc store.Scope, spec r
 			return err
 		}
 	}
-	return s.Recorder.StartLive(sc, spec, filter, func(m model.StubMapping) error {
-		_, err := s.PutMapping(context.WithoutCancel(ctx), sc, m.WithPersistent())
+	return s.Recorder.StartLive(sc, spec, filter, func(m model.StubMapping, files []record.File) error {
+		detached := context.WithoutCancel(ctx)
+		if err := s.putFiles(detached, sc, files); err != nil {
+			return err
+		}
+		_, err := s.PutMapping(detached, sc, m.WithPersistent())
 		return err
 	})
 }
@@ -123,15 +134,18 @@ func (s *Service) StopRecording(ctx context.Context, sc store.Scope) ([]model.St
 	if a == nil {
 		return []model.StubMapping{}, nil
 	}
-	ms, err := record.Build(&a.Spec, a.Exchanges())
+	ms, files, err := record.Build(&a.Spec, a.Exchanges())
 	if err != nil {
 		return nil, fmt.Errorf("build recorded mappings: %w", err)
 	}
-	return s.keep(ctx, sc, &a.Spec, ms)
+	return s.keep(ctx, sc, &a.Spec, ms, files)
 }
 
 // Snapshot builds mappings from the proxied requests in a scope's journal.
 func (s *Service) Snapshot(ctx context.Context, sc store.Scope, spec record.Spec) ([]model.StubMapping, error) {
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
 	var filter *match.RequestMatcher
 	if spec.Filters != nil {
 		var err error
@@ -147,26 +161,44 @@ func (s *Service) Snapshot(ctx context.Context, sc store.Scope, spec record.Spec
 	exchanges := make([]record.Exchange, 0, len(entries))
 	for i := len(entries) - 1; i >= 0; i-- {
 		e := entries[i]
-		exchanges = append(exchanges, record.Exchange{Request: e.Request, Status: e.Response.Status, Header: e.Response.Header, Body: e.Response.Body})
+		// The journal holds the reply as sent, which says which mapping matched; upstream did not say so.
+		header := e.Response.Header.Clone()
+		header.Del(matchedStubHeader)
+		header.Del(matchedNameHeader)
+		exchanges = append(exchanges, record.Exchange{Request: e.Request, Status: e.Response.Status, Header: header, Body: e.Response.Body})
 	}
-	ms, err := record.Build(&spec, exchanges)
+	ms, files, err := record.Build(&spec, exchanges)
 	if err != nil {
 		return nil, fmt.Errorf("build snapshot mappings: %w", err)
 	}
-	return s.keep(ctx, sc, &spec, ms)
+	return s.keep(ctx, sc, &spec, ms, files)
 }
 
-// keep stores recorded mappings when the spec persists them, and returns them as stored.
-func (s *Service) keep(ctx context.Context, sc store.Scope, spec *record.Spec, ms []model.StubMapping) ([]model.StubMapping, error) {
-	if !spec.PersistOrDefault() {
-		return ms, nil
+// putFiles stores the bodies a recording kept out of its mappings.
+func (s *Service) putFiles(ctx context.Context, sc store.Scope, files []record.File) error {
+	for _, f := range files {
+		if err := s.Files.Put(ctx, sc, f.Name, f.Body); err != nil {
+			return fmt.Errorf("store recorded body %s: %w", f.Name, err)
+		}
 	}
-	for i := range ms {
-		stored, err := s.PutMapping(ctx, sc, ms[i])
-		if err != nil {
+	return nil
+}
+
+// keep stores recorded mappings and their body files when the spec persists them, and returns the
+// mappings as stored, newest first as WireMock lists them.
+func (s *Service) keep(ctx context.Context, sc store.Scope, spec *record.Spec, ms []model.StubMapping, files []record.File) ([]model.StubMapping, error) {
+	if spec.PersistOrDefault() {
+		if err := s.putFiles(ctx, sc, files); err != nil {
 			return nil, err
 		}
-		ms[i] = stored
+		for i := range ms {
+			stored, err := s.PutMapping(ctx, sc, ms[i])
+			if err != nil {
+				return nil, err
+			}
+			ms[i] = stored
+		}
 	}
+	slices.Reverse(ms)
 	return ms, nil
 }

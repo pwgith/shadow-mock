@@ -100,7 +100,6 @@ Every row below was checked again against WireMock 3.13.2 for workstream 4, and 
 | `PUT /__admin/settings`, `proxyPassThrough` in settings | missing | supported |
 | `GET /__admin/docs`, `/__admin/docs/swagger`, `/__admin/swagger-ui/` | 404 | Swagger UI and OpenAPI document |
 | `GET /__admin/` | 404 | the mappings list |
-| `POST /__admin/recordings/snapshot` with `outputFormat: IDS` | returns mappings | returns `{"ids":[...]}` |
 | A mapping with a misspelt field (`{"request":{"urlPaht":"/a"}}`, top level, `request` or `response`) | accepted, field ignored | 422 with a JSON pointer |
 | Stored mapping | `request.method` absent when not given | `"method": "ANY"` filled in |
 | Journal entry | has `shadowMock` | also has `subEvents` |
@@ -123,7 +122,6 @@ Rows for HTTP/2, HTTPS and the browser proxy belong to workstreams 8 and 9. `Tes
 | HTTPS, client certificates, browser proxy | not built | supported (docs) |
 | `Date` header on responses | sent | not sent |
 | Content-Length vs chunked | always Content-Length | chunked for most responses |
-| Recorded mapping shape | `url` with the query string, body as `jsonBody`, no `name` | `urlPath` plus `queryParameters`, body as text, `name`, `Date` header kept |
 
 ## 6. Beyond core WireMock (docs)
 
