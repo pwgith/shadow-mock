@@ -74,6 +74,8 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | Admin changes sent from another web site | Allowed | Refused with 403 when the request has an `Origin` header for another host or a cross-site fetch header | Stops a web page driving an admin API that has no login. Command-line and library clients are not affected |
 | XML nested more than 1000 levels | Handled | Not matched, or refused by the `xPath` helper | A body of the maximum size could otherwise stop the server |
 | Memory used by the journal | Grows with the journal | Held to `storage.journal.hot.maxBytes` (512 MiB by default); the oldest entries go first | A journal of N entries could otherwise hold N times the largest body |
+| A matcher object with no operator, such as `{"equalz": "1"}` | 422 | The same, whatever `mappings.unknownFields` says | It would match nothing, or everything |
+| A mapping with a field Shadow Mock does not know, such as a misspelt `urlPaht` | 422 with a JSON pointer | The same, unless `mappings.unknownFields` is `keep`: then the field is stored and returned (FR-1.4). Shadow Mock's own extensions (`callResponses`, `gzipDisabled`) are known | A misspelt field otherwise gives a mapping that matches everything |
 | Proxy and webhook targets | Any address | Any address by default. `egress.blockPrivate: true` blocks private, loopback, link-local, carrier-grade NAT and other non-public ranges | For shared servers |
 
 ### Where Shadow Mock is more lenient
@@ -111,6 +113,10 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | The body of a failed response, for example a missing `bodyFileName` | An HTML error page with a stack trace | A small JSON error, `{"error": "not_found", ...}`. Both are status 500 |
 | A request that fails because its body file is missing | Not written to the journal | Written to the journal |
 | `MALFORMED_RESPONSE_CHUNK` | Sends the headers and no valid body | Sends the headers and a broken chunk. Go's HTTP client fails on Shadow Mock's and not on WireMock's |
+| Admin query values that cannot be read: `limit=-1` or `limit=many` on `GET /requests` | 500 | 400 `validation_failed`. A bad `matchingStub` or `since` is a 400 on both |
+| The pointer for a misspelt field of a `postServeActions` or `serveEventListeners` entry | The list, `/postServeActions` | The field, `/postServeActions/paramz` |
+| The `report` in the `REQUEST_NOT_MATCHED` sub event of an unmatched journal entry | WireMock's side-by-side table | Shadow Mock's own text, the same as the 404 body |
+| Swagger UI at `/__admin/swagger-ui/` | Bundled with the server | A page that loads Swagger UI from a CDN (jsDelivr), so it needs internet access. The OpenAPI document at `/__admin/docs/swagger` is served from the binary and describes Shadow Mock's API |
 | Journal `clientIp` | Written as `[0:0:0:0:0:0:0:1]` for IPv6 | Written as the plain address |
 
 ### Behaviour that matches WireMock on purpose

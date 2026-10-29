@@ -132,6 +132,14 @@ type shadowView struct {
 	CallNumber int64          `json:"callNumber,omitempty"`
 }
 
+// subEvent is something that happened while a request was served, such as the report on a
+// request no stub matched.
+type subEvent struct {
+	Type           string         `json:"type"`
+	TimeOffsetNano int64          `json:"timeOffsetNanos"`
+	Data           map[string]any `json:"data,omitempty"`
+}
+
 type serveEvent struct {
 	ID                 string                    `json:"id"`
 	Request            loggedRequest             `json:"request"`
@@ -140,6 +148,7 @@ type serveEvent struct {
 	Response           responseView              `json:"response"`
 	WasMatched         bool                      `json:"wasMatched"`
 	Timing             timingView                `json:"timing"`
+	SubEvents          []subEvent                `json:"subEvents"`
 	ShadowMock         shadowView                `json:"shadowMock"`
 }
 
@@ -173,6 +182,7 @@ func eventView(e *journal.Entry) serveEvent {
 		Response:   responseView{Status: e.Response.Status, Headers: headerMap(e.Response.Header)},
 		Timing:     timingView{AddedDelay: e.AddedDelay, ProcessTime: e.ProcessTime, ServeTime: e.ProcessTime, TotalTime: e.ProcessTime + e.AddedDelay},
 		ShadowMock: shadowView{Tenant: string(e.Tenant), Layer: layerOf(e), CallNumber: e.CallNumber},
+		SubEvents:  subEventsOf(e),
 	}
 	v.Response.Body = bodyText(e.Response.Body)
 	v.Response.BodyAsBase64 = base64.StdEncoding.EncodeToString(e.Response.Body)
@@ -186,6 +196,30 @@ func eventView(e *journal.Entry) serveEvent {
 	return v
 }
 
+// subEventsOf lists what happened inside the request: only a request no stub matched has one,
+// carrying the report that went out as the 404 body.
+func subEventsOf(e *journal.Entry) []subEvent {
+	if e.Matched() {
+		return []subEvent{}
+	}
+	return []subEvent{{Type: "REQUEST_NOT_MATCHED", Data: map[string]any{
+		"status": e.Response.Status, "contentType": e.Response.Header.Get("Content-Type"), "report": bodyText(e.Response.Body),
+	}}}
+}
+
+// removedEvents is what the remove endpoints answer: the serve events they took out of the journal.
+type removedEvents struct {
+	ServeEvents []serveEvent `json:"serveEvents"`
+}
+
+func removedView(es []*journal.Entry) removedEvents {
+	out := removedEvents{ServeEvents: make([]serveEvent, 0, len(es))}
+	for _, e := range es {
+		out.ServeEvents = append(out.ServeEvents, eventView(e))
+	}
+	return out
+}
+
 type serveEventList struct {
 	Requests               []serveEvent `json:"requests"`
 	Meta                   metaView     `json:"meta"`
@@ -193,11 +227,12 @@ type serveEventList struct {
 }
 
 type findResult struct {
-	Requests []loggedRequest `json:"requests"`
+	Requests               []loggedRequest `json:"requests"`
+	RequestJournalDisabled bool            `json:"requestJournalDisabled"`
 }
 
-func findView(es []*journal.Entry) findResult {
-	out := findResult{Requests: make([]loggedRequest, 0, len(es))}
+func findView(es []*journal.Entry, journalDisabled bool) findResult {
+	out := findResult{Requests: make([]loggedRequest, 0, len(es)), RequestJournalDisabled: journalDisabled}
 	for _, e := range es {
 		out.Requests = append(out.Requests, requestView(e.Request, e))
 	}

@@ -149,7 +149,7 @@ Other structure rules:
 
 * Structs that are marshalled to JSON carry explicit `json` tags (`musttag`).
 * WireMock-compatible and admin API JSON uses **camelCase** keys (`tagliatelle`). External formats that use snake_case (JWT claims such as `org_id`, OAuth fields) live in `internal/auth/claims.go`, which is excluded from that rule.
-* Unknown fields in the WireMock model are preserved through `Extra map[string]json.RawMessage` (FR-1.4). Never use `DisallowUnknownFields` on mapping input. **(review)**
+* Unknown fields in the WireMock model are preserved through `Extra map[string]json.RawMessage` (FR-1.4). Never use `DisallowUnknownFields` on mapping input: an unknown field is refused by `model.CheckKnownFields` unless `mappings.unknownFields` is `keep` (FR-10.9). **(review)**
 
 ## 15. Performance
 

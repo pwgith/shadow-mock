@@ -37,6 +37,9 @@ type Config struct {
 	MappingSetsDir string
 	// MatchedHeader echoes X-Shadow-Mock-Matched on mock responses (FR-7.12).
 	MatchedHeader bool
+	// KeepUnknownFields stores a mapping field Shadow Mock does not know instead of refusing it
+	// (mappings.unknownFields: keep, FR-1.4).
+	KeepUnknownFields bool
 	// SaaS turns off standalone-only operations such as save and shutdown.
 	SaaS bool
 	// LogRequests writes a log line for every mock request (log.requests).

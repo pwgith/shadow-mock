@@ -79,7 +79,9 @@ number (`6 / 4` is `2`, `7.0 / 2` is `3.5`), and negative indexes are off by one
 Missing: `request.id`, `request.path.N` (the path as segments), `request.requestLine.*`, and for multipart
 requests `request.multipart`, `request.parts.<name>.body`, `.bodyAsBase64`, `.binary`, `.headers.<key>`.
 
-## 4. Admin API (verified)
+## 4. Admin API (closed by workstream 4, FR-10.7 to FR-10.9)
+
+Every row below was checked again against WireMock 3.13.2 for workstream 4, and the admin API is now compared with a real WireMock by `TestAdminAPIMatchesWireMock`. The deliberate differences that remain (bad query values, error bodies, Swagger UI from a CDN) are in [COMPATIBILITY.md](COMPATIBILITY.md).
 
 | Endpoint or behaviour | Shadow Mock | WireMock |
 |---|---|---|

@@ -46,6 +46,7 @@ type Handler struct {
 	logger    *slog.Logger
 	startedAt time.Time
 	mux       *http.ServeMux
+	spec      specCache
 }
 
 // New builds the admin API.

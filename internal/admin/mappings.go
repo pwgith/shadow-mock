@@ -102,7 +102,11 @@ func (h *Handler) importMappings(w http.ResponseWriter, r *http.Request, sc stor
 	}
 	ms := make([]model.StubMapping, 0, len(body.Mappings))
 	for i, raw := range body.Mappings {
-		m, err := model.DecodeStubMapping(raw)
+		err := h.svc.CheckFields(raw)
+		var m model.StubMapping
+		if err == nil {
+			m, err = model.DecodeStubMapping(raw)
+		}
 		if err != nil {
 			return pointerPrefix(err, "/mappings/"+strconv.Itoa(i))
 		}
@@ -146,6 +150,13 @@ func (h *Handler) unmatchedMappings(w http.ResponseWriter, r *http.Request, sc s
 		return err
 	}
 	return writeJSON(w, http.StatusOK, mappingList{Mappings: ms, Meta: metaView{Total: len(ms)}})
+}
+
+func (h *Handler) deleteUnmatchedMappings(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
+	if err := h.svc.RemoveUnmatchedMappings(r.Context(), sc); err != nil {
+		return err
+	}
+	return writeJSON(w, http.StatusOK, struct{}{})
 }
 
 func (h *Handler) findByMetadata(w http.ResponseWriter, r *http.Request, sc store.Scope) error {

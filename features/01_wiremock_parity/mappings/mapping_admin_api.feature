@@ -122,7 +122,7 @@ Feature: Manage global mappings through the WireMock admin API
       | mapping                                                                              | message                    |
       | { "request": { "url": "/x", "urlPath": "/x" }, "response": { "status": 200 } }       | only one of url, urlPath   |
       | { "request": { "url": "/x" }, "response": { "status": 99 } }                         | status                     |
-      | { "request": { "url": "/x", "bodyPatterns": [ { "noSuchMatcher": 1 } ] }, "response": { "status": 200 } } | unknown matcher |
+      | { "request": { "url": "/x", "bodyPatterns": [ { "noSuchMatcher": 1 } ] }, "response": { "status": 200 } } | is not a valid match operation |
 
   @standalone
   Scenario: The admin path prefix is configurable

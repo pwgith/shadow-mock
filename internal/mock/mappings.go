@@ -32,8 +32,20 @@ func metadataMatches(cm match.ContentMatcher, metadata map[string]any) bool {
 	return cm.MatchContent(match.ContentOf(b)).Matched
 }
 
+// CheckFields refuses a mapping field that WireMock does not have, unless mappings.unknownFields
+// is keep (FR-10.9).
+func (s *Service) CheckFields(data []byte) error {
+	if s.Config.KeepUnknownFields {
+		return nil
+	}
+	return model.CheckKnownFields(data)
+}
+
 // DecodeAndValidate parses a mapping and compiles it.
 func (s *Service) DecodeAndValidate(data []byte) (model.StubMapping, error) {
+	if err := s.CheckFields(data); err != nil {
+		return model.StubMapping{}, err
+	}
 	m, err := model.DecodeStubMapping(data)
 	if err != nil {
 		return model.StubMapping{}, err
@@ -207,6 +219,20 @@ func (s *Service) RemoveByMetadata(ctx context.Context, sc store.Scope, p model.
 		return err
 	}
 	for _, m := range found {
+		if err := s.Mappings.Delete(ctx, sc, m.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("remove mapping %s: %w", m.ID, err)
+		}
+	}
+	return s.Layers.Rebuild(ctx, sc)
+}
+
+// RemoveUnmatchedMappings deletes the mappings that no journal entry was served by.
+func (s *Service) RemoveUnmatchedMappings(ctx context.Context, sc store.Scope) error {
+	unmatched, err := s.UnmatchedMappings(ctx, sc)
+	if err != nil {
+		return err
+	}
+	for _, m := range unmatched {
 		if err := s.Mappings.Delete(ctx, sc, m.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
 			return fmt.Errorf("remove mapping %s: %w", m.ID, err)
 		}

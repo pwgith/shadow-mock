@@ -24,9 +24,13 @@ import (
 type Settings struct {
 	FixedDelay        int64                    `json:"fixedDelay,omitempty"`
 	DelayDistribution *model.DelayDistribution `json:"delayDistribution,omitempty"`
-	ProxyPassThrough  bool                     `json:"proxyPassThrough,omitempty"`
+	ProxyPassThrough  bool                     `json:"proxyPassThrough"`
 	Extended          map[string]any           `json:"extended,omitempty"`
 }
+
+// DefaultSettings are the settings of a server nobody has configured: WireMock passes unmatched
+// requests through when a proxy is set up, so proxyPassThrough starts true.
+func DefaultSettings() Settings { return Settings{ProxyPassThrough: true} }
 
 // Renderer turns response definitions into responses.
 type Renderer struct {
@@ -47,7 +51,7 @@ type Renderer struct {
 
 // NewRenderer returns a renderer.
 func NewRenderer(files store.FileRepository, c clock.Clock, gzip bool) *Renderer {
-	return &Renderer{Files: files, Clock: c, Gzip: gzip, Templates: template.New(c)}
+	return &Renderer{Files: files, Clock: c, Gzip: gzip, Templates: template.New(c), settings: DefaultSettings()}
 }
 
 // Settings returns the global settings.

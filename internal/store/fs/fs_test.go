@@ -128,13 +128,13 @@ func TestPersistentMappingsAreWrittenImmediately(t *testing.T) {
 	if err := r.Put(ctx, scope, mapping(t, `{"id":"aaaaaaaa-0000-4000-8000-000000000001","request":{"urlPath":"/mem"},"response":{}}`)); err != nil {
 		t.Fatal(err)
 	}
-	if exists(filepath.Join(dir, "aaaaaaaa-0000-4000-8000-000000000001.json")) {
+	if exists(filepath.Join(dir, "any-mem-aaaaaaaa-0000-4000-8000-000000000001.json")) {
 		t.Error("a mapping that is not persistent must stay in memory")
 	}
 	if err := r.Put(ctx, scope, mapping(t, `{"id":"bbbbbbbb-0000-4000-8000-000000000001","persistent":true,"request":{"urlPath":"/disk"},"response":{}}`)); err != nil {
 		t.Fatal(err)
 	}
-	if !exists(filepath.Join(dir, "bbbbbbbb-0000-4000-8000-000000000001.json")) {
+	if !exists(filepath.Join(dir, "any-disk-bbbbbbbb-0000-4000-8000-000000000001.json")) {
 		t.Error("a persistent mapping must be written at once")
 	}
 }
@@ -154,7 +154,7 @@ func TestSaveWritesAPICreatedMappings(t *testing.T) {
 	if err := r.Save(ctx, scope); err != nil {
 		t.Fatal(err)
 	}
-	saved, err := os.ReadFile(filepath.Join(dir, "cccccccc-0000-4000-8000-000000000001.json"))
+	saved, err := os.ReadFile(filepath.Join(dir, "any-api-cccccccc-0000-4000-8000-000000000001.json"))
 	if err != nil || !strings.Contains(string(saved), "/api") {
 		t.Errorf("saved file = %q, %v", saved, err)
 	}

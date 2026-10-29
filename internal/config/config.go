@@ -196,6 +196,13 @@ type Limits struct {
 	Burst             int     `yaml:"burst"`
 }
 
+// Mappings configures how mappings sent to the admin API are read (FR-10.9).
+type Mappings struct {
+	// UnknownFields is reject (a field Shadow Mock does not know is a 422, as in WireMock) or keep
+	// (it is stored and returned unchanged, FR-1.4).
+	UnknownFields string `yaml:"unknownFields"`
+}
+
 // Templating configures response templating (P3).
 type Templating struct {
 	Global bool `yaml:"global"`
@@ -242,6 +249,7 @@ type Config struct {
 	Server      Server     `yaml:"server"`
 	Sessions    Sessions   `yaml:"sessions"`
 	Limits      Limits     `yaml:"limits"`
+	Mappings    Mappings   `yaml:"mappings"`
 	Templating  Templating `yaml:"templating"`
 	Egress      Egress     `yaml:"egress"`
 	Log         Log        `yaml:"log"`
@@ -263,9 +271,10 @@ func Default() Config {
 			Counters: Driver{Driver: "memory"},
 			Blobs:    Blobs{Driver: "fs", Dir: "./blobs"},
 		},
-		Respond: Respond{Gzip: "auto"},
-		Auth:    Auth{Driver: "noop"},
-		Tenancy: Tenancy{Directory: "static"},
+		Respond:  Respond{Gzip: "auto"},
+		Mappings: Mappings{UnknownFields: "reject"},
+		Auth:     Auth{Driver: "noop"},
+		Tenancy:  Tenancy{Directory: "static"},
 		Sessions: Sessions{
 			DefaultTTL: Duration(time.Hour),
 			MaxTTL:     Duration(24 * time.Hour),
@@ -428,6 +437,7 @@ func (c *Config) Validate() error {
 		oneOf("auth.driver", c.Auth.Driver, "noop", "token"),
 		oneOf("tenancy.directory", c.Tenancy.Directory, "static"),
 		oneOf("respond.gzip", c.Respond.Gzip, "auto", "off"),
+		oneOf("mappings.unknownFields", c.Mappings.UnknownFields, "reject", "keep"),
 		oneOf("sessions.detect.ambiguity", c.Sessions.Detect.Ambiguity, "first", "reject", "global"),
 		c.validateAuth(),
 	}

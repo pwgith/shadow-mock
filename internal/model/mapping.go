@@ -69,6 +69,9 @@ func DecodeStubMapping(data []byte) (StubMapping, error) {
 				"WireMock scenarios are not supported (%s). Use callResponses to vary the response by call number.", f)
 		}
 	}
+	if err := checkShape(data, false); err != nil {
+		return StubMapping{}, err
+	}
 	var f stubFields
 	if err := json.Unmarshal(data, &f); err != nil {
 		return StubMapping{}, apierr.Invalid("", "invalid mapping: %v", err)
@@ -106,6 +109,7 @@ func DecodeStubMapping(data []byte) (StubMapping, error) {
 		UsesCallNumber: bytes.Contains(raw["response"], []byte("callNumber")) || bytes.Contains(raw["callResponses"], []byte("callNumber")),
 		raw:            raw,
 	}
+	m.raw["request"] = withDefaultMethod(raw["request"])
 	if m.ID == "" {
 		m.ID = f.UUID
 	}
