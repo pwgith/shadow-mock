@@ -82,6 +82,13 @@ type WireMockSource struct {
 // ValidationError is a WireMock-format validation failure (422).
 type ValidationError struct {
 	Errors []WireMockError `json:"errors"`
+	// Status is the HTTP status; 0 means 422.
+	Status int `json:"-"`
+}
+
+// BadQuery returns WireMock's 400 for a query parameter it cannot read.
+func BadQuery(format string, a ...any) *ValidationError {
+	return &ValidationError{Status: http.StatusBadRequest, Errors: []WireMockError{{Code: 15, Title: fmt.Sprintf(format, a...)}}}
 }
 
 // Invalid returns a single-entry validation error for the JSON pointer.
@@ -107,7 +114,11 @@ func (v *ValidationError) Error() string {
 
 // Write renders the validation error.
 func (v *ValidationError) Write(w http.ResponseWriter) {
-	WriteJSON(w, http.StatusUnprocessableEntity, v)
+	status := v.Status
+	if status == 0 {
+		status = http.StatusUnprocessableEntity
+	}
+	WriteJSON(w, status, v)
 }
 
 // WriteError renders any error: API errors as they are, validation errors in WireMock

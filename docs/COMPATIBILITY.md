@@ -114,7 +114,6 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | A request that fails because its body file is missing | Not written to the journal | Written to the journal |
 | `MALFORMED_RESPONSE_CHUNK` | Sends the headers and no valid body | Sends the headers and a broken chunk. Go's HTTP client fails on Shadow Mock's and not on WireMock's |
 | Admin query values that cannot be read: `limit=-1` or `limit=many` on `GET /requests` | 500 | 400 `validation_failed`. A bad `matchingStub` or `since` is a 400 on both |
-| The body of an admin error for a bad query value | `{"errors": [{"code": 15, ...}]}` | `{"error": "validation_failed", "message": ...}`. The status is the same. Mapping validation keeps WireMock's `errors` shape |
 | The pointer for a misspelt field of a `postServeActions` or `serveEventListeners` entry | The list, `/postServeActions` | The field, `/postServeActions/paramz` |
 | The `report` in the `REQUEST_NOT_MATCHED` sub event of an unmatched journal entry | WireMock's side-by-side table | Shadow Mock's own text, the same as the 404 body |
 | Swagger UI at `/__admin/swagger-ui/` | Bundled with the server | A page that loads Swagger UI from a CDN (jsDelivr), so it needs internet access. The OpenAPI document at `/__admin/docs/swagger` is served from the binary and describes Shadow Mock's API |

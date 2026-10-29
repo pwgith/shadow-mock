@@ -248,7 +248,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ScopeKey'
       responses:
-        '200': { description: Deleted. }
+        '200': { description: Deleted., content: { application/json: { schema: { type: object } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -437,7 +437,7 @@ paths:
       summary: Delete one journal entry
       description: An id that is not in the journal is still a 200, as in WireMock (FR-10.8).
       responses:
-        '200': { description: Deleted. }
+        '200': { description: Deleted., content: { application/json: { schema: { type: object } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 

@@ -21,9 +21,7 @@ func matchSample(s *model.SampleRequest) *match.Request { return match.FromSampl
 // uuidPattern is the form WireMock demands of a request id or a stub id in a query.
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-func badRequest(format string, a ...any) error {
-	return apierr.New(http.StatusBadRequest, apierr.ValidationFailed, format, a...)
-}
+func badRequest(format string, a ...any) error { return apierr.BadQuery(format, a...) }
 
 // listRequests answers GET /requests. unmatched and matchingStub narrow the list, and meta.total
 // counts what they leave, before since and limit cut it down, as in WireMock (FR-10.7).
