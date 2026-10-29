@@ -60,15 +60,21 @@ func (s *Service) forward(ctx context.Context, w http.ResponseWriter, r *http.Re
 		if errors.As(err, &pe) {
 			code = pe.Code
 		}
-		if code == proxy.CodeBadGateway {
+		switch code {
+		case proxy.CodeBadGateway:
 			s.proxyFailure(w, sv, target, err)
+			return
+		case proxy.CodeDenied:
+			s.proxyDenied(w, sv)
 			return
 		}
 		s.fail(w, sv, req, apierr.New(http.StatusBadGateway, apierr.Code(code), "The upstream server could not be reached."))
 		return
 	}
 	if rec != nil && rec.Accepts(req) {
-		rec.Add(record.Exchange{Request: req, Status: res.Status, Header: res.Header.Clone(), Body: res.Body})
+		if err := rec.Add(record.Exchange{Request: req, Status: res.Status, Header: res.Header.Clone(), Body: res.Body}); err != nil {
+			s.Logger.WarnContext(ctx, "could not write a recorded mapping", "error", err.Error())
+		}
 	}
 	out := s.Renderer.FromUpstream(def, res.Status, res.Header, res.Body)
 	markMatched(out.Header, sv.entry.Stub)
@@ -89,6 +95,22 @@ func (s *Service) StartRecording(sc store.Scope, spec record.Spec) error {
 		}
 	}
 	return s.Recorder.Start(sc, spec, filter)
+}
+
+// StartLiveRecording is StartRecording for a recording that writes each new request's mapping to the
+// scope's store, as a persistent mapping, as soon as the request has been proxied.
+func (s *Service) StartLiveRecording(ctx context.Context, sc store.Scope, spec record.Spec) error {
+	var filter *match.RequestMatcher
+	if spec.Filters != nil {
+		var err error
+		if filter, err = s.CompilePattern(spec.Filters); err != nil {
+			return err
+		}
+	}
+	return s.Recorder.StartLive(sc, spec, filter, func(m model.StubMapping) error {
+		_, err := s.PutMapping(context.WithoutCancel(ctx), sc, m.WithPersistent())
+		return err
+	})
 }
 
 // RecordingStatus reports the state of a scope's recording.

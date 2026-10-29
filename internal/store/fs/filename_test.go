@@ -38,3 +38,24 @@ func TestFileNameIsWhatWireMockWrites(t *testing.T) {
 		})
 	}
 }
+
+func TestFilenameTemplatesNameNewFiles(t *testing.T) {
+	t.Parallel()
+	m, err := model.DecodeStubMapping([]byte(`{"name":"My Name","request":{"method":"GET","url":"/a/b?x=1"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m = m.WithID("11111111-1111-1111-1111-111111111111")
+	data := FilenameData(m)
+	if data["method"] != "GET" || data["url"] != "/a/b?x=1" || data["name"] != "My Name" {
+		t.Errorf("data = %v", data)
+	}
+	r := &Mappings{namer: func(map[string]any) (string, error) { return "GET-/a/b?x=1-ID.json", nil }}
+	if got := r.nameFor(m); got != "get-abx1-id.json" {
+		t.Errorf("nameFor = %q, want the rendered text lower-cased and cleaned", got)
+	}
+	r.namer = func(map[string]any) (string, error) { return "", nil }
+	if got := r.nameFor(m); got != "my-name-11111111-1111-1111-1111-111111111111.json" {
+		t.Errorf("an empty rendering falls back to the default, got %q", got)
+	}
+}

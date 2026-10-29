@@ -33,7 +33,7 @@ type Input struct {
 
 // templated reports whether def's text is rendered as a template.
 func (r *Renderer) templated(def *model.ResponseDefinition, in *Input) bool {
-	if in == nil || in.Request == nil {
+	if in == nil || in.Request == nil || r.TemplatingDisabled {
 		return false
 	}
 	return r.Templating || slices.Contains(def.Transformers, ResponseTemplate)

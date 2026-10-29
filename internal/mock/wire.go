@@ -149,3 +149,13 @@ func (s *Service) proxyFailure(w http.ResponseWriter, sv *served, target string,
 	w.WriteHeader(http.StatusInternalServerError)
 	_, _ = w.Write(body) //nolint:gosec // the error text names the target and the cause, and is sent as plain text
 }
+
+// proxyDenied answers a request whose upstream the target rules refuse, with WireMock's words.
+func (s *Service) proxyDenied(w http.ResponseWriter, sv *served) {
+	body := []byte("The target proxy address is denied in Shadow Mock's configuration.")
+	sv.entry.Response = journal.Response{Status: http.StatusInternalServerError, Header: http.Header{}, Body: body}
+	s.finish(sv) // recorded before the client can see the response (FR-5.5)
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	w.WriteHeader(http.StatusInternalServerError)
+	_, _ = w.Write(body)
+}

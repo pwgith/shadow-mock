@@ -16,6 +16,8 @@ differences is in [COMPATIBILITY.md](../COMPATIBILITY.md).
 * Response templating with WireMock's Handlebars helpers.
 * Record and playback, and webhooks.
 * WireMock's client libraries for Java, .NET, JavaScript and Python, for the calls above.
+* WireMock's command-line flags. A command line or Docker `command:` copied from a WireMock setup starts;
+  [Configuration](11-configuration.md#wiremocks-flags) says what each flag does.
 
 ## What is different
 
@@ -25,7 +27,7 @@ differences is in [COMPATIBILITY.md](../COMPATIBILITY.md).
 | `repeatsAsScenarios` when recording | `repeatsAsCallResponses` |
 | Java extensions | Go extensions: `pkg/extension` for custom matchers |
 | One set of mappings for everyone | Global mappings, plus [shadow mocks](06-shadow-mocks.md) for isolation |
-| Global browser-proxy mode | Not supported |
+| Global browser-proxy mode, HTTPS and HTTP/2 flags | Not supported yet. The flags are refused with a clear message |
 
 ## Converting a scenario
 

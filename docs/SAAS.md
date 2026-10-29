@@ -8,6 +8,16 @@
 
 Kaizentis (`kaizentis.xyz`) is a multi-application SaaS platform, and Shadow Mock is one of its applications. Clerk is the identity provider for the whole platform, and a Clerk **organisation** is the Shadow Mock **tenant**.
 
+### 1.0 Terminology
+
+| Term | Meaning | Here |
+|---|---|---|
+| **SaaS app** | The one Next.js app that integrates with Clerk. It looks after subscriptions, packages (plans and licences), and user and team management, and uses Clerk to generate the JWT passed to Tool Management apps | "Platform shell" in the table below |
+| **Tool Management app** | One per SaaS-hosted tool. The user is sent to it from the SaaS app with a JWT that it validates; it does not integrate with Clerk | "Shadow Mock management app" (repository `shadow-mock-hosting`, requirements in its `docs/REQUIREMENTS.md`) |
+| **Tool app** | The tool that adds value to the customer, running elsewhere | This Go app, called "the engine" in this document |
+
+This document still uses "platform shell", "management app" and "engine"; read them as SaaS app, Tool Management app and Tool app. Where the text has the management app calling Clerk directly (§3.2, §3.6), the proposed direction is that only the SaaS app integrates with Clerk; see `shadow-mock-hosting/docs/REQUIREMENTS.md` §2.2–§2.3. The sections will be rewritten once the open decisions there are made.
+
 ### 1.1 Components
 
 | Component | Tech | Hosting | Role |

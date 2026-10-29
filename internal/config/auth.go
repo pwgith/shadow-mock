@@ -17,6 +17,13 @@ var tokenName = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 
 // ResolveSecrets reads the secret of each token that names an environment variable.
 func ResolveSecrets(c *Config, lookup func(string) (string, bool)) error {
+	if env := c.Auth.Basic.PasswordEnv; env != "" && c.Auth.Basic.Password == "" {
+		v, ok := lookup(env)
+		if !ok || v == "" {
+			return fmt.Errorf("auth.basic.passwordEnv: the environment variable %s is not set", env)
+		}
+		c.Auth.Basic.Password = v
+	}
 	for i := range c.Auth.Tokens {
 		t := &c.Auth.Tokens[i]
 		if t.TokenEnv == "" {
@@ -36,6 +43,14 @@ func (c *Config) validateAuth() error {
 	switch {
 	case c.Mode == "server" && c.Auth.Driver != "token":
 		return errors.New("mode: server needs auth.driver: token, with at least one admin token, so the admin API is never open (see docs/guide/12-shared-server.md)")
+	case c.Auth.Driver == "basic":
+		switch {
+		case len(c.Auth.Tokens) > 0:
+			return errors.New("auth.tokens are given but auth.driver is basic; use one or the other")
+		case c.Auth.Basic.Username == "" || (c.Auth.Basic.Password == "" && c.Auth.Basic.PasswordEnv == ""):
+			return errors.New("auth.driver: basic needs auth.basic.username and a password (auth.basic.password, or passwordEnv to name an environment variable)")
+		}
+		return nil
 	case c.Auth.Driver != "token":
 		if len(c.Auth.Tokens) > 0 {
 			return errors.New("auth.tokens are given but auth.driver is not token, so the admin API would be open; set auth.driver: token")
@@ -114,6 +129,9 @@ func (c *Config) Warnings() []string {
 	d := Default()
 	if c.Storage.Blobs != d.Storage.Blobs {
 		out = append(out, "storage.blobs has no effect yet: it is reserved for the hosted service")
+	}
+	if c.Auth.Driver == "basic" {
+		out = append(out, "auth.driver: basic sends the password with every admin call; keep the admin API on a network you trust, or behind TLS")
 	}
 	if c.Auth.Driver == "token" {
 		for _, t := range c.Auth.Tokens {

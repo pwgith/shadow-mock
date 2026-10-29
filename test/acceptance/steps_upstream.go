@@ -43,7 +43,9 @@ func newUpstream() *upstream {
 		_, _ = io.Copy(io.Discard, r.Body) //nolint:errcheck // the body is not used
 		key := r.Method + " " + r.URL.RequestURI()
 		u.mu.Lock()
-		u.got = append(u.got, seen{r.Method, r.URL.RequestURI(), r.Header.Clone()})
+		h := r.Header.Clone()
+		h.Set("Host", r.Host) // Go moves the Host header out of the header map
+		u.got = append(u.got, seen{r.Method, r.URL.RequestURI(), h})
 		replies := u.routes[key]
 		n := u.calls[key]
 		u.calls[key]++

@@ -10,6 +10,8 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -23,6 +25,21 @@ type Options struct {
 	BlockPrivate bool
 	// Timeout caps one whole call. Zero means 30 seconds.
 	Timeout time.Duration
+	// Proxy, when set, picks a proxy server to send each call through; see ViaProxy.
+	Proxy func(*http.Request) (*url.URL, error)
+}
+
+// ViaProxy returns the Proxy option for a proxy server written as host:port or as a URL.
+func ViaProxy(via string) (func(*http.Request) (*url.URL, error), error) {
+	raw := via
+	if !strings.Contains(raw, "://") {
+		raw = "http://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return nil, fmt.Errorf("the proxy server %q is not host:port or a URL", via)
+	}
+	return http.ProxyURL(u), nil
 }
 
 // New returns a client for outbound calls. It does not follow redirects, so a target cannot
@@ -39,6 +56,7 @@ func New(o Options) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
+			Proxy:               o.Proxy,
 			DialContext:         d.DialContext,
 			TLSHandshakeTimeout: 10 * time.Second,
 			MaxIdleConns:        64,

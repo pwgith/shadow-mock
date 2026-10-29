@@ -736,6 +736,16 @@ func (w *world) initStateAsserts(sc *godog.ScenarioContext) {
 }
 
 func (w *world) initMappingAsserts(sc *godog.ScenarioContext) {
+	sc.Step(`^the folder "([^"]*)" holds (\d+) files?$`, func(dir string, want int) error {
+		names, err := os.ReadDir(filepath.Join(w.root, filepath.FromSlash(dir)))
+		if err != nil {
+			return fmt.Errorf("read %s: %w", dir, err)
+		}
+		if len(names) != want {
+			return fmt.Errorf("%s holds %d files, want %d", dir, len(names), want)
+		}
+		return nil
+	})
 	sc.Step(`^the folder "([^"]*)" has a file named like "([^"]*)"$`, func(dir, pattern string) error {
 		names, err := os.ReadDir(filepath.Join(w.root, filepath.FromSlash(dir)))
 		if err != nil {

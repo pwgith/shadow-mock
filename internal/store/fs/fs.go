@@ -31,6 +31,9 @@ type Mappings struct {
 	logger *slog.Logger
 	mem    *memory.Mappings
 
+	// namer, when set, names new files from a template instead of the default rule.
+	namer Namer
+
 	mu sync.Mutex
 	// files maps a file-backed mapping id to the file that defines it, and whether that file
 	// holds several mappings.
@@ -47,6 +50,21 @@ var (
 	_ store.Resetter          = (*Mappings)(nil)
 	_ store.Saver             = (*Mappings)(nil)
 )
+
+// SetNamer makes new mapping files be named by a filename template.
+func (r *Mappings) SetNamer(n Namer) { r.namer = n }
+
+// nameFor is the file name for a mapping: from the template when there is one that renders.
+func (r *Mappings) nameFor(m model.StubMapping) string {
+	if r.namer != nil {
+		if out, err := r.namer(FilenameData(m)); err == nil {
+			if name := slug(out); name != "" {
+				return name
+			}
+		}
+	}
+	return fileName(m)
+}
 
 // NewMappings opens (creating if needed) the mappings directory.
 func NewMappings(dir string, logger *slog.Logger) (*Mappings, error) {
@@ -232,7 +250,7 @@ func (r *Mappings) Save(ctx context.Context, s store.Scope) error {
 
 // write saves m to its own file, or to the single-mapping file it came from. Callers hold mu.
 func (r *Mappings) write(m model.StubMapping) error {
-	name := fileName(m)
+	name := r.nameFor(m)
 	if ref, ok := r.files[m.ID]; ok && !ref.multi {
 		name = ref.path
 	}

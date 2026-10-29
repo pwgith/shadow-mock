@@ -4,6 +4,8 @@
 package record
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -60,9 +62,13 @@ type Exchange struct {
 type Active struct {
 	Spec   Spec
 	filter *match.RequestMatcher
+	// onNew, when set, is called with the mapping for each request the recording has not seen
+	// before, as the exchange arrives (WireMock's --record-mappings).
+	onNew func(model.StubMapping) error
 
 	mu        sync.Mutex
 	exchanges []Exchange
+	seen      map[string]bool
 }
 
 // Accepts reports whether a request passes the recording's filter.
@@ -70,11 +76,36 @@ func (a *Active) Accepts(req *match.Request) bool {
 	return a.filter == nil || a.filter.Match(req)
 }
 
-// Add records an exchange.
-func (a *Active) Add(e Exchange) {
+// Add records an exchange. When the recording writes as it goes, a request it has not seen before is
+// turned into a mapping at once; a repeat of one it has seen adds nothing. The error is the
+// callback's, and the exchange is kept either way.
+func (a *Active) Add(e Exchange) error {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.exchanges = append(a.exchanges, e)
+	onNew := a.onNew
+	a.mu.Unlock()
+	if onNew == nil {
+		return nil
+	}
+	built, err := Build(&a.Spec, []Exchange{e})
+	if err != nil || len(built) == 0 {
+		return err
+	}
+	key, err := json.Marshal(built[0].Request)
+	if err != nil {
+		return fmt.Errorf("encode recorded request: %w", err)
+	}
+	a.mu.Lock()
+	if a.seen == nil {
+		a.seen = map[string]bool{}
+	}
+	repeat := a.seen[string(key)]
+	a.seen[string(key)] = true
+	a.mu.Unlock()
+	if repeat {
+		return nil
+	}
+	return onNew(built[0])
 }
 
 // Exchanges returns what has been recorded so far.
@@ -98,6 +129,11 @@ func NewRecorder() *Recorder {
 
 // Start begins recording in a scope. filter is the compiled spec.Filters, or nil.
 func (r *Recorder) Start(sc store.Scope, spec Spec, filter *match.RequestMatcher) error {
+	return r.StartLive(sc, spec, filter, nil)
+}
+
+// StartLive is Start for a recording that hands each new request's mapping to onNew as it arrives.
+func (r *Recorder) StartLive(sc store.Scope, spec Spec, filter *match.RequestMatcher, onNew func(model.StubMapping) error) error {
 	if spec.TargetBaseURL == "" {
 		return apierr.Invalid("/targetBaseUrl", "targetBaseUrl is required")
 	}
@@ -106,7 +142,7 @@ func (r *Recorder) Start(sc store.Scope, spec Spec, filter *match.RequestMatcher
 	if r.active[sc] != nil {
 		return apierr.New(http.StatusConflict, apierr.RecordingInProgress, "A recording is already running in this scope.")
 	}
-	r.active[sc] = &Active{Spec: spec, filter: filter}
+	r.active[sc] = &Active{Spec: spec, filter: filter, onNew: onNew}
 	r.status[sc] = StatusRecording
 	return nil
 }

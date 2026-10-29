@@ -117,7 +117,11 @@ func (h *Handler) countRequests(w http.ResponseWriter, r *http.Request, sc store
 	if err != nil {
 		return err
 	}
-	return writeJSON(w, http.StatusOK, countResult{Count: len(h.svc.FindRequests(sc, rm)), RequestJournalDisabled: !h.svc.Journal.Enabled()})
+	if !h.svc.Journal.Enabled() {
+		// WireMock answers -1 when it keeps no journal, which is not the same as none matching.
+		return writeJSON(w, http.StatusOK, countResult{Count: -1, RequestJournalDisabled: true})
+	}
+	return writeJSON(w, http.StatusOK, countResult{Count: len(h.svc.FindRequests(sc, rm))})
 }
 
 func (h *Handler) findRequests(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
