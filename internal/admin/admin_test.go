@@ -135,14 +135,21 @@ const (
 func TestSettings(t *testing.T) {
 	t.Parallel()
 	a := newAPI(t)
-	if s, _ := a.want(200, "GET", "/settings", "")["settings"].(map[string]any); len(s) != 0 {
-		t.Errorf("default settings = %v, want none", s)
+	if s, _ := a.want(200, "GET", "/settings", "")["settings"].(map[string]any); len(s) != 1 || s["proxyPassThrough"] != true {
+		t.Errorf("default settings = %v, want only proxyPassThrough: true", s)
 	}
 	a.want(200, "POST", "/settings", `{"fixedDelay":100,"extended":{"team":"claims"}}`)
 	s, _ := a.want(200, "GET", "/settings", "")["settings"].(map[string]any)
 	ext, _ := s["extended"].(map[string]any)
 	if s["fixedDelay"] != float64(100) || ext["team"] != "claims" {
 		t.Errorf("settings = %v", s)
+	}
+	// PUT does what POST does, and a body that leaves out proxyPassThrough keeps its value.
+	a.want(200, "PUT", "/settings", `{"proxyPassThrough":false}`)
+	a.want(200, "POST", "/settings", `{"fixedDelay":5}`)
+	s, _ = a.want(200, "GET", "/settings", "")["settings"].(map[string]any)
+	if s["proxyPassThrough"] != false || s["fixedDelay"] != float64(5) || s["extended"] != nil {
+		t.Errorf("after PUT and POST: %v", s)
 	}
 	a.wantError(422, "validation_failed", "POST", "/settings", `{"fixedDelay":-1}`)
 	a.wantError(422, "validation_failed", "POST", "/settings", `{"fixedDelay":"soon"}`)
@@ -226,7 +233,27 @@ func TestJournalEndpoints(t *testing.T) {
 	if future := a.want(200, "GET", "/requests?since=2099-01-01T00:00:00Z", ""); len(future["requests"].([]any)) != 0 {
 		t.Errorf("since in the future returned %v", future["requests"])
 	}
-	a.wantError(422, "validation_failed", "GET", "/requests?since=yesterday", "")
+	a.wantError(400, "validation_failed", "GET", "/requests?since=yesterday", "")
+	a.wantError(400, "validation_failed", "GET", "/requests?limit=-1", "")
+	a.wantError(400, "validation_failed", "GET", "/requests?limit=many", "")
+	a.wantError(400, "validation_failed", "GET", "/requests?matchingStub=nope", "")
+	// limit=0 shows nothing, and meta.total counts what the filters leave, not what limit shows.
+	if none := a.want(200, "GET", "/requests?limit=0", ""); len(none["requests"].([]any)) != 0 || none["meta"].(map[string]any)["total"] != float64(3) {
+		t.Errorf("limit=0 returned %v", none)
+	}
+	unmatched := a.want(200, "GET", "/requests?unmatched=true", "")
+	if len(unmatched["requests"].([]any)) != 1 || unmatched["meta"].(map[string]any)["total"] != float64(1) {
+		t.Errorf("unmatched=true returned %v", unmatched)
+	}
+	if all := a.want(200, "GET", "/requests?unmatched=false", ""); len(all["requests"].([]any)) != 3 {
+		t.Errorf("unmatched=false returned %v", all)
+	}
+	if byStub := a.want(200, "GET", "/requests?matchingStub="+idA, ""); len(byStub["requests"].([]any)) != 2 {
+		t.Errorf("matchingStub returned %v", byStub)
+	}
+	if byStub := a.want(200, "GET", "/requests?matchingStub="+idA+"&unmatched=true", ""); len(byStub["requests"].([]any)) != 0 {
+		t.Errorf("matchingStub with unmatched returned %v", byStub)
+	}
 
 	first, _ := reqs[0].(map[string]any)
 	id, _ := first["id"].(string)
@@ -235,7 +262,8 @@ func TestJournalEndpoints(t *testing.T) {
 	}
 	a.want(200, "DELETE", "/requests/"+id, "")
 	a.wantError(404, "not_found", "GET", "/requests/"+id, "")
-	a.wantError(404, "not_found", "DELETE", "/requests/"+id, "")
+	a.want(200, "DELETE", "/requests/"+id, "") // an id that is no longer there is still a 200
+	a.wantError(400, "validation_failed", "DELETE", "/requests/not-a-uuid", "")
 
 	if got := a.want(200, "POST", "/requests/count", `{"method":"GET","urlPath":"/one"}`); got["count"] != float64(1) {
 		t.Errorf("count = %v", got)
@@ -243,7 +271,7 @@ func TestJournalEndpoints(t *testing.T) {
 	a.wantError(422, "validation_failed", "POST", "/requests/count", `{"url":"/a","urlPath":"/a"}`)
 	a.wantError(422, "validation_failed", "POST", "/requests/find", `{"urlPattern":"("}`)
 	removed := a.want(200, "POST", "/requests/remove", `{"method":"POST"}`)
-	if r, _ := removed["requests"].([]any); len(r) != 1 {
+	if r, _ := removed["serveEvents"].([]any); len(r) != 1 {
 		t.Errorf("remove returned %v", removed)
 	}
 	if got := a.want(200, "GET", "/requests/unmatched", ""); len(got["requests"].([]any)) != 0 {

@@ -80,6 +80,9 @@ respond:
   gzip: auto                  # auto | off
   matchedHeader: false        # add X-Shadow-Mock-Matched to responses
 
+mappings:
+  unknownFields: reject       # reject | keep. reject answers 422 for a field a mapping may not have, as WireMock does
+
 templating:
   global: false               # template every response
   permittedSystemKeys: []     # environment variables the systemValue helper may read
@@ -152,6 +155,11 @@ Durations are written as `30s`, `15m`, `1h`, `720h`.
 * **`admin.globalWrites: deny`** rejects changes to the global mappings, files and settings through
   the admin API, which is useful on a shared server where global mocks come from files. Session
   calls still work.
+* **`mappings.unknownFields`** decides what happens to a mapping field Shadow Mock does not know,
+  such as `urlPaht`. With `reject` (the default, and what WireMock does) the admin API answers 422
+  with a pointer to the field. With `keep` the field is stored and returned unchanged, which suits
+  mappings that carry fields for other tools. A matcher without an operator is refused either way.
+  Mapping files read from `mappings/` are not checked.
 * **`storage.sessions.driver: fs`** saves sessions to disk so that they survive a restart. The
   default `memory` loses them.
 * **`sessions.detect.contentTypes`** limits which bodies are scanned for session keys.

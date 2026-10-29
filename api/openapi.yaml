@@ -240,6 +240,17 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/StubMappingList' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Mappings]
+      operationId: deleteUnmatchedMappings
+      summary: Delete the mappings that have not matched any request in the journal
+      x-saas: global-write-rejected
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      responses:
+        '200': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /__admin/mappings/find-by-metadata:
     post:
@@ -377,16 +388,22 @@ paths:
       tags: [Journal]
       operationId: listRequests
       summary: List journal entries, most recent first
+      description: |
+        `unmatched` and `matchingStub` narrow the list. `meta.total` counts what they leave, before
+        `since` and `limit` cut the list down (FR-10.7).
       parameters:
         - $ref: '#/components/parameters/ScopeKey'
-        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/JournalLimit'
         - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Unmatched'
+        - $ref: '#/components/parameters/MatchingStub'
       responses:
         '200':
           description: Journal entries.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServeEventList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
     delete:
       tags: [Journal]
@@ -418,10 +435,11 @@ paths:
       tags: [Journal]
       operationId: deleteRequest
       summary: Delete one journal entry
+      description: An id that is not in the journal is still a 200, as in WireMock (FR-10.8).
       responses:
         '200': { description: Deleted. }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
 
   /__admin/requests/count:
     post:
@@ -465,10 +483,26 @@ paths:
       requestBody: { $ref: '#/components/requestBodies/RequestPattern' }
       responses:
         '200':
-          description: The removed requests.
+          description: The serve events that were removed.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/FindRequestsResult' }
+              schema: { $ref: '#/components/schemas/RemovedServeEvents' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/requests/remove-by-metadata:
+    post:
+      tags: [Verification]
+      operationId: removeRequestsByMetadata
+      summary: Remove the requests served by a stub whose metadata matches a pattern
+      parameters:
+        - $ref: '#/components/parameters/ScopeKey'
+      requestBody: { $ref: '#/components/requestBodies/ContentPattern' }
+      responses:
+        '200':
+          description: The serve events that were removed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RemovedServeEvents' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /__admin/requests/unmatched:
@@ -701,6 +735,47 @@ paths:
         '200': { description: Updated. }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Settings]
+      operationId: replaceSettings
+      summary: Update global settings (the same as POST, as in WireMock)
+      x-saas: global-write-rejected
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GlobalSettings' }
+      responses:
+        '200': { description: Updated. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /__admin/docs:
+    get:
+      tags: [Settings]
+      operationId: getDocsIndex
+      summary: An HTML page that links to the OpenAPI document and Swagger UI
+      responses:
+        '200': { description: The page., content: { text/html: { schema: { type: string } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/docs/swagger:
+    get:
+      tags: [Settings]
+      operationId: getOpenApiDocument
+      summary: This OpenAPI document, as JSON
+      responses:
+        '200': { description: The document., content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/swagger-ui/:
+    get:
+      tags: [Settings]
+      operationId: getSwaggerUi
+      summary: Swagger UI for this API (the script and style come from a CDN)
+      responses:
+        '200': { description: The page., content: { text/html: { schema: { type: string } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /__admin/reset:
     post:
@@ -1057,9 +1132,12 @@ paths:
       operationId: listSessionRequests
       summary: List the session's journal
       parameters:
-        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/JournalLimit'
         - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Unmatched'
+        - $ref: '#/components/parameters/MatchingStub'
       responses:
+        '400': { $ref: '#/components/responses/BadRequest' }
         '200':
           description: Requests attributed to this session (FR-7.11).
           content:
@@ -1120,10 +1198,27 @@ paths:
       requestBody: { $ref: '#/components/requestBodies/RequestPattern' }
       responses:
         '200':
-          description: Removed requests.
+          description: The serve events that were removed.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/FindRequestsResult' }
+              schema: { $ref: '#/components/schemas/RemovedServeEvents' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /__admin/sessions/{sessionId}/requests/remove-by-metadata:
+    post:
+      tags: [Session scope]
+      operationId: removeSessionRequestsByMetadata
+      summary: Remove the session's requests served by a stub whose metadata matches a pattern
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody: { $ref: '#/components/requestBodies/ContentPattern' }
+      responses:
+        '200':
+          description: The serve events that were removed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RemovedServeEvents' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -1462,6 +1557,21 @@ components:
       name: offset
       in: query
       schema: { type: integer, minimum: 0, default: 0 }
+    JournalLimit:
+      name: limit
+      in: query
+      description: The most entries to return. 0 returns none, and leaving it out returns all.
+      schema: { type: integer, minimum: 0 }
+    Unmatched:
+      name: unmatched
+      in: query
+      description: Only the requests no stub served, when true.
+      schema: { type: boolean }
+    MatchingStub:
+      name: matchingStub
+      in: query
+      description: Only the requests the stub with this id served.
+      schema: { type: string, format: uuid }
     Since:
       name: since
       in: query
@@ -1935,6 +2045,15 @@ components:
             body: { type: string }
             bodyAsBase64: { type: string }
         wasMatched: { type: boolean }
+        subEvents:
+          type: array
+          description: What happened while the request was served. A request no stub matched has a REQUEST_NOT_MATCHED event holding the report.
+          items:
+            type: object
+            properties:
+              type: { type: string }
+              timeOffsetNanos: { type: integer }
+              data: { type: object, additionalProperties: true }
         timing:
           type: object
           properties:
@@ -1976,12 +2095,20 @@ components:
       required: [count]
       properties:
         count: { type: integer }
+        requestJournalDisabled: { type: boolean }
     FindRequestsResult:
       type: object
       properties:
         requests:
           type: array
           items: { $ref: '#/components/schemas/LoggedRequest' }
+        requestJournalDisabled: { type: boolean }
+    RemovedServeEvents:
+      type: object
+      properties:
+        serveEvents:
+          type: array
+          items: { $ref: '#/components/schemas/ServeEvent' }
     SampleRequest:
       type: object
       description: A request to evaluate without sending it as mock traffic.
@@ -2108,7 +2235,7 @@ components:
       properties:
         fixedDelay: { type: integer, minimum: 0 }
         delayDistribution: { $ref: '#/components/schemas/DelayDistribution' }
-        proxyPassThrough: { type: boolean }
+        proxyPassThrough: { type: boolean, description: "Starts true. A body that leaves it out keeps its current value." }
         extended: { type: object, additionalProperties: true }
     SettingsEnvelope:
       type: object

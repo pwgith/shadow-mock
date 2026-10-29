@@ -11,6 +11,7 @@ func (h *Handler) routes() {
 	h.mappingRoutes()
 	h.journalRoutes()
 	h.systemRoutes()
+	h.docsRoutes()
 	h.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		apierr.New(http.StatusNotFound, apierr.NotFound, "No admin endpoint %s %s.", r.Method, r.URL.Path).Write(w)
 	})
@@ -29,6 +30,7 @@ func (h *Handler) mappingRoutes() {
 	h.handle("POST", "/mappings/reset", configAccess, h.resetMappings)
 	h.handleGlobal("POST", "/mappings/save", configAccess, h.saveMappings)
 	h.handle("GET", "/mappings/unmatched", readAccess, h.unmatchedMappings)
+	h.handle("DELETE", "/mappings/unmatched", configAccess, h.deleteUnmatchedMappings)
 	h.handle("POST", "/mappings/find-by-metadata", readAccess, h.findByMetadata)
 	h.handle("POST", "/mappings/remove-by-metadata", configAccess, h.removeByMetadata)
 	h.handleGlobal("POST", "/mappings/validate", readAccess, h.validateMapping)
@@ -51,6 +53,7 @@ func (h *Handler) journalRoutes() {
 	h.handle("POST", "/requests/count", readAccess, h.countRequests)
 	h.handle("POST", "/requests/find", readAccess, h.findRequests)
 	h.handle("POST", "/requests/remove", stateAccess, h.removeRequests)
+	h.handle("POST", "/requests/remove-by-metadata", stateAccess, h.removeRequestsByMetadata)
 	h.handle("GET", "/requests/unmatched", readAccess, h.unmatchedRequests)
 	h.handle("GET", "/requests/unmatched/near-misses", readAccess, h.unmatchedNearMisses)
 	h.handle("POST", "/near-misses/request", readAccess, h.nearMissesForRequest)
@@ -77,6 +80,7 @@ func (h *Handler) systemRoutes() {
 	// Settings and system.
 	h.handleGlobal("GET", "/settings", readAccess, h.getSettings)
 	h.handleGlobal("POST", "/settings", configAccess, h.updateSettings)
+	h.handleGlobal("PUT", "/settings", configAccess, h.updateSettings)
 	h.handleGlobal("POST", "/reset", configAccess, h.resetAll)
 	h.handleGlobal("POST", "/shutdown", configAccess, h.shutdown)
 	h.handleGlobal("GET", "/version", readAccess, h.version)
@@ -93,4 +97,14 @@ func (h *Handler) systemRoutes() {
 	// Runtime.
 	h.handleGlobal("GET", "/stats/live", readAccess, h.liveStats)
 	h.handleGlobal("GET", "/usage", readAccess, h.usage)
+}
+
+// docsRoutes registers the API documents and the alias WireMock gives the mappings list.
+func (h *Handler) docsRoutes() {
+	h.handleGlobal("GET", "", readAccess, redirectToDirectory)
+	h.handleGlobal("GET", "/{$}", readAccess, h.listMappings)
+	h.handleGlobal("GET", "/docs", readAccess, h.docsIndex)
+	h.handleGlobal("GET", "/docs/swagger", readAccess, h.openAPI)
+	h.handleGlobal("GET", "/swagger-ui", readAccess, redirectToDirectory)
+	h.handleGlobal("GET", "/swagger-ui/", readAccess, h.swaggerUI)
 }

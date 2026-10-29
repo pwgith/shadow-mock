@@ -2,7 +2,10 @@ package admin
 
 import (
 	"net/http"
+	"regexp"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
@@ -15,22 +18,50 @@ import (
 
 func matchSample(s *model.SampleRequest) *match.Request { return match.FromSample(s) }
 
+// uuidPattern is the form WireMock demands of a request id or a stub id in a query.
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+func badRequest(format string, a ...any) error {
+	return apierr.New(http.StatusBadRequest, apierr.ValidationFailed, format, a...)
+}
+
+// listRequests answers GET /requests. unmatched and matchingStub narrow the list, and meta.total
+// counts what they leave, before since and limit cut it down, as in WireMock (FR-10.7).
 func (h *Handler) listRequests(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
-	var keep func(*journal.Entry) bool
-	if since := r.URL.Query().Get("since"); since != "" {
-		t, err := time.Parse(time.RFC3339, since)
-		if err != nil {
-			return apierr.New(http.StatusUnprocessableEntity, apierr.ValidationFailed, "since must be an RFC 3339 date-time.")
-		}
-		keep = func(e *journal.Entry) bool { return !e.LoggedAt.Before(t) }
+	q := r.URL.Query()
+	keep := func(*journal.Entry) bool { return true }
+	if strings.EqualFold(q.Get("unmatched"), "true") {
+		keep = func(e *journal.Entry) bool { return !e.Matched() }
 	}
-	limit := 0
-	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+	if stub := q.Get("matchingStub"); stub != "" {
+		if !uuidPattern.MatchString(stub) {
+			return badRequest("Query parameter matchingStub value '%s' is not a valid UUID.", stub)
+		}
+		narrowed := keep
+		keep = func(e *journal.Entry) bool { return narrowed(e) && e.Stub != nil && strings.EqualFold(e.Stub.ID, stub) }
+	}
+	var since time.Time
+	if v := q.Get("since"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return badRequest("since must be an ISO 8601 date-time, not %q.", v)
+		}
+		since = t
+	}
+	limit := -1
+	if v := q.Get("limit"); v != "" {
+		l, err := strconv.Atoi(v)
+		if err != nil || l < 0 {
+			return badRequest("limit must be 0 or more, not %q.", v)
+		}
 		limit = l
 	}
 	all := h.svc.Journal.Query(sc, keep, 0)
 	shown := all
-	if limit > 0 && limit < len(shown) {
+	if !since.IsZero() {
+		shown = slices.DeleteFunc(slices.Clone(shown), func(e *journal.Entry) bool { return e.LoggedAt.Before(since) })
+	}
+	if limit >= 0 && limit < len(shown) {
 		shown = shown[:limit]
 	}
 	out := serveEventList{
@@ -56,12 +87,15 @@ func (h *Handler) getRequest(w http.ResponseWriter, r *http.Request, sc store.Sc
 	return writeJSON(w, http.StatusOK, eventView(e))
 }
 
+// deleteRequest removes one entry. An id that is not in the journal is still a 200, as in
+// WireMock (FR-10.8); only an id that is not a UUID is refused.
 func (h *Handler) deleteRequest(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
 	id := r.PathValue("requestId")
-	if removed := h.svc.Journal.Remove(sc, func(e *journal.Entry) bool { return e.ID == id }); len(removed) == 0 {
-		return apierr.New(http.StatusNotFound, apierr.NotFound, "Request %s is not in the journal.", id)
+	if !uuidPattern.MatchString(id) {
+		return badRequest("%s is not a valid UUID.", id)
 	}
-	return ok(w)
+	h.svc.Journal.Remove(sc, func(e *journal.Entry) bool { return e.ID == id })
+	return writeJSON(w, http.StatusOK, struct{}{})
 }
 
 func (h *Handler) pattern(r *http.Request) (*match.RequestMatcher, error) {
@@ -76,7 +110,8 @@ func (h *Handler) pattern(r *http.Request) (*match.RequestMatcher, error) {
 }
 
 type countResult struct {
-	Count int `json:"count"`
+	Count                  int  `json:"count"`
+	RequestJournalDisabled bool `json:"requestJournalDisabled"`
 }
 
 func (h *Handler) countRequests(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
@@ -84,7 +119,7 @@ func (h *Handler) countRequests(w http.ResponseWriter, r *http.Request, sc store
 	if err != nil {
 		return err
 	}
-	return writeJSON(w, http.StatusOK, countResult{Count: len(h.svc.FindRequests(sc, rm))})
+	return writeJSON(w, http.StatusOK, countResult{Count: len(h.svc.FindRequests(sc, rm)), RequestJournalDisabled: !h.svc.Journal.Enabled()})
 }
 
 func (h *Handler) findRequests(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
@@ -92,7 +127,7 @@ func (h *Handler) findRequests(w http.ResponseWriter, r *http.Request, sc store.
 	if err != nil {
 		return err
 	}
-	return writeJSON(w, http.StatusOK, findView(h.svc.FindRequests(sc, rm)))
+	return writeJSON(w, http.StatusOK, findView(h.svc.FindRequests(sc, rm), !h.svc.Journal.Enabled()))
 }
 
 func (h *Handler) removeRequests(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
@@ -100,11 +135,25 @@ func (h *Handler) removeRequests(w http.ResponseWriter, r *http.Request, sc stor
 	if err != nil {
 		return err
 	}
-	return writeJSON(w, http.StatusOK, findView(h.svc.RemoveRequests(sc, rm)))
+	return writeJSON(w, http.StatusOK, removedView(h.svc.RemoveRequests(sc, rm)))
+}
+
+// removeRequestsByMetadata removes the entries served by a stub whose metadata matches the body
+// (FR-10.8).
+func (h *Handler) removeRequestsByMetadata(w http.ResponseWriter, r *http.Request, sc store.Scope) error {
+	var p model.ValuePattern
+	if err := h.decode(r, &p); err != nil {
+		return err
+	}
+	removed, err := h.svc.RemoveRequestsByMetadata(sc, p)
+	if err != nil {
+		return err
+	}
+	return writeJSON(w, http.StatusOK, removedView(removed))
 }
 
 func (h *Handler) unmatchedRequests(w http.ResponseWriter, _ *http.Request, sc store.Scope) error {
-	return writeJSON(w, http.StatusOK, findView(h.svc.UnmatchedRequests(sc)))
+	return writeJSON(w, http.StatusOK, findView(h.svc.UnmatchedRequests(sc), !h.svc.Journal.Enabled()))
 }
 
 func (h *Handler) unmatchedNearMisses(w http.ResponseWriter, _ *http.Request, sc store.Scope) error {

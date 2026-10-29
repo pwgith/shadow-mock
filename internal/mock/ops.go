@@ -39,6 +39,18 @@ func (s *Service) RemoveRequests(sc store.Scope, rm *match.RequestMatcher) []*jo
 	return s.Journal.Remove(sc, func(e *journal.Entry) bool { return rm.Match(e.Request) })
 }
 
+// RemoveRequestsByMetadata deletes and returns the journal entries in scope that a stub with
+// matching metadata served.
+func (s *Service) RemoveRequestsByMetadata(sc store.Scope, p model.ValuePattern) ([]*journal.Entry, error) {
+	cm, err := match.CompileContent(p, s.Layers.Options())
+	if err != nil {
+		return nil, apierr.Invalid("", "%s", err.Error())
+	}
+	return s.Journal.Remove(sc, func(e *journal.Entry) bool {
+		return e.Stub != nil && metadataMatches(cm, e.Stub.Metadata)
+	}), nil
+}
+
 // UnmatchedRequests returns the journal entries in scope that no stub served.
 func (s *Service) UnmatchedRequests(sc store.Scope) []*journal.Entry {
 	return s.Journal.Query(sc, func(e *journal.Entry) bool { return !e.Matched() }, 0)

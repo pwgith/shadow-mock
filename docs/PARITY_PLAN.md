@@ -116,6 +116,28 @@ The plan as first written:
 
 ### 4. Admin API (FR-10.7 to FR-10.9)
 
+**Status: done.** What the probes of WireMock 3.13.2 changed from the list below:
+
+* `meta.total` counts what `unmatched` and `matchingStub` leave, before `since` and `limit` cut the list.
+  `unmatched` is read as WireMock reads a boolean (anything but `true` is false), and both filters apply
+  together. A bad `matchingStub` or `since` is a 400 on both servers. A bad `limit` is a 500 in WireMock and
+  a 400 here.
+* `requests/remove-by-metadata` takes a value pattern and removes the entries a stub with matching metadata
+  served. `DELETE mappings/unmatched` removes the stubs no journal entry names.
+* `proxyPassThrough` starts true. A `POST` or `PUT` of settings replaces every setting but keeps
+  `proxyPassThrough` when the body leaves it out.
+* `GET /__admin` and `/__admin/swagger-ui` redirect with a slash. The Swagger page loads its script from a
+  CDN; the OpenAPI document is embedded.
+* The file name of a persisted mapping is the slug of its name, or `<method>-<url>` when it has none, then
+  the id. A mapping that is replaced keeps its first file name, as in WireMock.
+* Strict mappings check every part of a mapping (the lists are in `internal/model/strict.go`). Matchers
+  without an operator are always refused. `hasExactly` and `includes` stay valid in headers and query
+  parameters.
+* WireMock cannot delete mappings it loaded from files (`DELETE /mappings/unmatched` answers 500), so the
+  differential test compares mapping counts only against a WireMock without file mappings.
+
+The plan as first written:
+
 * Journal filters `unmatched`, `matchingStub`, `limit` (including 0) on `GET /__admin/requests`.
 * Response shapes: `serveEvents` on `requests/remove`, `requestJournalDisabled` on every journal response,
   `subEvents` on entries, `method: ANY` filled in on stored mappings.

@@ -21,10 +21,20 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request, _ store.Sc
 	return writeJSON(w, http.StatusOK, settingsEnvelope{Settings: h.svc.Renderer.Settings()})
 }
 
+// updateSettings replaces the settings, as POST and PUT do in WireMock. proxyPassThrough keeps its
+// value when the body does not name it.
 func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request, _ store.Scope) error {
-	var s respond.Settings
-	if err := h.decode(r, &s); err != nil {
+	var body struct {
+		respond.Settings
+		ProxyPassThrough *bool `json:"proxyPassThrough"`
+	}
+	if err := h.decode(r, &body); err != nil {
 		return err
+	}
+	s := body.Settings
+	s.ProxyPassThrough = h.svc.Renderer.Settings().ProxyPassThrough
+	if body.ProxyPassThrough != nil {
+		s.ProxyPassThrough = *body.ProxyPassThrough
 	}
 	if s.FixedDelay < 0 {
 		return apierr.New(http.StatusUnprocessableEntity, apierr.ValidationFailed, "fixedDelay must not be negative.")

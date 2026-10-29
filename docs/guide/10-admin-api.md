@@ -29,6 +29,7 @@ You can also scope a global call to a session by sending the session's key in th
 | `POST /mappings/reset` | Restore the mappings loaded from storage |
 | `POST /mappings/save` | Write API-created mappings to the `mappings/` folder |
 | `GET /mappings/unmatched` | Mappings that no request has matched |
+| `DELETE /mappings/unmatched` | Delete those mappings |
 | `POST /mappings/find-by-metadata` | Find mappings by their `metadata` |
 | `POST /mappings/remove-by-metadata` | Delete mappings by their `metadata` |
 | `POST /mappings/validate` | Check a mapping without saving it |
@@ -42,12 +43,13 @@ You can also scope a global call to a session by sending the session's key in th
 
 | Call | Purpose |
 |---|---|
-| `GET /requests` | List journal entries |
+| `GET /requests` | List journal entries. Narrow with `unmatched=true`, `matchingStub=<id>`, `limit=<n>` (0 shows none) and `since=<time>` |
 | `DELETE /requests` | Clear the journal |
 | `GET /requests/{id}`, `DELETE /requests/{id}` | One entry |
 | `POST /requests/count` | Count requests matching a pattern |
 | `POST /requests/find` | Find requests matching a pattern |
-| `POST /requests/remove` | Remove requests matching a pattern |
+| `POST /requests/remove` | Remove requests matching a pattern. Answers `{ "serveEvents": [...] }`, the entries removed |
+| `POST /requests/remove-by-metadata` | Remove the requests served by a mapping whose `metadata` matches a pattern |
 | `GET /requests/unmatched` | Requests that matched nothing |
 | `GET /requests/unmatched/near-misses` | Closest mappings for those |
 | `POST /near-misses/request` | Closest mappings for one request |
@@ -86,7 +88,9 @@ Create bodies and patch fields are in [Shadow mocks](06-shadow-mocks.md).
 
 | Call | Purpose |
 |---|---|
-| `GET /settings`, `POST /settings` | Global settings |
+| `GET /settings`, `POST /settings`, `PUT /settings` | Global settings. `POST` and `PUT` do the same. `proxyPassThrough` starts true and keeps its value when a body leaves it out |
+| `GET /` | The mappings list, as `GET /mappings` |
+| `GET /docs`, `GET /docs/swagger`, `GET /swagger-ui/` | An index of the documents, this API as an OpenAPI document, and Swagger UI (which loads its script from a CDN) |
 | `POST /reset` | Reset mappings, the journal and call counters |
 | `POST /shutdown` | Stop the server |
 | `GET /health` | WireMock-style health |
@@ -95,6 +99,22 @@ Create bodies and patch fields are in [Shadow mocks](06-shadow-mocks.md).
 
 Outside the admin prefix, `GET /__health` (liveness) and `GET /__ready` (readiness) are always
 available.
+
+## Journal answers
+
+Every journal answer says whether the journal is switched off (`requestJournalDisabled`), and
+`meta.total` in `GET /requests` counts what `unmatched` and `matchingStub` leave, before `since` and
+`limit` cut the list. Each entry has `subEvents`: empty for a request a mapping served, and for a request
+nothing matched a `REQUEST_NOT_MATCHED` event whose `data.report` holds the report that was the 404 body.
+Deleting an id that is not in the journal is still a 200; an id that is not a UUID is a 400.
+
+## Mapping files
+
+A mapping that is `persistent`, or saved with `POST /mappings/save`, is written to `mappings/<name>-<id>.json`.
+The name is the mapping's `name`, or `<method>-<url>` when it has none, in lower case with spaces as hyphens and
+every character but letters, digits, dots, underscores and hyphens removed (`Get /users?id=1` becomes
+`get-usersid1`). A mapping that is replaced keeps its file name. A stored mapping always has `request.method`;
+it is `ANY` when the mapping gave none.
 
 ## Scenarios
 
@@ -110,7 +130,9 @@ Errors are JSON with a stable machine-readable code:
 ```
 
 Mapping validation failures use WireMock's `{ "errors": [ ... ] }` shape, so WireMock clients can
-read them.
+read them. A mapping with a field Shadow Mock does not know, such as `urlPaht`, is a 422 whose
+`source.pointer` names it (`/request/urlPaht`). Set `mappings.unknownFields: keep` to store such fields
+instead (see [Configuration](11-configuration.md)).
 
 Codes you may meet:
 

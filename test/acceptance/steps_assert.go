@@ -325,6 +325,16 @@ func (w *world) initJSONAsserts(sc *godog.ScenarioContext) {
 		}
 		return nil
 	})
+	sc.Step(`^the response JSON at "([^"]*)" is (true|false)$`, func(path, want string) error {
+		v, found, err := w.jsonOne(path)
+		if err != nil {
+			return err
+		}
+		if !found || text(v) != want {
+			return fmt.Errorf("%s = %v (found %v), want %s", path, v, found, want)
+		}
+		return nil
+	})
 	sc.Step(`^the response JSON at "([^"]*)" is null$`, func(path string) error {
 		v, found, err := w.jsonOne(path)
 		if err != nil || !found || v != nil {
@@ -726,6 +736,24 @@ func (w *world) initStateAsserts(sc *godog.ScenarioContext) {
 }
 
 func (w *world) initMappingAsserts(sc *godog.ScenarioContext) {
+	sc.Step(`^the folder "([^"]*)" has a file named like "([^"]*)"$`, func(dir, pattern string) error {
+		names, err := os.ReadDir(filepath.Join(w.root, filepath.FromSlash(dir)))
+		if err != nil {
+			return fmt.Errorf("read %s: %w", dir, err)
+		}
+		re, err := regexp.Compile("^" + pattern + "$")
+		if err != nil {
+			return fmt.Errorf("pattern %q: %w", pattern, err)
+		}
+		var have []string
+		for _, n := range names {
+			if re.MatchString(n.Name()) {
+				return nil
+			}
+			have = append(have, n.Name())
+		}
+		return fmt.Errorf("no file in %s is named like %s; it holds %v", dir, pattern, have)
+	})
 	sc.Step(`^the admin mapping "([^"]*)" has name "([^"]*)"$`, func(id, name string) error {
 		r, err := w.mustAdmin("GET", "/mappings/"+id, "", 200)
 		if err != nil {

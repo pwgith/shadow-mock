@@ -232,7 +232,7 @@ func (r *Mappings) Save(ctx context.Context, s store.Scope) error {
 
 // write saves m to its own file, or to the single-mapping file it came from. Callers hold mu.
 func (r *Mappings) write(m model.StubMapping) error {
-	name := m.ID + ".json"
+	name := fileName(m)
 	if ref, ok := r.files[m.ID]; ok && !ref.multi {
 		name = ref.path
 	}

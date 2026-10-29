@@ -32,6 +32,7 @@ func TestDecodeKeepsUnknownFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	want["uuid"] = "m1"
+	want["request"].(map[string]any)["method"] = "ANY" // WireMock stores the method it matched on
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("round trip (-want +got):\n%s", diff)
 	}
