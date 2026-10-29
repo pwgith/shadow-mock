@@ -67,7 +67,8 @@ may see a proxy error such as 502 instead of the raw fault.
 
 ## Gzip
 
-Responses are gzip-compressed when the client sends `Accept-Encoding: gzip`. Turn this off for one
+Responses are gzip-compressed when the client sends `Accept-Encoding: gzip`, whatever their size, and
+without a `Vary` header, as WireMock does. A body that already has a `Content-Encoding` is left as it is. Turn this off for one
 mapping with `"gzipDisabled": true`, or for everything with `respond.gzip: "off"` in the
 [configuration](11-configuration.md).
 
@@ -91,7 +92,9 @@ A response can forward the request to a real server instead of answering itself:
 * Hop-by-hop headers are dropped. `additionalProxyRequestHeaders` adds headers and
   `removeProxyRequestHeaders` removes them.
 * The upstream's status, headers and body are returned to the client.
-* If the upstream cannot be reached, the client gets a `502` with the error code `bad_gateway`.
+* If the upstream cannot be reached, the client gets a `500` whose text begins `Network failure trying
+  to make a proxied request from Shadow Mock to` and names the address, as WireMock's does. A target
+  that `egress.blockPrivate` refuses is still a `502` with `egress_blocked`.
 
 Proxy mappings are useful for mocking one endpoint while the rest of an API stays real. Give the
 proxy mapping a low priority so specific stubs win.

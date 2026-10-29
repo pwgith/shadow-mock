@@ -117,6 +117,10 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | The pointer for a misspelt field of a `postServeActions` or `serveEventListeners` entry | The list, `/postServeActions` | The field, `/postServeActions/paramz` |
 | The `report` in the `REQUEST_NOT_MATCHED` sub event of an unmatched journal entry | WireMock's side-by-side table | Shadow Mock's own text, the same as the 404 body |
 | Swagger UI at `/__admin/swagger-ui/` | Bundled with the server | A page that loads Swagger UI from a CDN (jsDelivr), so it needs internet access. The OpenAPI document at `/__admin/docs/swagger` is served from the binary and describes Shadow Mock's API |
+| `Access-Control-Allow-Origin` when stub CORS is on and the mapping sets its own | Both values, the request's origin and the mapping's | The mapping's alone |
+| CORS on the admin API | Applied | Not applied: the admin API refuses requests from other web sites (see "Where Shadow Mock is stricter or safer") |
+| A reply with a `statusMessage` | Kept alive | Followed by `Connection: close`, because it is written on a connection taken over from Go's server. Over HTTP/2 the standard phrase is sent |
+| Files in `__files` | `Last-Modified` and `Accept-Ranges` headers | Not sent |
 | Journal `clientIp` | Written as `[0:0:0:0:0:0:0:1]` for IPv6 | Written as the plain address |
 
 ### Behaviour that matches WireMock on purpose

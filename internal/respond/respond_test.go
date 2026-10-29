@@ -249,7 +249,8 @@ func TestWriteGzip(t *testing.T) {
 		{"no Accept-Encoding at all", true, "", `{"body":"BIG"}`, false, ""},
 		{"gzipDisabled on the mapping", true, "gzip", `{"body":"BIG","gzipDisabled":true}`, false, ""},
 		{"compression turned off in the engine", false, "gzip", `{"body":"BIG"}`, false, ""},
-		{"a small body", true, "gzip", `{"body":"tiny"}`, false, ""},
+		{"a small body is compressed too", true, "gzip", `{"body":"tiny"}`, true, ""},
+		{"an empty body", true, "gzip", `{"status":200}`, false, ""},
 		{"a body that is already encoded", true, "gzip", `{"body":"BIG","headers":{"Content-Encoding":"br"}}`, false, "br"},
 	}
 	for _, tt := range tests {
@@ -268,16 +269,18 @@ func TestWriteGzip(t *testing.T) {
 			if err := r.Write(t.Context(), rec, req, resp, nil); err != nil {
 				t.Fatal(err)
 			}
+			wantBody := big
+			if strings.Contains(tt.def, "tiny") {
+				wantBody = "tiny"
+			}
 			enc := rec.Header().Get("Content-Encoding")
-			if tt.wantGzip {
-				if enc != "gzip" || !strings.Contains(rec.Header().Get("Vary"), "Accept-Encoding") {
-					t.Fatalf("Content-Encoding %q, Vary %q; want gzip", enc, rec.Header().Get("Vary"))
-				}
-				if gunzip(t, rec.Body.Bytes()) != big {
-					t.Error("the gzipped body does not decode to the original")
-				}
-			} else if enc != tt.wantHeader {
+			switch {
+			case !tt.wantGzip && enc != tt.wantHeader:
 				t.Errorf("Content-Encoding = %q, want %q", enc, tt.wantHeader)
+			case tt.wantGzip && (enc != "gzip" || rec.Header().Get("Vary") != ""):
+				t.Fatalf("Content-Encoding %q, Vary %q; want gzip and no Vary", enc, rec.Header().Get("Vary"))
+			case tt.wantGzip && gunzip(t, rec.Body.Bytes()) != wantBody:
+				t.Error("the gzipped body does not decode to the original")
 			}
 			if got := rec.Header().Get("Content-Length"); got != itoa(rec.Body.Len()) {
 				t.Errorf("Content-Length = %s, body is %d bytes", got, rec.Body.Len())
@@ -475,5 +478,33 @@ func TestMaxDelayShortensADelayAndADribble(t *testing.T) {
 		if got := clk.Now().Sub(start); got != 500*time.Millisecond {
 			t.Errorf("%s took %v of fake time, want it shortened to 500ms", body, got)
 		}
+	}
+}
+
+func TestWriteWithAReasonPhraseOfItsOwn(t *testing.T) {
+	t.Parallel()
+	r, _, _ := newRenderer(t, true)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		resp, err := r.Render(req.Context(), def(t, `{"status":202,"statusMessage":"All Good\r\nX-Injected: yes","body":"ok","headers":{"X-A":"b"}}`), nil, nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if err := r.Write(req.Context(), w, req, resp, nil); err != nil {
+			t.Error(err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	res, err := http.Get(srv.URL) //nolint:noctx // a local test server
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusAccepted || res.Status != "202 All Good  X-Injected: yes" {
+		t.Errorf("status line = %q", res.Status)
+	}
+	if res.Header.Get("X-Injected") != "" || res.Header.Get("X-A") != "b" || string(body) != "ok" {
+		t.Errorf("headers %v, body %q: a line break in the phrase must not start a header", res.Header, body)
 	}
 }

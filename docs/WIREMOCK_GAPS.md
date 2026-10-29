@@ -102,7 +102,9 @@ Every row below was checked again against WireMock 3.13.2 for workstream 4, and 
 | Journal entry | has `shadowMock` | also has `subEvents` |
 | Persisted mapping file | `<id>.json` | `<name>-<id>.json` |
 
-## 5. Wire behaviour (verified unless noted)
+## 5. Wire behaviour (closed by workstream 5, FR-10.10 and FR-10.11, except the rows marked later)
+
+Rows for HTTP/2, HTTPS and the browser proxy belong to workstreams 8 and 9. `TestWireBehaviourMatchesWireMock` compares the rest with a real WireMock; the deliberate differences are in [COMPATIBILITY.md](COMPATIBILITY.md).
 
 | Behaviour | Shadow Mock | WireMock |
 |---|---|---|

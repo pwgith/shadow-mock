@@ -78,12 +78,13 @@ Feature: Proxying to a real upstream
       | GET    | /payments/1 | ${upstream.payments}  |
     Then the response body is "real"
 
-  Scenario: An unreachable upstream is a bad gateway
+  @FR-10.11
+  Scenario: An unreachable upstream is a 500 that says so, as in WireMock
     Given the upstream stub server "payments" is stopped
     And the global mapping:
       """json
       { "request": { "urlPathPattern": "/payments/.*" }, "response": { "proxyBaseUrl": "${upstream.payments}" } }
       """
     When I send a "GET" request to "/payments/1"
-    Then the response status is 502
-    And the response JSON at "$.error" is "bad_gateway"
+    Then the response status is 500
+    And the response body contains "Network failure trying to make a proxied request"

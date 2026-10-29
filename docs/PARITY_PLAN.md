@@ -151,6 +151,27 @@ The plan as first written:
 
 ### 5. Wire behaviour (FR-10.10, FR-10.11)
 
+**Status: done.** What the probes of WireMock 3.13.2 changed from the list below:
+
+* `Matched-Stub-Name` is sent only when the mapping has a name. Both headers are in the journal's copy of the reply.
+* A request body is inflated before matching, templating and the journal, and the journal keeps the
+  `Content-Encoding` header. The inflated size is capped at `limits.maxBodyBytes`.
+* CORS is a filter on everything WireMock serves. A preflight (`OPTIONS` with `Origin` and
+  `Access-Control-Request-Method`) is answered 200 whether or not a mapping exists and is not journalled; other
+  requests get `Vary: Origin`, and `Access-Control-Allow-Origin` (the request's `Origin`, even `null`) and
+  `Access-Control-Allow-Credentials: true` when there is an `Origin`. `Access-Control-Allow-Headers` repeats the requested
+  headers without spaces. Shadow Mock leaves the admin API out and sends a mapping's own
+  `Access-Control-Allow-Origin` alone, where WireMock sends both.
+* `/__files/<path>` is served before mappings, and `/<path>` only when no mapping matches. A folder is a 403 and a
+  missing file under `/__files/` a 404. Neither is journalled.
+* An unreachable proxy target is a 500 whose text begins `Network failure trying to make a proxied request from`.
+  `egress_blocked` stays a 502, since WireMock has no such rule.
+* A reason phrase is written on the hijacked connection, which is then closed (`Connection: close`); a line break in it
+  is replaced by a space. Over HTTP/2 the standard phrase is sent. A body sent in dribbled chunks is not gzipped.
+* CI now runs the admin and wire comparisons too, against a third reference server started with `--enable-stub-cors`.
+
+The plan as first written:
+
 * Send `statusMessage` as the reason phrase. Go's server cannot, so replies with a custom phrase are
   written through a hijacked connection, with the same headers and framing as the normal path.
 * Send `Matched-Stub-Id` and `Matched-Stub-Name` on every matched reply, as WireMock does. The existing

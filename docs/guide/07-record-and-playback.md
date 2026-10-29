@@ -85,6 +85,5 @@ specific active recording wins when several are running.
 
 * Recording forwards real requests, including their headers and bodies, to the upstream. Use a
   test environment.
-* If the upstream cannot be reached, the client receives a `502` with the error code
-  `bad_gateway`.
+* If the upstream cannot be reached, the client receives a `500` that says so, as WireMock sends.
 * While a recording runs, requests that were forwarded show as unmatched in the journal.

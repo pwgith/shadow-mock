@@ -33,7 +33,8 @@ Feature: Gzip response compression
       | GET    | /nogzip | gzip                   |
     Then the response header "Content-Encoding" is absent
 
-  Scenario: Small bodies and pre-encoded bodies are not recompressed
+  @FR-10.10
+  Scenario: A small body is compressed too, and no Vary header is added
     Given the global mapping:
       """json
       { "request": { "urlPath": "/tiny" }, "response": { "status": 200, "body": "ok" } }
@@ -41,7 +42,19 @@ Feature: Gzip response compression
     When I send a request:
       | method | path  | header:Accept-Encoding |
       | GET    | /tiny | gzip                   |
-    Then the response header "Content-Encoding" is absent
+    Then the response header "Content-Encoding" is "gzip"
+    And the response header "Vary" is absent
+    And the decoded response body has 2 characters
+
+  Scenario: A body that is already encoded is not compressed again
+    Given the global mapping:
+      """json
+      { "request": { "urlPath": "/br" }, "response": { "status": 200, "body": "ok", "headers": { "Content-Encoding": "br" } } }
+      """
+    When I send a request:
+      | method | path | header:Accept-Encoding |
+      | GET    | /br  | gzip                   |
+    Then the response header "Content-Encoding" is "br"
 
   @saas
   Scenario: An org can turn compression off

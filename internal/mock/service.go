@@ -40,6 +40,10 @@ type Config struct {
 	// KeepUnknownFields stores a mapping field Shadow Mock does not know instead of refusing it
 	// (mappings.unknownFields: keep, FR-1.4).
 	KeepUnknownFields bool
+	// StubCORS answers CORS preflight requests and adds CORS headers (server.stubCors).
+	StubCORS bool
+	// ServeFiles serves __files over HTTP (server.serveFiles).
+	ServeFiles bool
 	// SaaS turns off standalone-only operations such as save and shutdown.
 	SaaS bool
 	// LogRequests writes a log line for every mock request (log.requests).

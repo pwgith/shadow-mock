@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Starts real WireMock servers to compare Shadow Mock against.
 #
-#   scripts/wiremock-reference.sh start   downloads WireMock (once), then starts two servers:
+#   scripts/wiremock-reference.sh start   downloads WireMock (once), then starts three servers:
 #                                           :18080  root = a copy of corpus/wiremock
 #                                           :18081  no stubs, for the client suite
+#                                           :18082  root = a copy of corpus/wiremock, with --enable-stub-cors
 #   scripts/wiremock-reference.sh stop    stops them
 #
 # Then, from the repository root:
 #
-#   SHADOWMOCK_WIREMOCK_URL=http://localhost:18080 go test ./test/conformance -run TestDifferentialAgainstRealWireMock
+#   SHADOWMOCK_WIREMOCK_URL=http://localhost:18080 SHADOWMOCK_WIREMOCK_CORS_URL=http://localhost:18082 \
+#     go test ./test/conformance -run 'TestDifferentialAgainstRealWireMock|TestAdminAPIMatchesWireMock|TestWireBehaviourMatchesWireMock'
 #   BASE_URL=http://localhost:18081 node --test test/client/compat.test.mjs
 #
 # Needs Java 11 or later and curl. The jar is checked against the SHA-1 Maven Central publishes
@@ -36,9 +38,10 @@ fetch() {
   fi
 }
 
-launch() { # name port root
+launch() { # name port root [extra WireMock flags]
   local name="$1" port="$2" root="$3"
-  java -jar "$JAR" --port "$port" --root-dir "$root" >"$HOME_DIR/$name.log" 2>&1 &
+  shift 3
+  java -jar "$JAR" --port "$port" --root-dir "$root" "$@" >"$HOME_DIR/$name.log" 2>&1 &
   echo $! >"$HOME_DIR/$name.pid"
   for _ in $(seq 1 60); do
     if curl -fs "http://localhost:$port/__admin/version" >/dev/null 2>&1; then
@@ -55,16 +58,18 @@ launch() { # name port root
 start() {
   fetch
   stop
-  rm -rf "$HOME_DIR/corpus-root" "$HOME_DIR/empty-root"
+  rm -rf "$HOME_DIR/corpus-root" "$HOME_DIR/cors-root" "$HOME_DIR/empty-root"
   cp -r "$REPO/corpus/wiremock" "$HOME_DIR/corpus-root"
+  cp -r "$REPO/corpus/wiremock" "$HOME_DIR/cors-root"
   mkdir -p "$HOME_DIR/empty-root"
   launch corpus 18080 "$HOME_DIR/corpus-root"
   launch empty 18081 "$HOME_DIR/empty-root"
+  launch cors 18082 "$HOME_DIR/cors-root" --enable-stub-cors
 }
 
 stop() {
   local f
-  for f in "$HOME_DIR"/corpus.pid "$HOME_DIR"/empty.pid; do
+  for f in "$HOME_DIR"/corpus.pid "$HOME_DIR"/empty.pid "$HOME_DIR"/cors.pid; do
     [[ -f "$f" ]] || continue
     kill "$(cat "$f")" 2>/dev/null || true
     rm -f "$f"

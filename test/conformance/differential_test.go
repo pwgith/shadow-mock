@@ -49,7 +49,6 @@ var knownDifferences = map[string]string{
 // ignoredHeaders are headers one server adds that say nothing about behaviour.
 var ignoredHeaders = []string{
 	"Date", "Server", "Transfer-Encoding", "Content-Length", "Connection", "Keep-Alive", "Vary",
-	"Matched-Stub-Id", "Matched-Stub-Name",
 }
 
 // TestDifferentialAgainstRealWireMock replays every corpus request against Shadow Mock and a

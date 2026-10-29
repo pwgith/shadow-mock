@@ -156,6 +156,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 			MaxBodyBytes: cfg.Limits.MaxBodyBytes, MappingSetsDir: filepath.Join(cfg.Root, "mapping-sets"),
 			MatchedHeader: cfg.Respond.MatchedHeader, LogRequests: cfg.Log.Requests,
 			KeepUnknownFields: cfg.Mappings.UnknownFields == "keep",
+			StubCORS:          cfg.Server.StubCORS, ServeFiles: cfg.Server.ServeFiles,
 			Limits: mock.Limits{
 				MaxSessions: cfg.Limits.MaxSessions, MaxMappings: cfg.Limits.MaxMappings,
 				MaxMappingsPerSession: cfg.Limits.MaxMappingsPerSession, MaxDelay: time.Duration(cfg.Limits.MaxDelay),

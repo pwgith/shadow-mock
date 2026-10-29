@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -21,6 +22,21 @@ func (w *world) initHTTP(sc *godog.ScenarioContext) {
 	sc.Step(`^I send a "([^"]*)" request to "([^"]*)"$`, func(m, p string) error { return w.sendSimple(m, p, nil, "") })
 	sc.Step(`^I send a "([^"]*)" request to "([^"]*)" with body:$`, func(m, p string, doc *godog.DocString) error {
 		return w.sendSimple(m, p, nil, doc.Content, docType(doc))
+	})
+	sc.Step(`^I send a "([^"]*)" request to "([^"]*)" with a gzip body:$`, func(m, p string, doc *godog.DocString) error {
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
+		if _, err := zw.Write([]byte(doc.Content)); err != nil {
+			return fmt.Errorf("gzip the body: %w", err)
+		}
+		if err := zw.Close(); err != nil {
+			return fmt.Errorf("gzip the body: %w", err)
+		}
+		r := newRequest(m, p)
+		r.body = buf.Bytes()
+		r.header.Set("Content-Encoding", "gzip")
+		r.header.Set("Content-Type", docType(doc))
+		return w.sendOne(r)
 	})
 	sc.Step(`^I send a "([^"]*)" request to "([^"]*)" with multipart parts:$`, w.sendMultipart)
 	sc.Step(`^I send a "([^"]*)" request to "([^"]*)" with header "([^"]*)" set to "([^"]*)"$`, func(m, p, h, v string) error {
