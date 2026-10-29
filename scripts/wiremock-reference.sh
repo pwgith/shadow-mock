@@ -10,7 +10,7 @@
 # Then, from the repository root:
 #
 #   SHADOWMOCK_WIREMOCK_URL=http://localhost:18080 SHADOWMOCK_WIREMOCK_CORS_URL=http://localhost:18082 \
-#     go test ./test/conformance -run 'TestDifferentialAgainstRealWireMock|TestAdminAPIMatchesWireMock|TestWireBehaviourMatchesWireMock'
+#     go test ./test/conformance -run 'TestDifferentialAgainstRealWireMock|TestAdminAPIMatchesWireMock|TestWireBehaviourMatchesWireMock|TestRecordingMatchesWireMock'
 #   BASE_URL=http://localhost:18081 node --test test/client/compat.test.mjs
 #
 # Needs Java 11 or later and curl. The jar is checked against the SHA-1 Maven Central publishes

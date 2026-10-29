@@ -116,7 +116,7 @@ Feature: Settings WireMock takes as command-line flags
         """
       When I send a "GET" request to "/anything"
       Then the folder "mappings" has a file named like "get-anything-[0-9a-f-]{36}\.json"
-      And a file under "mappings/" contains "real"
+      And a file under "__files/" contains "real"
       When I send a "GET" request to "/anything"
       Then the folder "mappings" holds 1 file
 
