@@ -21,7 +21,9 @@ import (
 const wiremockURLVar = "SHADOWMOCK_WIREMOCK_URL"
 
 // differentialSkip lists corpus cases the two servers cannot be compared on, with the reason.
-// They are about the environment (clock, address, upstreams), never about behaviour.
+// They are about the environment (clock, randomness, addresses, listeners and upstreams), never about
+// behaviour: each is compared by a test of its own, or cannot be compared because the answer depends on
+// the clock or on chance.
 var differentialSkip = map[string]string{
 	"c003000403": "scheme and port matching needs an HTTPS listener on 8443; TestTLSMatchesWireMock compares it",
 	"c004000302": "relative dates are measured from each server's own clock; the corpus requests assume Shadow Mock's fixed clock",
@@ -31,11 +33,10 @@ var differentialSkip = map[string]string{
 	"c010000101": "the body holds the request id and the server's own address",
 	"c010000201": "the body holds the current time",
 	"c010000202": "the body holds random values",
-	"c011000106": "waits 10 s on purpose",
-	"c013000101": "proxies to an upstream that only the acceptance suite starts",
-	"c013000103": "proxies to an upstream that only the acceptance suite starts",
-	"c013000104": "proxies to an upstream that only the acceptance suite starts",
-	"c013000105": "proxies to an upstream that only the acceptance suite starts",
+	"c013000101": "needs an upstream on port 8089; TestProxyingCorpusMatchesWireMock compares it",
+	"c013000103": "needs an upstream on port 8089; TestProxyingCorpusMatchesWireMock compares it",
+	"c013000104": "needs an upstream on port 8089; TestProxyingCorpusMatchesWireMock compares it",
+	"c013000105": "needs an upstream on port 8089; TestProxyingCorpusMatchesWireMock compares it",
 }
 
 // knownDifferences lists corpus cases where Shadow Mock deliberately answers differently from

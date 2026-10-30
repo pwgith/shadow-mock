@@ -311,8 +311,8 @@ gRPC stays out of scope.
 
 ## Definition of done for the whole plan
 
-* Every row of WIREMOCK_GAPS.md is closed, or moved to "Not supported" in COMPATIBILITY.md with a reason.
-* The differential test has no skips for behaviour (only for the clock, randomness and addresses).
-* `docs/WIREMOCK_GAPS.md` is replaced by a short "verified parity" statement that points to the differential test.
+* Every row of WIREMOCK_GAPS.md is closed, or moved to "Not supported" in COMPATIBILITY.md with a reason. **Done.**
+* The differential test has no skips for behaviour (only for the clock, randomness and addresses). **Done.** Closing the last skips found two real differences (proxy header rules), now in COMPATIBILITY.md; the proxying cases are compared by `TestProxyingCorpusMatchesWireMock`, the ten-second delay case now runs, and the recording session payload no longer skips.
+* `docs/WIREMOCK_GAPS.md` is replaced by a short "verified parity" statement that points to the differential test. **Done.**
 * Release notes for the next minor version list the new flags and the behaviour changes (strict mappings,
   `Matched-Stub-Id`, gzip floor).

@@ -5,9 +5,9 @@ is checked, the rule that keeps it true, and every place Shadow Mock deliberatel
 
 ## How it is checked
 
-Two tests run against a **real WireMock** (3.13.2) on every pull request, in the
-`wiremock-reference` CI job. Everything else in the test suite takes its expected results from
-Shadow Mock itself. These two take them from WireMock.
+Tests run against a **real WireMock** (3.13.2) on every pull request, in the
+`wiremock-reference` CI job; [WIREMOCK_GAPS.md](WIREMOCK_GAPS.md) lists them. Everything else in the test suite takes its expected results from
+Shadow Mock itself. The two that started it take them from WireMock:
 
 1. **Corpus replay** (`test/conformance/differential_test.go`). Every request in
    [corpus/wiremock](../corpus/README.md) is sent to Shadow Mock and to WireMock. The status,
@@ -28,8 +28,8 @@ bash scripts/wiremock-reference.sh stop
 ```
 
 Some corpus cases cannot be compared and are skipped, with the reason in the test: the body holds
-the current time or random values, a date is measured from each server's own clock, the case waits
-ten seconds on purpose, or the mapping proxies to an upstream that only the acceptance suite starts.
+the current time or random values, a date is measured from each server's own clock, or the case needs a listener or an upstream
+that a test of its own provides. [WIREMOCK_GAPS.md](WIREMOCK_GAPS.md) lists every test that compares with WireMock.
 
 ## The rule
 
@@ -134,6 +134,8 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | The admin listener of `listen.admin` | (WireMock has no second listener) | Plain HTTP. HTTPS serves what the mock listener serves |
 | A TLS handshake that fails | Logged at debug | Logged by Go's HTTP server on standard error |
 | The certificate authority when `--ca-keystore` is not given | One kept in `~/.wiremock/ca-keystore.jks` | One made on first use, stored in `~/.shadowmock` (or `proxy.browser.caDir`) with `ca.pem` beside it. Its SHA-256 is logged at start-up |
+| `additionalProxyRequestHeaders` for a header the client also sent | Adds it, so the upstream receives both and a server that reads the first sees the client's | Replaces the client's |
+| `removeProxyRequestHeaders` | Removes a header only when the name is written in lower case (`cookie`, not `Cookie`) | Removes the header whatever the case of either name |
 | The JWT keys | In the extended global settings, made on first start and kept with them | In `templating.jwt`; what is not set is made at each start, so tokens do not outlive the server. `POST /__admin/settings` does not carry them |
 | A date other than `exp` and `nbf` given to `{{jwt}}` as a claim | A date claim, in seconds | The text of the date. The `now` helper gives text here, not a date |
 | The `random` helper's values | Datafaker's, in every locale | Shadow Mock's own short word lists, in English, for `Name`, `Address`, `Internet`, `Company`, `Lorem`, `Number`, `PhoneNumber`, `Bool` and `Color`; another class or method is an `[ERROR: …]` |
