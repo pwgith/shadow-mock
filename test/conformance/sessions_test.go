@@ -325,7 +325,7 @@ var sessionFiles = map[string]string{
 	"files/claim-from-file.json":                         "covered by TestKeyBasedShadowMock",
 	"runtime/dry-run.json":                               "dry-run",
 	"runtime/validate-mapping.json":                      "validate",
-	"recording/record-into-session.json":                 "skip: recording is P3",
+	"recording/record-into-session.json":                 "record",
 }
 
 func TestSessionPayloadFiles(t *testing.T) {
@@ -371,6 +371,13 @@ func TestSessionPayloadFiles(t *testing.T) {
 				if r, _ := se.admin("PATCH", "/sessions/"+base.id, body); r.status != 200 {
 					t.Errorf("%d %s", r.status, r.body)
 				}
+			case "record":
+				if r, _ := se.admin("POST", "/sessions/"+base.id+"/recordings/start", body); r.status != 200 {
+					t.Errorf("start: %d %s", r.status, r.body)
+				}
+				if r, _ := se.admin("POST", "/sessions/"+base.id+"/recordings/stop", ""); r.status != 200 {
+					t.Errorf("stop: %d %s", r.status, r.body)
+				}
 			case "validate":
 				r, v := se.admin("POST", "/mappings/validate", body)
 				if r.status != 200 || v["valid"] != true {
@@ -383,9 +390,6 @@ func TestSessionPayloadFiles(t *testing.T) {
 					t.Errorf("dry run: %d %s", r.status, r.body)
 				}
 			default:
-				if strings.HasPrefix(how, "skip") {
-					t.Skip(how)
-				}
 			}
 		})
 	}
