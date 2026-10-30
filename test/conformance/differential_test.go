@@ -23,7 +23,7 @@ const wiremockURLVar = "SHADOWMOCK_WIREMOCK_URL"
 // differentialSkip lists corpus cases the two servers cannot be compared on, with the reason.
 // They are about the environment (clock, address, upstreams), never about behaviour.
 var differentialSkip = map[string]string{
-	"c003000403": "scheme and port matching needs an HTTPS listener on 8443",
+	"c003000403": "scheme and port matching needs an HTTPS listener on 8443; TestTLSMatchesWireMock compares it",
 	"c004000302": "relative dates are measured from each server's own clock; the corpus requests assume Shadow Mock's fixed clock",
 	"c004000303": "relative dates are measured from each server's own clock; the corpus requests assume Shadow Mock's fixed clock",
 	"c004000306": "truncates to the current month, which depends on each server's own clock",

@@ -212,6 +212,8 @@ func (a *App) routers(cfg config.Config, o Options) error {
 		Limiter:      limiter,
 		AdminHosts:   cfg.Admin.AllowedHosts,
 		AdminOrigins: cfg.Admin.AllowedOrigins,
+
+		AdminRequireHTTPS: cfg.TLS.AdminRequireHTTPS,
 	}
 	a.mockRoute = &route
 	if cfg.Listen.Admin != "" {

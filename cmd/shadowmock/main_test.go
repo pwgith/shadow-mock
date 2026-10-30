@@ -57,7 +57,7 @@ func acceptAll(t *testing.T, ln net.Listener) <-chan net.Conn {
 // A listener with a limit holds that many connections; another waits until one closes.
 func TestListenHoldsAtMostTheLimitedNumberOfConnections(t *testing.T) {
 	t.Parallel()
-	ln, err := listen("127.0.0.1:0", 2)
+	ln, err := listen(t.Context(), "127.0.0.1:0", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestListenHoldsAtMostTheLimitedNumberOfConnections(t *testing.T) {
 
 func TestListenWithNoLimitAcceptsEveryConnection(t *testing.T) {
 	t.Parallel()
-	ln, err := listen("127.0.0.1:0", 0)
+	ln, err := listen(t.Context(), "127.0.0.1:0", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestListenWithNoLimitAcceptsEveryConnection(t *testing.T) {
 
 func TestListenReportsAnAddressThatCannotBeUsed(t *testing.T) {
 	t.Parallel()
-	if _, err := listen("not-an-address", 0); err == nil {
+	if _, err := listen(t.Context(), "not-an-address", 0); err == nil {
 		t.Error("a bad address should be an error")
 	}
 }

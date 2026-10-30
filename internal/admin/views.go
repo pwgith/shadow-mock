@@ -80,7 +80,10 @@ func requestView(r *match.Request, e *journal.Entry) loggedRequest {
 	}
 	v.Body = bodyText(r.Body)
 	v.BodyAsBase64 = base64.StdEncoding.EncodeToString(r.Body)
-	v.Protocol, v.Scheme, v.Host, v.Port = "HTTP/1.1", r.Scheme, r.Host, r.Port
+	v.Protocol, v.Scheme, v.Host, v.Port = r.Protocol, r.Scheme, r.Host, r.Port
+	if v.Protocol == "" {
+		v.Protocol = "HTTP/1.1"
+	}
 	v.FormParams = map[string]queryParam{}
 	for k, vs := range r.Form() {
 		v.FormParams[k] = queryParam{Key: k, Values: vs}

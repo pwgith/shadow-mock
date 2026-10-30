@@ -302,6 +302,7 @@ type Config struct {
 	Egress      Egress     `yaml:"egress"`
 	Log         Log        `yaml:"log"`
 	Tracing     Tracing    `yaml:"tracing"`
+	TLS         TLS        `yaml:"tls"`
 }
 
 // Default returns the documented defaults (DESIGN.md §11).
@@ -512,6 +513,7 @@ func (c *Config) Validate() error {
 		oneOf("mappings.unknownFields", c.Mappings.UnknownFields, "reject", "keep"),
 		oneOf("sessions.detect.ambiguity", c.Sessions.Detect.Ambiguity, "first", "reject", "global"),
 		c.validateAuth(),
+		c.validateTLS(),
 	}
 	if err := errors.Join(checks...); err != nil {
 		return err

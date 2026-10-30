@@ -222,8 +222,9 @@ Accept every WireMock flag so a copied command line starts. Each flag is in one 
   `--jetty-*`, `--async-response-*`, `--max-http-client-connections`, `--disable-connection-reuse`,
   `--disable-extensions-scanning`, `--disable-optimize-xml-factories-loading`,
   `--disable-strict-http-headers`, `--extensions`, `--supported-proxy-encodings`.
-* **Implemented in workstreams 8 and 9** (until then they stop startup with "not supported yet, see
-  docs/PARITY_PLAN.md"): the TLS, HTTP/2 and browser-proxy flags.
+* **Implemented in workstream 8:** the TLS and HTTP/2 flags (section 8).
+* **Implemented in workstream 9** (until then they stop startup with "not supported yet, see
+  docs/PARITY_PLAN.md"): the browser-proxy flags.
 
 Each flag maps onto a configuration key, so the YAML file and environment variables get the same
 settings. The `--help` text lists them.
@@ -243,6 +244,17 @@ Recorded mappings match WireMock's shape: `urlPath` plus `queryParameters`, a `n
 mapping shape is covered by a differential test of `snapshot` against both servers.
 
 ### 8. TLS and HTTP/2 (FR-10.14)
+
+**Status: done.** `TestTLSMatchesWireMock` runs against a real WireMock 3.13.2 started with `--https-port 18443 --admin-api-require-https` (the fourth server `scripts/wiremock-reference.sh` starts, on :18083). It compares the 403 and its body for the admin API over plain HTTP, scheme and port matching (the case the corpus could not run, `c003000403`) and the `protocol` and `scheme` the journal records for HTTP/1.1, TLS and HTTP/2. What the probes found:
+
+* `--admin-api-require-https` answers plain admin calls 403 with `{"errors":[{"code":40,"title":"HTTPS is required for accessing the admin API"}]}`. Mock traffic is not affected.
+* The journal's `protocol` is `HTTP/2.0` for an HTTP/2 request, over TLS or h2c, and an HTTP/2 request has no `Host` header. Shadow Mock always wrote `HTTP/1.1` and added a `Host` header; both are fixed.
+* `--disable-http` closes the plain port and not the HTTPS one; `--disable-http2-plain` and `--disable-http2-tls` make an HTTP/2 client fail.
+* The keystores are read by `internal/tlsconf` with two new modules, `software.sslmate.com/src/go-pkcs12` and `github.com/pavlo-v-chernykh/keystore-go/v4`. Their formats are tested by writing keystores in the test; there is no keystore in the repository.
+* Client certificates, `--disable-http` and the HTTP/2 switches are tested by running the real listeners (`cmd/shadowmock/tls_test.go`), because the acceptance harness serves the engine on test servers.
+* Differences kept on purpose are in COMPATIBILITY.md: the generated certificate, a missing truststore refused at start-up, and a separate admin listener staying plain.
+
+What was planned:
 
 * HTTPS listener from PEM files in YAML, and from PKCS12 and JKS keystores through the WireMock flags
   (`--https-port`, `--https-keystore`, `--keystore-type`, `--keystore-password`, `--key-manager-password`).

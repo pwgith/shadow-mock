@@ -55,6 +55,8 @@ type Router struct {
 	Telemetry *telemetry.Telemetry
 	// Limiter, when set, limits how fast each client address may send mock traffic.
 	Limiter *ratelimit.Limiter
+	// AdminRequireHTTPS refuses admin calls that did not arrive over TLS (--admin-api-require-https).
+	AdminRequireHTTPS bool
 }
 
 var _ http.Handler = (*Router)(nil)
@@ -94,6 +96,10 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e := apierr.New(http.StatusForbidden, apierr.IPNotAllowed, "Requests from %s are not allowed for this org.", ip)
 		e.Details = map[string]any{"ip": ip.String()}
 		e.Write(w)
+		return
+	}
+	if isAdmin && rt.AdminRequireHTTPS && r.TLS == nil {
+		(&apierr.ValidationError{Status: http.StatusForbidden, Errors: []apierr.WireMockError{{Code: 40, Title: "HTTPS is required for accessing the admin API"}}}).Write(w)
 		return
 	}
 	if isAdmin && !rt.adminGate(w, r) {
@@ -328,4 +334,14 @@ func (rt *Router) serveMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.Metrics.ServeHTTP(w, r)
+}
+
+// Protocols says which HTTP versions a server speaks (FR-10.14): HTTP/1.1 always, HTTP/2 over TLS
+// through ALPN, and HTTP/2 without TLS on prior knowledge (h2c), each unless turned off.
+func Protocols(srv *http.Server, http2TLS, http2Plain bool) {
+	var p http.Protocols
+	p.SetHTTP1(true)
+	p.SetHTTP2(http2TLS)
+	p.SetUnencryptedHTTP2(http2Plain)
+	srv.Protocols = &p
 }

@@ -80,6 +80,7 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-10.9, FR-1.4 | `01_wiremock_parity/mappings/strict_mappings.feature` |
 | FR-10.10 | `01_wiremock_parity/responses/response_framing.feature`, `01_wiremock_parity/responses/gzip.feature` |
 | FR-10.11 | `01_wiremock_parity/responses/server_behaviours.feature`, `01_wiremock_parity/responses/proxying.feature` |
+| FR-10.14 | `03_standalone/tls.feature` and `01_wiremock_parity/request_matching/auth_host_port_scheme.feature` (scheme and port), with the listeners themselves in `cmd/shadowmock/tls_test.go` and the keystores in `internal/tlsconf` |
 | FR-10.13 | `03_standalone/wiremock_flags.feature` (and `internal/config/wmflags_test.go`, which checks every flag in WireMock's `--help`) |
 | FR-10.12 | `01_wiremock_parity/record_playback/snapshot.feature` (and `test/conformance/recording_differential_test.go`) |
 | FR-10.14 to FR-10.16 | planned, see [PARITY_PLAN.md](../docs/PARITY_PLAN.md); each gets a feature as its workstream is built |
