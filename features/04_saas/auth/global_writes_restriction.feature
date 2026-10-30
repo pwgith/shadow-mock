@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.5a @FR-6.5
+@saas @P5 @FR-9.5a @FR-6.5 @TA-3
 Feature: Global session writes only through the management app
   In SaaS mode, the engine rejects global-scope writes from anyone, including
   org admins. The management app makes them, after checking team grants.
@@ -7,7 +7,7 @@ Feature: Global session writes only through the management app
   Background:
     Given Shadow Mock is running in SaaS mode
     And the org "acme" with handle "acme" on plan "Team"
-    And I am "carol" in org "acme" with role "org:admin"
+    And I am "carol" in org "acme" with app role "admin"
     And a key-based shadow mock "S1"
 
   Scenario Outline: Global-scope writes are rejected

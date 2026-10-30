@@ -15,26 +15,26 @@ Feature: Roles and permissions on the engine admin API
 
     Examples:
       | user  | role       | method | path                         | status |
-      | alice | org:member | GET    | /sessions                    | 200    |
-      | alice | org:member | POST   | /sessions/key-based          | 201    |
-      | alice | org:member | DELETE | /sessions/${S1.id}           | 200    |
-      | alice | org:member | POST   | /sessions/${S1.id}/mappings  | 201    |
-      | carol | org:admin  | DELETE | /sessions/${S1.id}           | 200    |
-      | vic   | org:viewer | GET    | /sessions/${S1.id}/requests  | 200    |
-      | vic   | org:viewer | POST   | /sessions/key-based          | 403    |
-      | vic   | org:viewer | POST   | /sessions/${S1.id}/mappings  | 403    |
+      | alice | member     | GET    | /sessions                    | 200    |
+      | alice | member     | POST   | /sessions/key-based          | 201    |
+      | alice | member     | DELETE | /sessions/${S1.id}           | 200    |
+      | alice | member     | POST   | /sessions/${S1.id}/mappings  | 201    |
+      | carol | admin      | DELETE | /sessions/${S1.id}           | 200    |
+      | vic   | viewer     | GET    | /sessions/${S1.id}/requests  | 200    |
+      | vic   | viewer     | POST   | /sessions/key-based          | 403    |
+      | vic   | viewer     | POST   | /sessions/${S1.id}/mappings  | 403    |
 
-  Scenario: Sessions record who created them, including CI keys
-    Given I am CI key "ck_ACME0000000000000" in org "acme"
+  Scenario: Sessions record who created them, including the label of a Tool app key
+    Given I am the Tool app key "ci-tests" in org "acme"
     When I call admin "POST" "/sessions/key-based" with:
       """json
       {}
       """
-    Then the created session has "createdBy" equal to "ci:ck_ACME0000000000000"
+    Then the created session has "createdBy" equal to "ci-tests"
 
   Scenario: Team membership has no effect on engine permissions
     Given "alice" is in no teams
-    And I am "alice" in org "acme" with role "org:member"
+    And I am "alice" in org "acme" with app role "member"
     When I call admin "POST" "/sessions/url-based" with:
       """json
       {}

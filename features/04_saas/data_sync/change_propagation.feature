@@ -21,7 +21,7 @@ Feature: Change propagation from the shared database to every engine instance
     Then within 1 s instances 1, 2 and 3 all return 404 for "GET /gone"
 
   Scenario: Session creation is read-your-writes on the creating instance
-    Given I am "alice" in org "acme" with role "org:member"
+    Given I am "alice" in org "acme" with app role "member"
     When I create a key-based shadow mock "S1" through instance 1
     Then a request with key "${S1.key}" to instance 1 immediately uses "S1"
     And within 100 ms a request with key "${S1.key}" to instance 3 uses "S1"

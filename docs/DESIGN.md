@@ -101,7 +101,7 @@ func From(ctx context.Context) ID                      { /* … defaults to Loca
 package auth
 
 type Principal struct {
-    UserID string    // Clerk user id or machine id
+    UserID string    // the token's subject, or the label of a Tool app key
     OrgID  tenant.ID
     Roles  []Role    // org-level: viewer | editor | admin
     Scopes []string
@@ -132,7 +132,7 @@ Implementations:
 
 | Type | Standalone | SaaS |
 |---|---|---|
-| `Authenticator` | `NoopAuthenticator` returns `{UserID:"local", OrgID:"local", Roles:[admin]}` | `JWTAuthenticator` with a list of trusted Clerk issuers (session JWTs and M2M JWTs; JWKS cache; user, `org_id` and `org_role` claims mapped to roles; SAAS.md §3.2) |
+| `Authenticator` | `NoopAuthenticator` returns `{UserID:"local", OrgID:"local", Roles:[admin]}` | `JWTAuthenticator` with a list of trusted issuers named in configuration (key set cache; `sub`, `org_id`, `app_role` and `scope` claims; lifetime capped by the engine) and a `KeyAuthenticator` for Tool app keys (REQUIREMENTS.md FR-11.2, FR-11.3) |
 | `Authorizer` | `RoleAuthorizer` (it still runs, and with the admin role always passes) | `RoleAuthorizer` plus tenant equality check plus quota checks |
 
 The admin middleware **always** runs `Authenticate`, then puts the principal and tenant in the context. Every handler calls `Authorize` before touching a store. Because standalone uses the same chain, a missing check shows up in tests rather than in production.
@@ -583,7 +583,7 @@ func (o *Org) Allows(ip netip.Addr) bool {
 
 ## 10. Admin API
 
-The full contract is in [api/openapi.yaml](../api/openapi.yaml) (OpenAPI 3.1): every WireMock-compatible endpoint, its session-scoped twin, the session and runtime extensions, platform endpoints and error codes. The CI token exchange served by the management app is in [api/ci-token.openapi.yaml](../api/ci-token.openapi.yaml). This section describes how requests flow through the engine.
+The full contract is in [api/openapi.yaml](../api/openapi.yaml) (OpenAPI 3.1): every WireMock-compatible endpoint, its session-scoped twin, the session and runtime extensions, platform endpoints and error codes. This section describes how requests flow through the engine.
 
 ### 10.1 Pipeline
 
@@ -683,16 +683,15 @@ storage:
 respond:
   gzip: auto                # auto = gzip when the client sends Accept-Encoding: gzip (WireMock default) | off
 auth:
-  driver: noop              # noop | jwt
-  issuers: []               # SaaS: clerk-users and clerk-ci entries, see SAAS.md §3.2
-  # - name: clerk-users
-  #   jwksUrl: https://clerk.kaizentis.xyz/.well-known/jwks.json
-  #   issuer: https://clerk.kaizentis.xyz
-  #   audience: shadowmock
-  #   userClaim: sub
-  #   orgClaim: org_id
-  #   rolesClaim: org_role
-  #   roleMap: { "org:admin": admin, "org:member": editor, "org:viewer": viewer }
+  driver: noop              # noop | token | basic | managed
+  issuers: []               # managed mode: the management app's signing keys, see REQUIREMENTS.md FR-11.2
+  # - name: management-app
+  #   issuer: https://shadowmock.kaizentis.xyz
+  #   audience: mocks-production
+  #   jwksUrl: https://shadowmock.kaizentis.xyz/.well-known/jwks.json   # or publicKey: pinned
+  #   maxLifetime: 2m
+  #   replayCheck: false        # true keeps each jti in Redis until it expires
+  #   roleMap: { admin: admin, member: editor, viewer: viewer }   # app_role to engine role
 tenancy:
   directory: static         # static (standalone: single org "local") | postgres (SaaS: orgs + aliases + allowlists)
   requireOrgSegment: false  # true in SaaS: every path starts with /<org-handle>
@@ -752,7 +751,7 @@ The full SaaS platform context (Next.js and Clerk on Vercel, the separate manage
 
 | Concern | Standalone | SaaS |
 |---|---|---|
-| Auth | `NoopAuthenticator` | `JWTAuthenticator` only, trusting Clerk session JWTs (users) and Clerk M2M JWTs (CI) |
+| Auth | `NoopAuthenticator` | `JWTAuthenticator` for tokens from the configured issuer (people) and `KeyAuthenticator` for Tool app keys (machines); nothing else, and no Clerk |
 | Tenancy | Static directory, single org `local`, org segment optional | Postgres-backed directory: `shadowmock.kaizentis.xyz/<org-handle>/…`, admin JWT org must match |
 | Network | optional `local.ipAllowlist` | Per-org IP allowlist from the management app |
 | Storage | `fs` + `memory` | `postgres` shared with the management app; bodies and `__files` in S3-compatible object storage (R2) |
@@ -782,7 +781,7 @@ None of these changes touch `engine`, `match`, `detect` or `admin` handler code.
 | **P3 – Parity** | Templating, delays and faults, gzip responses, proxy, record and playback, XML and XPath, JSON schema, multipart, webhooks, near misses, conformance suite |
 | **P3.1 – Parity completion** | Everything in PARITY_PLAN.md: Jayway JSONPath, template blocks and helpers, admin API shapes and filters, wire behaviours, command-line flags, recording shape, TLS and HTTP/2, browser proxy, extension replacements (FR-10.1 to FR-10.16) |
 | **P4 – Central server** | Separate admin listener, metrics and tracing, Docker, hardening, quotas |
-| **P5 – SaaS** | Clerk and machine JWT auth, org-handle path tenancy with JWT org match, per-org IP allowlist, usage metering and quotas, Postgres (shared schema, migrations, JSON Schema export) and Redis, distributed change events, async journal and stats, validate and dry-run endpoints for the management app |
+| **P5 – SaaS (managed mode)** | Everything in REQUIREMENTS.md §3.10 (FR-11.1 to FR-11.17): trusted-issuer tokens, Tool app keys and the metadata scope; org-handle path tenancy with credential org match; suspended and deleted orgs; per-org rate limit; the usage endpoint; Postgres (the `engine` schema, migrations, notify triggers, JSON Schema export), Redis and S3 drivers; a change listener with a version poll; egress and managed-mode guards; an audit trail, org purge and person anonymise; the admin API additions for the management app |
 
 ## 16. Key decisions (ADR summary)
 

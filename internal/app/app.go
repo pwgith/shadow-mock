@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,6 +21,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/pwgith/shadow-mock/internal/admin"
+	"github.com/pwgith/shadow-mock/internal/audit"
 	"github.com/pwgith/shadow-mock/internal/auth"
 	"github.com/pwgith/shadow-mock/internal/browserproxy"
 	"github.com/pwgith/shadow-mock/internal/clock"
@@ -47,6 +49,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/store/memory"
 	"github.com/pwgith/shadow-mock/internal/telemetry"
 	"github.com/pwgith/shadow-mock/internal/tenant"
+	"github.com/pwgith/shadow-mock/internal/usage"
 	"github.com/pwgith/shadow-mock/internal/webhook"
 	"github.com/pwgith/shadow-mock/pkg/extension"
 )
@@ -76,6 +79,12 @@ type App struct {
 	globalFS  *fs.Mappings
 	sessions  *fs.SessionStore
 	closers   []func() error
+
+	// Managed mode: the directory of orgs, the Tool app keys, the audit trail and the usage meter (FR-11).
+	directory *tenant.Memory
+	keys      *auth.MemoryKeys
+	trail     *audit.Trail
+	meter     *usage.Meter
 }
 
 // New wires the engine from configuration. Nothing listens or loads until Start.
@@ -104,15 +113,9 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	var sessionMappings store.MappingRepository = memory.NewMappings()
-	if cfg.Storage.Sessions.Driver == "fs" {
-		ss, serr := fs.NewSessionStore(filepath.Join(cfg.Root, "sessions"))
-		if serr != nil {
-			return nil, serr
-		}
-		a.sessions = ss
-		a.closers = append(a.closers, ss.Close)
-		sessionMappings = ss
+	sessionMappings, err := a.sessionMappings(cfg)
+	if err != nil {
+		return nil, err
 	}
 	mappings := store.SplitMappings{Global: global, Sessions: sessionMappings}
 	files := store.SplitFiles{Global: globalFiles, Sessions: memory.NewFiles()}
@@ -142,6 +145,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	jrnl := journal.NewMemory(cfg.Storage.Journal.Hot.MaxEntries)
 	jrnl.LimitBodies(cfg.Storage.Journal.Hot.MaxBodyBytes)
 	jrnl.LimitSize(cfg.Storage.Journal.Hot.MaxBytes)
+	a.managedState(cfg, o)
 	svc := &mock.Service{
 		Mappings:     mappings,
 		Files:        files,
@@ -155,7 +159,8 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Proxy:        forwarder,
 		BrowserProxy: browserForwarder,
 		Recorder:     record.NewRecorder(),
-		Stats:        stats.New(),
+		Stats:        a.statsTracker(cfg),
+		Usage:        a.meter,
 		Metrics:      mx,
 		Telemetry:    tel,
 		Clock:        o.Clock,
@@ -199,11 +204,15 @@ func (a *App) routers(cfg config.Config, o Options) error {
 	if cfg.Limits.RequestsPerSecond > 0 {
 		limiter = ratelimit.New(o.Clock, cfg.Limits.RequestsPerSecond, cfg.Limits.Burst)
 	}
-	authn, guard := newAuthenticators(cfg)
+	authn, guard, err := a.authenticators(cfg, o)
+	if err != nil {
+		return err
+	}
+	managed := cfg.Mode == modeManaged
 	adminAPI := admin.New(a.svc, authn, auth.RoleAuthorizer{DenyGlobalWrites: cfg.Admin.GlobalWrites == "deny"},
-		admin.Config{Version: o.Version, PublicBaseURL: cfg.Server.PublicBaseURL, MaxBodyBytes: cfg.Limits.MaxBodyBytes, Shutdown: o.Shutdown}, o.Logger)
+		admin.Config{Version: o.Version, PublicBaseURL: cfg.Server.PublicBaseURL, MaxBodyBytes: cfg.Limits.MaxBodyBytes, Shutdown: o.Shutdown, SaaS: managed, Managed: managed, Audit: a.trail}, o.Logger)
 	route := server.Router{
-		Directory:    tenant.NewStatic(&tenant.Org{ID: tenant.Local, Handle: string(tenant.Local), Allowlist: allow, AllowlistAdmin: cfg.Tenancy.Local.AllowlistAdmin}),
+		Directory:    a.orgDirectory(allow, cfg),
 		LocalOrg:     string(tenant.Local),
 		AdminPrefix:  cfg.AdminPrefix,
 		Admin:        adminAPI,
@@ -220,6 +229,12 @@ func (a *App) routers(cfg config.Config, o Options) error {
 		AdminOrigins: cfg.Admin.AllowedOrigins,
 
 		AdminRequireHTTPS: cfg.TLS.AdminRequireHTTPS,
+
+		RequireOrgSegment: cfg.Tenancy.RequireOrgSegment || managed,
+		Usage:             a.meter,
+		Clock:             o.Clock,
+		ExemptAdminTokens: managed,
+		OrgLimits:         server.NewOrgLimiters(),
 	}
 	if cfg.Proxy.Browser.Enabled {
 		bp, bpErr := a.browserProxy(cfg, o)
@@ -541,4 +556,100 @@ func (a *App) startTelemetry(cfg config.Config, o Options) (*telemetry.Telemetry
 		return tel.Shutdown(ctx)
 	})
 	return tel, nil
+}
+
+// orgDirectory is the standalone directory of the single local org, or in managed mode an empty one that the
+// management app fills.
+func (a *App) orgDirectory(allow []netip.Prefix, cfg config.Config) tenant.Directory {
+	if cfg.Mode == modeManaged {
+		a.directory = tenant.NewMemory()
+		return a.directory
+	}
+	return tenant.NewStatic(&tenant.Org{ID: tenant.Local, Handle: string(tenant.Local), Allowlist: allow, AllowlistAdmin: cfg.Tenancy.Local.AllowlistAdmin})
+}
+
+// authenticators picks the admin authenticator and the one that guards the metrics.
+func (a *App) authenticators(cfg config.Config, o Options) (authn, guard auth.Authenticator, err error) {
+	if cfg.Mode != modeManaged {
+		authn, guard = newAuthenticators(cfg)
+		return authn, guard, nil
+	}
+	issuers, err := trustedIssuers(cfg, o.Clock)
+	if err != nil {
+		return nil, nil, err
+	}
+	a.keys = auth.NewMemoryKeys()
+	m := auth.NewManaged(auth.ManagedOptions{Issuers: issuers, Keys: a.keys, Replay: auth.NewMemoryReplay(o.Clock), Clock: o.Clock})
+	return m, auth.SystemOnly{Inner: m}, nil
+}
+
+// trustedIssuers turns the configured issuers into the authenticator's.
+func trustedIssuers(cfg config.Config, clk clock.Clock) ([]auth.Issuer, error) {
+	out := make([]auth.Issuer, 0, len(cfg.Auth.Issuers))
+	for i, ic := range cfg.Auth.Issuers {
+		is := auth.Issuer{
+			Name: ic.Name, Issuer: ic.Issuer, Audience: ic.Audience, MaxLifetime: time.Duration(ic.MaxLifetime), ReplayCheck: ic.ReplayCheck,
+		}
+		if ic.PublicKey != "" {
+			key, err := auth.ParsePublicKey(ic.PublicKey)
+			if err != nil {
+				return nil, fmt.Errorf("auth.issuers[%d].publicKey: %w", i, err)
+			}
+			is.Keys = auth.Pinned{PublicKey: key}
+		} else {
+			is.Keys = auth.NewJWKS(ic.JWKSURL, nil, clk)
+		}
+		if len(ic.RoleMap) > 0 {
+			is.RoleMap = make(map[string]auth.Role, len(ic.RoleMap))
+			for claim, role := range ic.RoleMap {
+				is.RoleMap[claim] = auth.Role(role)
+			}
+		}
+		out = append(out, is)
+	}
+	return out, nil
+}
+
+// Directory is the directory of orgs in managed mode, which the management app writes; nil in other modes.
+func (a *App) Directory() *tenant.Memory { return a.directory }
+
+// Keys is the store of Tool app keys in managed mode; nil in other modes.
+func (a *App) Keys() *auth.MemoryKeys { return a.keys }
+
+// Audit is the audit trail in managed mode; nil in other modes.
+func (a *App) Audit() *audit.Trail { return a.trail }
+
+// Usage is the usage meter in managed mode; nil in other modes.
+func (a *App) Usage() *usage.Meter { return a.meter }
+
+// managedState makes the usage meter and the audit trail that managed mode keeps (FR-11.12, FR-11.15).
+func (a *App) managedState(cfg config.Config, o Options) {
+	if cfg.Mode == modeManaged {
+		a.meter, a.trail = usage.New(o.Clock), audit.New()
+	}
+}
+
+// statsTracker holds a day of history in managed mode, for the history endpoint, and an hour otherwise.
+func (a *App) statsTracker(cfg config.Config) *stats.Tracker {
+	if cfg.Mode == modeManaged {
+		return stats.NewKeeping(24 * time.Hour)
+	}
+	return stats.New()
+}
+
+// modeManaged is the mode of the hosted multi-tenant engine.
+const modeManaged = "managed"
+
+// sessionMappings is where shadow mocks keep their mappings: in memory, or on disk when sessions are kept there.
+func (a *App) sessionMappings(cfg config.Config) (store.MappingRepository, error) {
+	if cfg.Storage.Sessions.Driver != "fs" {
+		return memory.NewMappings(), nil
+	}
+	ss, err := fs.NewSessionStore(filepath.Join(cfg.Root, "sessions"))
+	if err != nil {
+		return nil, err
+	}
+	a.sessions = ss
+	a.closers = append(a.closers, ss.Close)
+	return ss, nil
 }

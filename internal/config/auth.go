@@ -40,6 +40,9 @@ func ResolveSecrets(c *Config, lookup func(string) (string, bool)) error {
 
 // validateAuth checks the admin tokens and works out their hashes.
 func (c *Config) validateAuth() error {
+	if c.Mode == "managed" {
+		return nil // validateManaged checks its credentials
+	}
 	switch {
 	case c.Mode == "server" && c.Auth.Driver != "token":
 		return errors.New("mode: server needs auth.driver: token, with at least one admin token, so the admin API is never open (see docs/guide/12-shared-server.md)")
@@ -59,6 +62,11 @@ func (c *Config) validateAuth() error {
 	case len(c.Auth.Tokens) == 0:
 		return errors.New("auth.driver: token needs at least one entry in auth.tokens")
 	}
+	return c.validateTokens()
+}
+
+// validateTokens checks each admin token's name, role and secret, and that one of them is an admin.
+func (c *Config) validateTokens() error {
 	seen := map[string]bool{}
 	admins := 0
 	var errs []error

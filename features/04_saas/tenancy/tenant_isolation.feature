@@ -8,7 +8,7 @@ Feature: Tenant isolation
     And the org "acme" with handle "acme" on plan "Team"
     And the org "globex" with handle "globex" on plan "Team"
     And org "globex" has a key-based shadow mock "G1"
-    And I am "alice" in org "acme" with role "org:admin"
+    And I am "alice" in org "acme" with app role "admin"
 
   Scenario Outline: Cross-org admin access is impossible even with a valid id
     When I call admin "<method>" "https://shadowmock.test/acme/__admin<path>"

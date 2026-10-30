@@ -3,7 +3,7 @@ Feature: Browsing journal history in the management app
 
   Background:
     Given the org "acme" with handle "acme" on plan "Team"
-    And I am signed in to the management app as "erin" in org "acme" with role "org:member"
+    And I am signed in to the management app as "erin" in org "acme" with app role "member"
     And org "acme" has 500 journal entries from the last 3 days
 
   Scenario: Search the journal by summary fields

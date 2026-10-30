@@ -34,6 +34,11 @@ type Org struct {
 	Allowlist []netip.Prefix
 	// AllowlistAdmin applies the allowlist to the admin API too.
 	AllowlistAdmin bool
+	// Status and Limits come from the org's plan (managed mode). The zero value serves.
+	Status Status
+	Limits Limits
+	// Aliases are older handles that still resolve to the org, for good.
+	Aliases []string
 }
 
 // Allows reports whether ip may send traffic to the org.
@@ -75,4 +80,39 @@ func NewStatic(orgs ...*Org) *Static {
 func (s *Static) Lookup(handle string) (*Org, bool) {
 	o, ok := s.orgs[handle]
 	return o, ok
+}
+
+// Status is where an org stands with the platform (FR-11.5).
+type Status string
+
+// Statuses. Only Deleted is final.
+const (
+	StatusTrialing  Status = "trialing"
+	StatusActive    Status = "active"
+	StatusPastDue   Status = "past_due"
+	StatusSuspended Status = "suspended"
+	StatusCancelled Status = "cancelled"
+	StatusDeleted   Status = "deleted"
+)
+
+// Serves reports whether an org in this status has its traffic served. A past-due org still is.
+func (s Status) Serves() bool {
+	switch s {
+	case "", StatusTrialing, StatusActive, StatusPastDue:
+		return true
+	case StatusSuspended, StatusCancelled, StatusDeleted:
+		return false
+	}
+	return false
+}
+
+// Limits are the parts of an org's plan the engine enforces itself (FR-11.5, FR-11.6).
+type Limits struct {
+	// RequestsPerSecond and Burst limit the org's mock traffic. Zero means the server's own setting.
+	RequestsPerSecond float64
+	Burst             int
+	// MonthlyRequestCap is the hard cap on served requests in a calendar month, with Grace requests
+	// more before traffic is refused. Zero means no cap.
+	MonthlyRequestCap int64
+	Grace             int64
 }

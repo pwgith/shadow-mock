@@ -12,8 +12,9 @@ info:
     * **Standalone**: base URL `http://localhost:8080`. There is no authentication (every call
       runs as user `local` in org `local` with the admin role). The org segment is optional and,
       if present, must be `local`.
-    * **SaaS**: base URL `https://shadowmock.kaizentis.xyz/{orgHandle}`. Every `/__admin` call
-      needs a Clerk JWT (session JWT for users, M2M JWT for CI) whose `org_id` matches the org of
+    * **Managed (hosted)**: base URL `https://mocks.kaizentis.xyz/{orgHandle}`. Every `/__admin` call
+      needs a token from a trusted issuer (the management app signs one of about 60 seconds for each
+      call it makes for a user) or a Tool app key (`smt_…`), and the credential's org must match the org of
       `{orgHandle}`, otherwise `403 org_mismatch`. A per-org IP allowlist can also apply
       (`applyToAdmin`).
 
@@ -35,7 +36,7 @@ info:
 
     Mock traffic never needs a JWT. Engine-generated responses on mock paths use the
     `MockTrafficError` body (for example `unknown_org`, `unknown_url_based_mock`,
-    `ip_not_allowed`, `rate_limited`, `monthly_request_cap`, `ambiguous_session`,
+    `ip_not_allowed`, `rate_limited`, `monthly_request_cap`, `org_suspended`, `org_deleted`, `ambiguous_session`,
     `egress_blocked`). Unmatched requests get a WireMock-style 404 diagnostic body.
 
     ## Errors
@@ -51,15 +52,16 @@ info:
 servers:
   - url: http://localhost:8080
     description: Standalone (no authentication)
-  - url: https://shadowmock.kaizentis.xyz/{orgHandle}
-    description: SaaS (Clerk JWT required on /__admin)
+  - url: https://mocks.kaizentis.xyz/{orgHandle}
+    description: Managed (a token or a Tool app key is required on /__admin)
     variables:
       orgHandle:
         default: acme
         description: The org's immutable Shadow Mock handle (or an alias of it).
 
 security:
-  - clerkJWT: []
+  - managedToken: []
+  - toolAppKey: []
   - adminToken: []
   - {}
 
@@ -1441,6 +1443,108 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /__admin/stats:
+    get:
+      tags: [Runtime]
+      operationId: getStatsHistory
+      summary: Stats per step over a range
+      x-saas: saas-only
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: step, in: query, description: A duration of at least a minute, schema: { type: string, default: 1h } }
+      responses:
+        '200':
+          description: One point per step.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  points: { type: array, items: { $ref: '#/components/schemas/StatsPoint' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /__admin/audit:
+    get:
+      tags: [Runtime]
+      operationId: listAudit
+      summary: The audit trail of state-changing calls
+      x-saas: saas-only
+      description: For the management app (the system scope).
+      responses:
+        '200':
+          description: Entries.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries: { type: array, items: { $ref: '#/components/schemas/AuditEntry' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Only the management app may read the trail.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No audit trail is kept (`not_supported`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /__admin/org/purge:
+    post:
+      tags: [Runtime]
+      operationId: purgeOrg
+      summary: Delete the org's runtime state
+      x-saas: saas-only
+      description: For the management app (the system scope). Safe to repeat.
+      responses:
+        '200':
+          description: Nothing was left to delete.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurgeResult' }
+        '202':
+          description: State was deleted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurgeResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Only the management app may purge.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /__admin/people/{personId}/anonymise:
+    post:
+      tags: [Runtime]
+      operationId: anonymisePerson
+      summary: Replace a person's name in sessions and the audit trail
+      x-saas: saas-only
+      description: For the management app (the system scope).
+      parameters:
+        - { name: personId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Done.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  sessions: { type: integer }
+                  auditEntries: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Only the management app may anonymise.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   # ───────────────────────────── Platform (outside the org prefix) ─────────────────────────────
   /__health:
     servers:
@@ -1510,15 +1614,22 @@ components:
         `Authorization: Bearer <token>`. Its role (viewer, editor or admin) decides what it may do.
         Mock traffic and the health endpoints need no token. Not used when the server runs without
         admin tokens.
-    clerkJWT:
+    managedToken:
       type: http
       scheme: bearer
       bearerFormat: JWT
       description: |
-        SaaS only. A Clerk session JWT from the `shadowmock` template (claims `sub`, `org_id`,
-        `org_role`, `aud: shadowmock`), or a Clerk M2M JWT from the CI token exchange (claims
-        `org_id`, `org_role`, `ci_key_id`; see `api/ci-token.openapi.yaml`). Opaque API keys are
-        never accepted. Ignored in standalone mode.
+        Managed mode only. A token signed by a trusted issuer named in the engine's configuration
+        (claims `sub`, `org_id`, `app_role`, `scope`, `iss`, `aud`, `exp`, `jti`). It lives about a
+        minute and the engine rejects any with a lifetime over about two minutes. `scope: metadata`
+        limits it to metadata. Ignored in standalone mode.
+    toolAppKey:
+      type: http
+      scheme: bearer
+      description: |
+        Managed mode only. A Tool app key, `smt_<id>_<secret>`, with the scopes `sessions`, `validate`
+        and `read`. It can never write the global layer, settings or the journal. A mock set key
+        (`smk_…`) is never accepted. Ignored in standalone mode.
 
   parameters:
     ScopeKey:
@@ -1662,12 +1773,18 @@ components:
         - token_not_active
         - untrusted_issuer
         - invalid_audience
+        - token_too_long
+        - token_replayed
         # authorisation (403)
         - no_active_org
         - org_mismatch
         - forbidden
         - ip_not_allowed
         - global_writes_via_management_app
+        - org_suspended
+        - scope_metadata
+        # gone (410)
+        - org_deleted
         # not found (404)
         - not_found
         - not_supported
@@ -2449,34 +2566,49 @@ components:
               count: { type: integer }
     Usage:
       type: object
+      description: Hourly usage buckets of the org (managed mode).
       properties:
-        plan: { type: string, examples: [Team] }
-        period:
-          type: object
-          properties:
-            start: { type: string, format: date-time }
-            end: { type: string, format: date-time }
-            mockRequests:
-              type: object
-              properties:
-                used: { type: integer }
-                included: { type: integer }
-                overage: { type: integer }
-                hardCap: { type: [integer, 'null'] }
-            concurrentSessionsP95:
-              type: object
-              properties:
-                current: { type: integer }
-                included: { type: integer }
-                ceiling: { type: integer }
-        limits:
-          type: object
-          properties:
-            requestsPerSecond: { type: integer }
-            hotJournalEntries: { type: integer }
-            retentionDays: { type: integer }
-            ciKeys: { type: integer }
-            ipAllowlist: { type: boolean }
+        buckets:
+          type: array
+          items:
+            type: object
+            properties:
+              periodStart: { type: string, format: date-time }
+              periodEnd: { type: string, format: date-time }
+              requests: { type: integer, format: int64, description: Served mock requests; not admin calls, rejections or limited ones. }
+              concurrentSessionsMax: { type: integer }
+              storedFiles:
+                type: object
+                properties:
+                  count: { type: integer }
+                  bytes: { type: integer, format: int64 }
+              rateLimited: { type: integer, format: int64 }
+              ipRejected: { type: integer, format: int64 }
+              revision: { type: integer, description: Rises each time the bucket is read after it changed. }
+    StatsPoint:
+      type: object
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+      additionalProperties: true
+    AuditEntry:
+      type: object
+      properties:
+        at: { type: string, format: date-time }
+        org: { type: string }
+        issuer: { type: string }
+        subject: { type: string }
+        key: { type: string, description: Label of the Tool app key, when one was used. }
+        tokenId: { type: string }
+        method: { type: string }
+        route: { type: string }
+        status: { type: integer }
+    PurgeResult:
+      type: object
+      properties:
+        status: { type: string }
+        sessions: { type: integer }
+        journalEntries: { type: integer }
     ExportResult:
       type: object
       properties:

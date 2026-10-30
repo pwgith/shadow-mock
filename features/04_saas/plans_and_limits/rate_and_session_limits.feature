@@ -62,10 +62,10 @@ Feature: Plan limits on request rate and sessions
     Then the response status is 201
     And the response header "X-Shadow-Mock-Usage-Warning" is "sessions_over_included"
 
-  Scenario Outline: CI key limits
+  Scenario Outline: Tool app key limits
     Given the org "acme" is on Shadow Mock plan "<plan>"
-    And org "acme" has <keys> active CI keys
-    When an org admin creates another CI key
+    And org "acme" has <keys> active Tool app keys
+    When an org admin creates another Tool app key
     Then the result is "<result>"
 
     Examples:

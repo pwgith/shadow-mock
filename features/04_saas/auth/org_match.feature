@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.6a @security
+@saas @P5 @FR-9.6a @security @TA-9
 Feature: The JWT org must match the org in the path
   The JWT is the source of truth for identity, and the path must agree with
   it. A token for one org can never act on another.
@@ -9,7 +9,7 @@ Feature: The JWT org must match the org in the path
     And the org "globex" with handle "globex" on plan "Team"
 
   Scenario: Matching org is allowed
-    Given I am "alice" in org "acme" with role "org:member"
+    Given I am "alice" in org "acme" with app role "member"
     When I call admin "POST" "https://shadowmock.test/acme/__admin/sessions/key-based" with:
       """json
       {}
@@ -28,13 +28,13 @@ Feature: The JWT org must match the org in the path
     And the response JSON at "$.message" contains "switch active org"
     And no session was created in either org
 
-  Scenario: CI tokens are checked the same way
-    Given I am CI key "ck_ACME0000000000000" in org "acme"
+  Scenario: Tool app keys are checked the same way
+    Given I am the Tool app key "ci-tests" in org "acme"
     When I call admin "GET" "https://shadowmock.test/globex/__admin/sessions"
     Then the response status is 403
     And the response JSON at "$.error" is "org_mismatch"
 
   Scenario: The check cannot be skipped by any admin endpoint
-    Given I am "alice" in org "globex" with role "org:admin"
+    Given I am "alice" in org "globex" with app role "admin"
     When I call every admin endpoint under "https://shadowmock.test/acme/__admin"
     Then every response status is 403 or 404

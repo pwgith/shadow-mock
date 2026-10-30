@@ -67,10 +67,14 @@ func (h *Handler) shutdown(w http.ResponseWriter, _ *http.Request, _ store.Scope
 
 type versionView struct {
 	Version string `json:"version"`
+	// SchemaVersion is the version of the engine's database schema, and MappingSchema of the JSON Schema for
+	// mappings published with the release (FR-11.11e).
+	SchemaVersion int `json:"schemaVersion"`
+	MappingSchema int `json:"mappingSchema"`
 }
 
 func (h *Handler) version(w http.ResponseWriter, _ *http.Request, _ store.Scope) error {
-	return writeJSON(w, http.StatusOK, versionView{Version: h.cfg.Version})
+	return writeJSON(w, http.StatusOK, versionView{Version: h.cfg.Version, SchemaVersion: SchemaVersion, MappingSchema: MappingSchemaVersion})
 }
 
 // Health is the Health schema.
@@ -106,10 +110,6 @@ func (h *Handler) liveStats(w http.ResponseWriter, r *http.Request, sc store.Sco
 		URLBased: len(h.svc.Sessions.List(sc.Tenant, session.URLBased)),
 	}
 	return writeJSON(w, http.StatusOK, h.svc.Stats.Live(sc.Tenant, window, d, h.svc.Clock.Now(), active))
-}
-
-func (h *Handler) usage(_ http.ResponseWriter, _ *http.Request, _ store.Scope) error {
-	return apierr.New(http.StatusNotFound, apierr.NotSupported, "Standalone and central-server mode have no plans or usage.")
 }
 
 // recordings tracks recording state per scope. Capturing traffic needs proxying, which
@@ -173,3 +173,9 @@ func (h *Handler) snapshot(w http.ResponseWriter, r *http.Request, sc store.Scop
 	}
 	return writeSnapshot(w, &spec, ms)
 }
+
+// The versions a release reports, so the management app can check them against the ones it was built for.
+const (
+	SchemaVersion        = 1
+	MappingSchemaVersion = 1
+)

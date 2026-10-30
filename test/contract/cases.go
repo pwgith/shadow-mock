@@ -189,6 +189,10 @@ var Cases = []Case{
 	// ── Runtime and platform ──
 	{Name: "live stats", OperationID: "getLiveStats", Method: http.MethodGet, Path: "/__admin/stats/live?window=15m", WantStatus: statuses(200)},
 	{Name: "usage (SaaS only)", OperationID: "getUsage", Method: http.MethodGet, Path: "/__admin/usage", WantStatus: statuses(200, 404)},
+	{Name: "stats history", OperationID: "getStatsHistory", Method: http.MethodGet, Path: "/__admin/stats?step=15m", WantStatus: statuses(200)},
+	{Name: "audit trail (management app only)", OperationID: "listAudit", Method: http.MethodGet, Path: "/__admin/audit", WantStatus: statuses(200, 403, 404)},
+	{Name: "purge (management app only)", OperationID: "purgeOrg", Method: http.MethodPost, Path: "/__admin/org/purge", WantStatus: statuses(200, 202, 403)},
+	{Name: "anonymise (management app only)", OperationID: "anonymisePerson", Method: http.MethodPost, Path: "/__admin/people/nobody/anonymise", WantStatus: statuses(200, 403)},
 	{Name: "liveness", OperationID: "getLiveness", Method: http.MethodGet, Path: "/__health", WantStatus: statuses(200)},
 	{Name: "readiness", OperationID: "getReadiness", Method: http.MethodGet, Path: "/__ready", WantStatus: statuses(200, 503)},
 	{Name: "metrics", OperationID: "getMetrics", Method: http.MethodGet, Path: "/__metrics", WantStatus: statuses(200, 404)},

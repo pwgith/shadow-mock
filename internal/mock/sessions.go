@@ -35,6 +35,8 @@ type CreateSessionRequest struct {
 	ParentID   string            `json:"parentId"`
 	SeedFrom   *SeedFrom         `json:"seedFrom"`
 	Metadata   map[string]any    `json:"metadata"`
+	// CreatedByKey is the label of the Tool app key making the request. The admin handler sets it; a client cannot.
+	CreatedByKey string `json:"-"`
 }
 
 // CreateSession validates and creates a key-based or URL-based shadow mock, with its initial
@@ -60,7 +62,7 @@ func (s *Service) CreateSession(ctx context.Context, t tenant.ID, kind session.K
 	}
 	sess, err := s.Sessions.Create(ctx, t, session.CreateRequest{
 		Kind: kind, Name: req.Name, TTLSeconds: req.TTLSeconds, Tokens: req.Tokens, ParentID: req.ParentID,
-		Masks: req.Masks, Metadata: req.Metadata, CreatedBy: createdBy,
+		Masks: req.Masks, Metadata: req.Metadata, CreatedBy: createdBy, CreatedByKey: req.CreatedByKey,
 	})
 	if err != nil {
 		return session.Session{}, err
@@ -80,6 +82,7 @@ func (s *Service) CreateSession(ctx context.Context, t tenant.ID, kind session.K
 	s.Detector.Invalidate()
 	s.persist(ctx)
 	s.Logger.InfoContext(ctx, "session created", "session_id", sess.ID, "kind", string(kind), "tenant", string(t))
+	s.noteSessions(t)
 	return sess, nil
 }
 

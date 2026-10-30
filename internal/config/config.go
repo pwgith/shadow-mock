@@ -110,8 +110,9 @@ type Respond struct {
 type Auth struct {
 	Driver string `yaml:"driver"` // noop | token | basic | jwt (SaaS)
 	// Basic is the one username and password of auth.driver: basic (WireMock's --admin-api-basic-auth).
-	Basic   BasicAuth        `yaml:"basic"`
-	Issuers []map[string]any `yaml:"issuers"`
+	Basic BasicAuth `yaml:"basic"`
+	// Issuers are the trusted issuers of admin tokens (mode: managed, FR-11.2).
+	Issuers []IssuerConfig `yaml:"issuers"`
 	// Tokens are the admin tokens when driver is token.
 	Tokens []AdminToken `yaml:"tokens"`
 }
@@ -294,7 +295,7 @@ type Tracing struct {
 
 // Config is the whole configuration.
 type Config struct {
-	Mode        string     `yaml:"mode"` // standalone | server
+	Mode        string     `yaml:"mode"` // standalone | server | managed
 	Listen      Listen     `yaml:"listen"`
 	AdminPrefix string     `yaml:"adminPrefix"`
 	Admin       Admin      `yaml:"admin"`
@@ -310,6 +311,8 @@ type Config struct {
 	Proxy       Proxy      `yaml:"proxy"`
 	Templating  Templating `yaml:"templating"`
 	Matching    Matching   `yaml:"matching"`
+	Managed     Managed    `yaml:"managed"`
+	Console     Console    `yaml:"console"`
 	Egress      Egress     `yaml:"egress"`
 	Log         Log        `yaml:"log"`
 	Tracing     Tracing    `yaml:"tracing"`
@@ -479,7 +482,10 @@ func applyEnv(cfg *Config, lookup func(string) (string, bool)) error {
 			*dst = v
 		}
 	}
-	bools := map[string]*bool{"SHADOWMOCK_TRACING_ENABLED": &cfg.Tracing.Enabled, "SHADOWMOCK_LOG_REQUESTS": &cfg.Log.Requests}
+	bools := map[string]*bool{
+		"SHADOWMOCK_TRACING_ENABLED": &cfg.Tracing.Enabled, "SHADOWMOCK_LOG_REQUESTS": &cfg.Log.Requests,
+		"SHADOWMOCK_EGRESS_BLOCKPRIVATE": &cfg.Egress.BlockPrivate,
+	}
 	for k, dst := range bools {
 		if v, ok := lookup(k); ok && v != "" {
 			b, err := strconv.ParseBool(v)
@@ -510,7 +516,7 @@ func oneOf(name, v string, allowed ...string) error {
 // (postgres, redis, s3, jwt) are rejected until they are built (DESIGN.md §15, P5).
 func (c *Config) Validate() error {
 	checks := []error{
-		oneOf("mode", c.Mode, "standalone", "server"),
+		oneOf("mode", c.Mode, "standalone", "server", "managed"),
 		oneOf("admin.globalWrites", c.Admin.GlobalWrites, "allow", "deny"),
 		oneOf("storage.global.driver", c.Storage.Global.Driver, "fs", "memory"),
 		oneOf("storage.sessions.driver", c.Storage.Sessions.Driver, "memory", "fs"),
@@ -527,6 +533,7 @@ func (c *Config) Validate() error {
 		c.validateTLS(),
 		c.Proxy.Browser.validate(c.Proxy.Via),
 		c.validateExtensions(),
+		c.validateManaged(),
 	}
 	if err := errors.Join(checks...); err != nil {
 		return err

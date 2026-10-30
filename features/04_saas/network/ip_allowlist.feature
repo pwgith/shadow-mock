@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.6b
+@saas @P5 @FR-9.6b @TA-15
 Feature: Per-org IP allowlist for mock traffic
   Org admins can restrict calls to their mocks to a set of source IP ranges.
   The check runs before the body is read, detection or matching.
@@ -59,7 +59,7 @@ Feature: Per-org IP allowlist for mock traffic
       | cidr           |
       | 203.0.113.0/24 |
     And the org "acme" has "applyToAdmin" set to <apply>
-    And I am "alice" in org "acme" with role "org:member"
+    And I am "alice" in org "acme" with app role "member"
     When I call admin "GET" "/sessions" from IP "198.51.100.77"
     Then the response status is <status>
 
@@ -87,3 +87,16 @@ Feature: Per-org IP allowlist for mock traffic
     Given the org "acme" is on Shadow Mock plan "Starter"
     When the org admin tries to add an IP allowlist entry
     Then the change is rejected with "upgrade to Team"
+
+  Scenario: Tokens from the management app are exempt from the admin allowlist, keys are not
+    Given the org's IP allowlist is "198.51.100.0/24" and applies to the admin API
+    When the management app calls admin "GET" "/sessions" with a token it signed, from the host's servers at "203.0.113.4"
+    Then the response status is 200
+    When a pipeline calls admin "GET" "/sessions" with a Tool app key from "203.0.113.4"
+    Then the response status is 403
+    And the response JSON at "$.error" is "ip_not_allowed"
+
+  Scenario: Mock traffic is never exempt
+    Given the org's IP allowlist is "198.51.100.0/24"
+    When the SUT sends "GET /acme/hello" from "203.0.113.4"
+    Then the response status is 403

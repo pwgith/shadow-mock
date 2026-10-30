@@ -1,56 +1,76 @@
-@saas @P5 @NFR-4.3
-Feature: Usage metering for billing
-  The engine records per-org daily meters. They are reported to the platform
-  billing service once a day, idempotently.
+@saas @P5 @FR-11.12 @NFR-4.3
+Feature: Usage the management app can read
+  The engine counts what happened and answers `GET /__admin/usage` with hourly buckets. The management app reads
+  them and reports to the platform; the engine does not know the platform exists.
 
   Background:
-    Given Shadow Mock is running in SaaS mode with 2 instances
+    Given Shadow Mock is running in managed mode with the trusted issuer "management-app"
     And the org "acme" with handle "acme" on plan "Team"
-    And org "acme" has the global mapping:
-      """json
-      { "request": { "urlPath": "/m" }, "response": { "status": 200 } }
-      """
+    And a mapping "hello" in the global layer for "GET /hello"
 
-  Scenario: mock_requests counts every served request across instances
-    When I send 600 requests to instance 1 and 400 requests to instance 2
-    And the meters are flushed
-    Then the org "acme" meter "mock_requests" for today is 1000
+  Scenario: Requests are counted in hourly buckets across instances
+    Given 2 instances are running
+    When the SUT sends 30 requests to instance 1 and 20 to instance 2 in the same hour
+    And I call admin "GET" "/usage" with a token for "alice" in org "acme"
+    Then the bucket for that hour has "requests" 50
+    And the bucket has a "periodStart", a "periodEnd" and a "revision"
 
   Scenario Outline: What counts as a billable mock request
-    When <action>
-    And the meters are flushed
-    Then the org "acme" meter "mock_requests" increases by <delta>
+    When <event>
+    And I call admin "GET" "/usage" with a token for "alice" in org "acme"
+    Then the "requests" of the hour <counts>
 
     Examples:
-      | action                                                        | delta |
-      | I send a "GET" request to "/m"                                 | 1     |
-      | I send a "GET" request to "/unmatched"                         | 1     |
-      | I call admin "GET" "/sessions"                                 | 0     |
-      | I send a request rejected by the IP allowlist                  | 0     |
-      | I send a request rejected by the rate limit                    | 0     |
+      | event                                          | counts                |
+      | the SUT sends "GET /acme/hello" and it is served | goes up by 1          |
+      | the SUT sends "GET /acme/unknown" and nothing matches | goes up by 1     |
+      | I call admin "GET" "/sessions" with a token    | does not change       |
+      | the SUT is rejected by the IP allowlist        | does not change       |
+      | the SUT is rate limited                        | does not change       |
+      | the SUT is rejected as suspended               | does not change       |
 
-  Scenario: Concurrent sessions are billed at the monthly 95th percentile
-    Given the test clock is at the start of the billing month
-    When org "acme" has 10 active sessions for 95% of the month and 100 for 5% of the month
-    Then the org "acme" billable "concurrent_sessions_p95" for the month is 10
+  Scenario: The busiest moment of concurrent sessions is reported for each hour
+    Given 3 sessions are active at 10:05 and 7 at 10:40 and 2 at 10:55
+    When I call admin "GET" "/usage" with a token for "alice" in org "acme"
+    Then the bucket for 10:00 has "concurrentSessionsMax" 7
 
   Scenario: URL-based and key-based sessions both count
-    Given org "acme" has 3 active key-based and 2 active URL-based shadow mocks for the whole day
-    Then every 5-minute concurrent-session sample for org "acme" today is 5
+    Given 2 key-based and 3 URL-based shadow mocks are active
+    When I call admin "GET" "/usage" with a token for "alice" in org "acme"
+    Then the current bucket has "concurrentSessionsMax" 5
 
-  Scenario: Visibility meters are recorded
-    Given org "acme" creates 4 sessions and keeps each for 30 minutes
-    Then the org "acme" meter "sessions_created" for today is 4
-    And the org "acme" meter "session_minutes" for today is 120
+  Scenario: Stored files are reported as their peak
+    Given the org stores 3 files totalling 1500000 bytes
+    When I call admin "GET" "/usage" with a token for "alice" in org "acme"
+    Then the current bucket has "storedFiles" with count 3 and bytes 1500000
 
-  Scenario: Daily reporting is idempotent
-    Given the daily usage report for org "acme" for yesterday has been sent
-    When the report job runs again for yesterday
-    Then the billing provider holds exactly one usage record per meter for org "acme" for yesterday
+  Scenario: Rate limited and rejected requests are visible, not billed
+    When the SUT is rate limited 7 times and rejected by the allowlist 4 times
+    And I call admin "GET" "/usage" with a token for "alice" in org "acme"
+    Then the current bucket has "rateLimited" 7 and "ipRejected" 4
 
-  Scenario: Usage is visible through the admin API
-    Given I am "alice" in org "acme" with role "org:member"
+  Scenario: Late data is a higher revision of the same bucket
+    Given a bucket was read at revision 1
+    When late requests for that hour are counted
+    And I call admin "GET" "/usage" with a token for "alice" in org "acme"
+    Then the bucket has the same "periodStart" and a higher "revision"
+
+  Scenario: A range can be asked for
+    When I call admin "GET" "/usage?from=2026-10-30T09:00:00Z&to=2026-10-30T12:00:00Z" with a token for "alice" in org "acme"
+    Then the response has one bucket for each hour in the range
+
+  Scenario: A key with the read scope can read usage, and the metadata scope can too
+    When I call admin "GET" "/usage" with a key that has the scope "read"
+    Then the response status is 200
+    When I call admin "GET" "/usage" with a token that has the scope "metadata"
+    Then the response status is 200
+
+  Scenario: One org cannot read another's usage
+    Given the org "globex" with handle "globex" on plan "Team"
+    When I call admin "GET" "/usage" on org "globex" with a token for "alice" in org "acme"
+    Then the response status is 403
+
+  Scenario: Standalone has no usage
+    Given Shadow Mock is running in standalone mode
     When I call admin "GET" "/usage"
-    Then the response JSON at "$.period.mockRequests.used" is a number
-    And the response JSON at "$.period.mockRequests.included" is 15000000
-    And the response JSON at "$.period.concurrentSessionsP95.included" is 50
+    Then the response status is 404

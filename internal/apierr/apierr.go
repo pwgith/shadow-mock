@@ -37,6 +37,17 @@ const (
 	RateLimited                  Code = "rate_limited"
 	SessionLimitReached          Code = "session_limit_reached"
 	MappingLimitReached          Code = "mapping_limit_reached"
+	UntrustedIssuer              Code = "untrusted_issuer"
+	InvalidAudience              Code = "invalid_audience"
+	TokenExpired                 Code = "token_expired"
+	TokenNotActive               Code = "token_not_active"
+	TokenTooLong                 Code = "token_too_long"
+	TokenReplayed                Code = "token_replayed"
+	NoActiveOrg                  Code = "no_active_org"
+	OrgSuspended                 Code = "org_suspended"
+	OrgDeleted                   Code = "org_deleted"
+	ScopeMetadata                Code = "scope_metadata"
+	MonthlyRequestCap            Code = "monthly_request_cap"
 )
 
 // Error is an API error with an HTTP status.
