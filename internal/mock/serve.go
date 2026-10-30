@@ -38,6 +38,9 @@ type Traffic struct {
 	Path        string
 	ClientIP    string
 	AbsoluteURL string
+	// BrowserProxy is true for a request that came through the browser proxy; one no mapping matches
+	// goes on to the origin the client named.
+	BrowserProxy bool
 }
 
 // served is what one mock request produced, for the journal and stats.
@@ -82,6 +85,7 @@ func (s *Service) ServeMock(w http.ResponseWriter, r *http.Request, tr Traffic) 
 	if tr.ClientIP != "" {
 		req.ClientIP = tr.ClientIP
 	}
+	req.BrowserProxy = tr.BrowserProxy
 	sv.entry.Request = req
 
 	stack, err := s.trafficStack(ctx, tr, req, sv)
@@ -97,6 +101,10 @@ func (s *Service) ServeMock(w http.ResponseWriter, r *http.Request, tr Traffic) 
 		}
 		if rec := s.recordingFor(stack); rec != nil {
 			s.forward(ctx, w, r, req, &model.ResponseDefinition{ProxyBaseURL: rec.Spec.TargetBaseURL}, nil, rec, sv)
+			return
+		}
+		if tr.BrowserProxy && s.BrowserProxy != nil {
+			s.passThrough(ctx, w, r, req, stack, sv)
 			return
 		}
 		s.unmatched(w, req, stack, sv)

@@ -24,6 +24,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 		w.initWebhook(sc)
 		w.initConcurrent(sc)
 		w.initUpstream(sc)
+		w.initBrowserProxy(sc)
 		w.initMatchers(sc)
 		w.initBehaviour(sc)
 		w.initMetrics(sc)

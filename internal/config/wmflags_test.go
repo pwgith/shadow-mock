@@ -34,9 +34,9 @@ var wireMockFlags = map[string]string{ // name -> a value, or "" for a flag with
 	"webhook-threadpool-size": "5",
 }
 
-// notYet are the flags that belong to the browser-proxy workstream.
-var notYet = map[string]bool{
-	"enable-browser-proxying": true, "ca-keystore": true, "ca-keystore-password": true, "ca-keystore-type": true,
+// needsBrowserProxying are the flags that mean something only with browser proxying on.
+var needsBrowserProxying = map[string]bool{
+	"ca-keystore": true, "ca-keystore-password": true, "ca-keystore-type": true,
 	"trust-all-proxy-targets": true, "trust-proxy-target": true,
 }
 
@@ -61,6 +61,9 @@ func TestEveryWireMockFlagIsAccepted(t *testing.T) {
 			if needsHTTPSPort[name] {
 				args = append([]string{"--https-port", "8443"}, args...)
 			}
+			if needsBrowserProxying[name] {
+				args = append([]string{"--enable-browser-proxying"}, args...)
+			}
 			if name == "https-require-client-cert" {
 				args = append(args, "--https-truststore", "t")
 			}
@@ -68,10 +71,7 @@ func TestEveryWireMockFlagIsAccepted(t *testing.T) {
 				args = append(args, value)
 			}
 			_, _, err := resolve(t, args...)
-			switch {
-			case notYet[name] && (err == nil || !strings.Contains(err.Error(), "not supported yet")):
-				t.Errorf("--%s should be refused with \"not supported yet\", got %v", name, err)
-			case !notYet[name] && err != nil:
+			if err != nil {
 				t.Errorf("--%s was refused: %v", name, err)
 			}
 		})

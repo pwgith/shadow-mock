@@ -92,13 +92,19 @@ func isJKS(kind string, data []byte) bool {
 }
 
 func fromKeystore(c config.TLS) (tls.Certificate, error) {
-	data, err := os.ReadFile(c.Keystore)
+	return LoadKeystore(c.Keystore, c.KeystoreType, c.KeystorePassword, c.KeyManagerPassword)
+}
+
+// LoadKeystore reads the certificate chain and private key in a PKCS12 or JKS keystore. A password left
+// empty is WireMock's default; a JKS key password left empty is the keystore's.
+func LoadKeystore(path, kind, storePassword, keyPassword string) (tls.Certificate, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // the keystore is the file the configuration names
 	if err != nil {
 		return tls.Certificate{}, err
 	}
-	storePass := password(c.KeystorePassword)
-	if isJKS(c.KeystoreType, data) {
-		keyPass := c.KeyManagerPassword
+	storePass := password(storePassword)
+	if isJKS(kind, data) {
+		keyPass := keyPassword
 		if keyPass == "" {
 			keyPass = storePass
 		}

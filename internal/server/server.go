@@ -19,6 +19,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/admin"
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/auth"
+	"github.com/pwgith/shadow-mock/internal/browserproxy"
 	"github.com/pwgith/shadow-mock/internal/mock"
 	"github.com/pwgith/shadow-mock/internal/ratelimit"
 	"github.com/pwgith/shadow-mock/internal/stats"
@@ -57,12 +58,20 @@ type Router struct {
 	Limiter *ratelimit.Limiter
 	// AdminRequireHTTPS refuses admin calls that did not arrive over TLS (--admin-api-require-https).
 	AdminRequireHTTPS bool
+	// BrowserProxy, when set, lets clients use this listener as a proxy server: CONNECT tunnels are
+	// opened up, and requests in absolute form are answered as mock traffic that falls through to the
+	// origin when no mapping matches (--enable-browser-proxying).
+	BrowserProxy *browserproxy.Proxy
 }
 
 var _ http.Handler = (*Router)(nil)
 
 // ServeHTTP implements http.Handler.
 func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodConnect {
+		rt.connect(w, r)
+		return
+	}
 	path := r.URL.EscapedPath()
 	switch path {
 	case "/__health":
@@ -115,11 +124,45 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rt.serveAdmin(w, r2)
 		return
 	}
-	tr := mock.Traffic{Tenant: org.ID, Path: rest, ClientIP: ip.String(), AbsoluteURL: absoluteURL(r)}
+	tr := mock.Traffic{Tenant: org.ID, Path: rest, ClientIP: ip.String(), AbsoluteURL: absoluteURL(r), BrowserProxy: rt.viaProxy(r)}
 	if id, inner, isURLBased := urlBased(rest); isURLBased {
 		tr.URLMockID, tr.Path = id, inner
 	}
 	rt.Service.ServeMock(w, r.WithContext(ctx), tr)
+}
+
+// viaProxy reports whether a request reached this listener as a proxy request: sent in absolute form,
+// or inside a CONNECT tunnel.
+func (rt *Router) viaProxy(r *http.Request) bool {
+	if rt.BrowserProxy == nil {
+		return false
+	}
+	_, tunnelled := browserproxy.Authority(r.Context())
+	return tunnelled || r.URL.IsAbs()
+}
+
+// connect opens a tunnel for a client that wants this listener as its proxy server. The tunnel is
+// subject to the same allowlist and rate limit as any mock traffic, in the local org.
+func (rt *Router) connect(w http.ResponseWriter, r *http.Request) {
+	if rt.BrowserProxy == nil || !rt.ServeMock || rt.RequireOrgSegment {
+		apierr.New(http.StatusMethodNotAllowed, apierr.NotFound, "Browser proxying is not turned on.").Write(w)
+		return
+	}
+	org, found := rt.Directory.Lookup(rt.LocalOrg)
+	if !found {
+		apierr.New(http.StatusNotFound, apierr.UnknownOrg, "No org has the handle in this URL.").Write(w)
+		return
+	}
+	ip := rt.ClientIP.From(r)
+	if !org.Allows(ip) {
+		rt.Stats.RecordIPRejection(org.ID, ip.String())
+		apierr.New(http.StatusForbidden, apierr.IPNotAllowed, "Requests from %s are not allowed for this org.", ip).Write(w)
+		return
+	}
+	if !rt.withinRate(w, ip) {
+		return
+	}
+	rt.BrowserProxy.Serve(w, r, rt)
 }
 
 // org resolves the org segment. It returns the org, the prefix it occupied, and the rest.

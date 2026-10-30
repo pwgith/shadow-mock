@@ -68,3 +68,54 @@ func TestTheHTTPSAddressFollowsTheBindAddress(t *testing.T) {
 		})
 	}
 }
+
+func TestBrowserProxySettingsAreChecked(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		yaml string
+		want string // empty: accepted
+	}{
+		{"on", "proxy: { browser: { enabled: true } }", ""},
+		{"with its own authority", "proxy: { browser: { enabled: true, caKeystore: ca.p12, caKeystoreType: PKCS12 } }", ""},
+		{"trusting an origin", "proxy: { browser: { enabled: true, trustTargets: [example.com] } }", ""},
+		{"an authority without browser proxying", "proxy: { browser: { caKeystore: ca.p12 } }", "need proxy.browser.enabled"},
+		{"trust without browser proxying", "proxy: { browser: { trustAll: true } }", "need proxy.browser.enabled"},
+		{"an unknown keystore type", "proxy: { browser: { enabled: true, caKeystoreType: BKS } }", "must be JKS or PKCS12"},
+		{"a trusted target that is not a host", "proxy: { browser: { enabled: true, trustTargets: ['http://x/'] } }", "not a host name"},
+		{"trust with an upstream proxy", "proxy: { via: 'p:3128', browser: { enabled: true, trustAll: true } }", "cannot be combined with proxy.via"},
+		{"an upstream proxy without trust", "proxy: { via: 'p:3128', browser: { enabled: true } }", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cfg := config.Default()
+			if err := config.Merge(&cfg, []byte(tt.yaml)); err != nil {
+				t.Fatal(err)
+			}
+			err := cfg.Validate()
+			switch {
+			case tt.want == "" && err != nil:
+				t.Errorf("want it accepted, got %v", err)
+			case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+				t.Errorf("want an error containing %q, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
+func TestBrowserProxyFlagsSetTheConfiguration(t *testing.T) {
+	t.Parallel()
+	cfg, _, err := config.Resolve([]string{
+		"--enable-browser-proxying", "--ca-keystore", "ca.jks", "--ca-keystore-password", "pw", "--ca-keystore-type", "jks",
+		"--trust-all-proxy-targets", "--trust-proxy-target", "a.example,b.example", "--trust-proxy-target", "c.example",
+	}, func(string) (string, bool) { return "", false })
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := cfg.Proxy.Browser
+	if !b.Enabled || !b.TrustAll || b.CAKeystore != "ca.jks" || b.CAKeystorePassword != "pw" || b.CAKeystoreType != "jks" ||
+		strings.Join(b.TrustTargets, ",") != "a.example,b.example,c.example" {
+		t.Errorf("flags not applied: %+v", b)
+	}
+}

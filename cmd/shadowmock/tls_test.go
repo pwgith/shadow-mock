@@ -40,13 +40,19 @@ func freePort(t *testing.T) int {
 // plain and the HTTPS base URLs once they answer.
 func serveWith(t *testing.T, change func(*config.TLS)) (plain, secure string) {
 	t.Helper()
+	return serveCfg(t, func(c *config.Config) { change(&c.TLS) })
+}
+
+// serveCfg is serveWith for a change to any part of the configuration.
+func serveCfg(t *testing.T, change func(*config.Config)) (plain, secure string) {
+	t.Helper()
 	cfg := config.Default()
 	cfg.Root = t.TempDir()
 	cfg.Storage.Global.Watch = false
 	httpPort, httpsPort := strconv.Itoa(freePort(t)), strconv.Itoa(freePort(t))
 	cfg.Listen.Mock = net.JoinHostPort("127.0.0.1", httpPort)
 	cfg.TLS.Port, _ = strconv.Atoi(httpsPort)
-	change(&cfg.TLS)
+	change(&cfg)
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}

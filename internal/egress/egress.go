@@ -5,12 +5,16 @@
 package egress
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -27,6 +31,10 @@ type Options struct {
 	Timeout time.Duration
 	// Proxy, when set, picks a proxy server to send each call through; see ViaProxy.
 	Proxy func(*http.Request) (*url.URL, error)
+	// TrustAll accepts any certificate a server presents; TrustedHosts accepts any from those hosts.
+	// Otherwise a server's certificate must be one the system trusts.
+	TrustAll     bool
+	TrustedHosts []string
 }
 
 // ViaProxy returns the Proxy option for a proxy server written as host:port or as a URL.
@@ -53,17 +61,79 @@ func New(o Options) *http.Client {
 	if o.BlockPrivate {
 		d.Control = control
 	}
+	tr := &http.Transport{
+		Proxy:               o.Proxy,
+		DialContext:         d.DialContext,
+		TLSHandshakeTimeout: 10 * time.Second,
+		MaxIdleConns:        64,
+		IdleConnTimeout:     60 * time.Second,
+	}
+	if o.trusting() {
+		tr.DialTLSContext, tr.ForceAttemptHTTP2 = o.dialTLS(d), true
+	}
 	return &http.Client{
-		Timeout: timeout,
-		Transport: &http.Transport{
-			Proxy:               o.Proxy,
-			DialContext:         d.DialContext,
-			TLSHandshakeTimeout: 10 * time.Second,
-			MaxIdleConns:        64,
-			IdleConnTimeout:     60 * time.Second,
-		},
+		Timeout:       timeout,
+		Transport:     tr,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
+}
+
+// trusting reports whether some servers are trusted without checking their certificate.
+func (o Options) trusting() bool { return o.TrustAll || len(o.TrustedHosts) > 0 }
+
+// dialTLS dials a server and ends up with a TLS connection to it. The check of the server's certificate
+// is made here, where the host that was dialled is known, because Go does not say it to a verifier
+// when it is an IP address.
+func (o Options) dialTLS(d *net.Dialer) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	hosts := make([]string, len(o.TrustedHosts))
+	for i, h := range o.TrustedHosts {
+		hosts[i] = strings.ToLower(h)
+	}
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, fmt.Errorf("read address %q: %w", addr, err)
+		}
+		raw, err := d.DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		trusted := o.TrustAll || slices.Contains(hosts, strings.ToLower(host))
+		conn := tls.Client(raw, &tls.Config{
+			ServerName: host,
+			MinVersion: tls.VersionTLS12,
+			NextProtos: []string{"h2", "http/1.1"},
+			// The default check is switched off so that it can be skipped for the servers that are trusted,
+			// and made, with the same rules, for every other.
+			InsecureSkipVerify: true, //nolint:gosec // VerifyConnection below verifies the chain of every server that is not trusted
+			VerifyConnection: func(cs tls.ConnectionState) error {
+				if trusted {
+					return nil
+				}
+				return verifyChain(cs, host)
+			},
+		})
+		hsCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		if err := conn.HandshakeContext(hsCtx); err != nil {
+			_ = raw.Close()
+			return nil, err
+		}
+		return conn, nil
+	}
+}
+
+// verifyChain checks a server's certificate chain against the system's roots for host.
+func verifyChain(cs tls.ConnectionState, host string) error {
+	if len(cs.PeerCertificates) == 0 {
+		return errors.New("the server presented no certificate")
+	}
+	opts := x509.VerifyOptions{DNSName: host, Intermediates: x509.NewCertPool()}
+	for _, c := range cs.PeerCertificates[1:] {
+		opts.Intermediates.AddCert(c)
+	}
+	_, err := cs.PeerCertificates[0].Verify(opts)
+	return err
 }
 
 // control runs after DNS resolution, so a hostname that resolves to a private address is

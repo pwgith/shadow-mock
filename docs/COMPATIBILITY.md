@@ -60,7 +60,6 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | Feature | What happens |
 |---|---|
 | Scenarios | The mapping is rejected with `scenarios_not_supported`. Use `callResponses` |
-| Global browser-proxy mode | Not built |
 | Java extensions | Use Go extensions |
 
 ## Differences in behaviour
@@ -133,6 +132,12 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | `--https-require-client-cert` with no `--https-truststore` | Starts, and then no client can connect | Refused at start-up, naming the missing truststore |
 | The admin listener of `listen.admin` | (WireMock has no second listener) | Plain HTTP. HTTPS serves what the mock listener serves |
 | A TLS handshake that fails | Logged at debug | Logged by Go's HTTP server on standard error |
+| The certificate authority when `--ca-keystore` is not given | One kept in `~/.wiremock/ca-keystore.jks` | One made on first use, stored in `~/.shadowmock` (or `proxy.browser.caDir`) with `ca.pem` beside it. Its SHA-256 is logged at start-up |
+| `CONNECT` when browser proxying is off | Answers 200, and then the connection is of no use | 405, naming the setting |
+| `CONNECT` over HTTP/2, and `CONNECT` to a host name with characters other than letters, digits, dots, hyphens and underscores | Served | Refused (501 and 400) |
+| Browser proxying and `--proxy-via` with `--trust-all-proxy-targets` or `--trust-proxy-target` | Accepted | Refused at start-up: the trust is applied to connections Shadow Mock makes itself |
+| `--trust-proxy-target` | An origin (host) | A host name or IP address; a port is not part of it |
+| Body text of the 500 for a failed pass-through | "…from WireMock to …" | "…from Shadow Mock to …"; the rest is the same, and an untrusted certificate is "SSL failure" on both |
 | Journal `clientIp` | Written as `[0:0:0:0:0:0:0:1]` for IPv6 | Written as the plain address |
 
 ### Behaviour that matches WireMock on purpose

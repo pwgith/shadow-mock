@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # Starts real WireMock servers to compare Shadow Mock against.
 #
-#   scripts/wiremock-reference.sh start   downloads WireMock (once), then starts four servers:
+#   scripts/wiremock-reference.sh start   downloads WireMock (once), then starts five servers:
 #                                           :18080  root = a copy of corpus/wiremock
 #                                           :18081  no stubs, for the client suite
 #                                           :18082  root = a copy of corpus/wiremock, with --enable-stub-cors
 #                                           :18083  no stubs, with HTTPS on :18443 and --admin-api-require-https
+#                                           :18084  no stubs, with --enable-browser-proxying --trust-all-proxy-targets
 #   scripts/wiremock-reference.sh stop    stops them
 #
 # Then, from the repository root:
 #
 #   SHADOWMOCK_WIREMOCK_URL=http://localhost:18080 SHADOWMOCK_WIREMOCK_CORS_URL=http://localhost:18082 \
 #   SHADOWMOCK_WIREMOCK_TLS_PLAIN_URL=http://localhost:18083 SHADOWMOCK_WIREMOCK_TLS_URL=https://localhost:18443 \
-#     go test ./test/conformance -run 'TestDifferentialAgainstRealWireMock|TestAdminAPIMatchesWireMock|TestWireBehaviourMatchesWireMock|TestRecordingMatchesWireMock|TestTLSMatchesWireMock'
+#     go test ./test/conformance -run 'TestDifferentialAgainstRealWireMock|TestAdminAPIMatchesWireMock|TestWireBehaviourMatchesWireMock|TestRecordingMatchesWireMock|TestTLSMatchesWireMock|TestBrowserProxyMatchesWireMock'
 #   BASE_URL=http://localhost:18081 node --test test/client/compat.test.mjs
 #
 # Needs Java 11 or later and curl. The jar is checked against the SHA-1 Maven Central publishes
@@ -61,19 +62,20 @@ launch() { # name port root [extra WireMock flags]
 start() {
   fetch
   stop
-  rm -rf "$HOME_DIR/corpus-root" "$HOME_DIR/cors-root" "$HOME_DIR/empty-root" "$HOME_DIR/tls-root"
+  rm -rf "$HOME_DIR/corpus-root" "$HOME_DIR/cors-root" "$HOME_DIR/empty-root" "$HOME_DIR/tls-root" "$HOME_DIR/proxy-root"
   cp -r "$REPO/corpus/wiremock" "$HOME_DIR/corpus-root"
   cp -r "$REPO/corpus/wiremock" "$HOME_DIR/cors-root"
-  mkdir -p "$HOME_DIR/empty-root" "$HOME_DIR/tls-root"
+  mkdir -p "$HOME_DIR/empty-root" "$HOME_DIR/tls-root" "$HOME_DIR/proxy-root"
   launch corpus 18080 "$HOME_DIR/corpus-root"
   launch empty 18081 "$HOME_DIR/empty-root"
   launch cors 18082 "$HOME_DIR/cors-root" --enable-stub-cors
   launch tls 18083 "$HOME_DIR/tls-root" --https-port 18443 --admin-api-require-https
+  launch proxy 18084 "$HOME_DIR/proxy-root" --enable-browser-proxying --trust-all-proxy-targets
 }
 
 stop() {
   local f
-  for f in "$HOME_DIR"/corpus.pid "$HOME_DIR"/empty.pid "$HOME_DIR"/cors.pid "$HOME_DIR"/tls.pid; do
+  for f in "$HOME_DIR"/corpus.pid "$HOME_DIR"/empty.pid "$HOME_DIR"/cors.pid "$HOME_DIR"/tls.pid "$HOME_DIR"/proxy.pid; do
     [[ -f "$f" ]] || continue
     kill "$(cat "$f")" 2>/dev/null || true
     rm -f "$f"

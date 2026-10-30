@@ -81,9 +81,12 @@ type Service struct {
 	// Webhooks sends the calls mappings make after serving; nil disables them.
 	Webhooks *webhook.Dispatcher
 	// Proxy forwards requests to upstream servers; Recorder holds the running recordings.
-	Proxy    *proxy.Forwarder
-	Recorder *record.Recorder
-	Stats    *stats.Tracker
+	Proxy *proxy.Forwarder
+	// BrowserProxy sends on the requests the browser proxy passes through. It differs from Proxy in
+	// which origin certificates it trusts.
+	BrowserProxy *proxy.Forwarder
+	Recorder     *record.Recorder
+	Stats        *stats.Tracker
 	// Metrics receives one call per served request; nil disables it.
 	Metrics Observer
 	// Telemetry starts a span for each mock request; nil records nothing.

@@ -5,9 +5,9 @@ classes on `master`) and a real WireMock 3.13.2. "Verified" means the same reque
 servers and the answers differed. "Docs" means the WireMock documentation says it works and it has not
 been run. Scenarios are left out on purpose.
 
-## 1. Command-line flags (closed by workstreams 6 and 8, FR-10.13 and FR-10.14, except the browser-proxy flags)
+## 1. Command-line flags (closed by workstreams 6, 8 and 9, FR-10.13, FR-10.14 and FR-10.15)
 
-All the flags below are now accepted. The ones in the browser-proxy row are refused with "not supported yet" until workstream 9. What each flag does is in [the configuration guide](guide/11-configuration.md).
+All the flags below are now accepted. What each flag does is in [the configuration guide](guide/11-configuration.md).
 
 What it was:
 
@@ -105,9 +105,9 @@ Every row below was checked again against WireMock 3.13.2 for workstream 4, and 
 | Journal entry | has `shadowMock` | also has `subEvents` |
 | Persisted mapping file | `<id>.json` | `<name>-<id>.json` |
 
-## 5. Wire behaviour (closed by workstreams 5 and 8, FR-10.10, FR-10.11 and FR-10.14, except the browser proxy)
+## 5. Wire behaviour (closed by workstreams 5, 8 and 9, FR-10.10, FR-10.11, FR-10.14 and FR-10.15)
 
-The browser-proxy row belongs to workstream 9. `TestWireBehaviourMatchesWireMock` and `TestTLSMatchesWireMock` compare the rest with a real WireMock; the deliberate differences are in [COMPATIBILITY.md](COMPATIBILITY.md).
+`TestWireBehaviourMatchesWireMock`, `TestTLSMatchesWireMock` and `TestBrowserProxyMatchesWireMock` compare these with a real WireMock; the deliberate differences are in [COMPATIBILITY.md](COMPATIBILITY.md).
 
 | Behaviour | Shadow Mock | WireMock |
 |---|---|---|
@@ -120,7 +120,7 @@ The browser-proxy row belongs to workstream 9. `TestWireBehaviourMatchesWireMock
 | Proxy target unreachable | 502 `bad_gateway` | 500 |
 | HTTP/2 over plain text (h2c, prior knowledge) | served (closed by workstream 8; `tls.disableHttp2Plain` turns it off) | served |
 | HTTPS, client certificates | supported (closed by workstream 8) | supported |
-| Browser proxy | not built | supported (docs) |
+| Browser proxy | supported (closed by workstream 9; `proxy.browser.enabled`) | supported |
 | `Date` header on responses | sent | not sent |
 | Content-Length vs chunked | always Content-Length | chunked for most responses |
 
@@ -135,8 +135,8 @@ The browser-proxy row belongs to workstream 9. `TestWireBehaviourMatchesWireMock
 
 | Area (WireMock test classes) | Notes |
 |---|---|
-| HTTPS and certificates (`HttpsAcceptanceTest`, `ClientAuthenticationAcceptanceTest`, `KeyStoreSettingsTest`) | closed by workstream 8: `internal/tlsconf` and `cmd/shadowmock/tls_test.go`. `CertificateAuthorityTest` belongs to the browser proxy |
-| Browser proxy (`BrowserProxyAcceptanceTest`, `HttpsBrowserProxy*`) | not built |
+| HTTPS and certificates (`HttpsAcceptanceTest`, `ClientAuthenticationAcceptanceTest`, `KeyStoreSettingsTest`) | closed by workstream 8: `internal/tlsconf` and `cmd/shadowmock/tls_test.go`. `CertificateAuthorityTest` is closed by workstream 9 |
+| Browser proxy (`BrowserProxyAcceptanceTest`, `HttpsBrowserProxy*`, `CertificateAuthorityTest`) | closed by workstream 9: `internal/browserproxy`, `cmd/shadowmock/browserproxy_test.go` and `TestBrowserProxyMatchesWireMock` |
 | HTTP/2 (`Http2AcceptanceTest`, `Http2DisabledAcceptanceTest`) | closed by workstream 8 |
 | Command line (`CommandLineOptionsTest`, `WireMockConfigurationTest`, `BindAddressTest`) | gap in section 1 |
 | Template helpers (`*HelperTest`, `ResponseTemplatingAcceptanceTest`, `MultipartTemplatingAcceptanceTest`, `ArrayFunctionsTest`, `ListFunctionsTest`, `JsonMergeHelperTest`, `JsonSortHelperTest`) | gap in section 3 |
