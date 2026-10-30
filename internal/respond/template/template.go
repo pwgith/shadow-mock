@@ -6,6 +6,7 @@ package template
 import (
 	"fmt"
 	"html"
+	"maps"
 	"strings"
 	"sync"
 
@@ -27,6 +28,9 @@ type Engine struct {
 
 	mu    sync.RWMutex
 	cache map[string]*compiled
+
+	// extra holds the helpers a switched-on extension adds (jwt, faker); see AddHelpers.
+	extra map[string]any
 }
 
 // compiled is a parsed template.
@@ -42,6 +46,18 @@ const varsKey = "vars"
 // New returns an engine whose time helpers read c.
 func New(c clock.Clock) *Engine {
 	return &Engine{clock: c, cache: map[string]*compiled{}}
+}
+
+// AddHelpers adds helpers to the set a template may call. It is for start-up, before any template is
+// rendered: templates parsed earlier are forgotten.
+func (e *Engine) AddHelpers(h map[string]any) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.extra == nil {
+		e.extra = map[string]any{}
+	}
+	maps.Copy(e.extra, h)
+	clear(e.cache)
 }
 
 // PermitSystemKeys sets the keys the systemValue helper may read.

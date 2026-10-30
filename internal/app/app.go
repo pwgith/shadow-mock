@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -27,6 +28,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/detect"
 	"github.com/pwgith/shadow-mock/internal/egress"
 	"github.com/pwgith/shadow-mock/internal/engine"
+	"github.com/pwgith/shadow-mock/internal/graphql"
 	"github.com/pwgith/shadow-mock/internal/journal"
 	"github.com/pwgith/shadow-mock/internal/match"
 	"github.com/pwgith/shadow-mock/internal/metrics"
@@ -36,6 +38,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/ratelimit"
 	"github.com/pwgith/shadow-mock/internal/record"
 	"github.com/pwgith/shadow-mock/internal/respond"
+	"github.com/pwgith/shadow-mock/internal/respond/template"
 	"github.com/pwgith/shadow-mock/internal/server"
 	"github.com/pwgith/shadow-mock/internal/session"
 	"github.com/pwgith/shadow-mock/internal/stats"
@@ -93,7 +96,7 @@ func New(cfg config.Config, o Options) (*App, error) {
 }
 
 func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
-	custom, err := customMatchers(o.Matchers)
+	custom, err := customMatchers(append(slices.Clone(o.Matchers), extensionMatchers(cfg)...))
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +126,10 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	mx := metrics.New(func() int { return len(registry.All()) })
 	detector.Observe(o.Clock.Now, mx.Rebuilt)
 	a.metrics = mx
-	renderer := newRenderer(cfg, files, o.Clock)
+	renderer, err := newRenderer(cfg, files, o.Clock)
+	if err != nil {
+		return nil, err
+	}
 	client, forwarder, browserForwarder, err := newForwarders(cfg, tel)
 	if err != nil {
 		return nil, err
@@ -431,7 +437,7 @@ func newAuthenticators(cfg config.Config) (authn, guard auth.Authenticator) {
 }
 
 // newRenderer builds the response renderer under the respond, templating and proxy settings.
-func newRenderer(cfg config.Config, files store.FileRepository, clk clock.Clock) *respond.Renderer {
+func newRenderer(cfg config.Config, files store.FileRepository, clk clock.Clock) (*respond.Renderer, error) {
 	renderer := respond.NewRenderer(files, clk, cfg.Respond.Gzip != "off")
 	renderer.Templating = cfg.Templating.Global
 	renderer.TemplatingDisabled = cfg.Templating.Disabled
@@ -440,7 +446,34 @@ func newRenderer(cfg config.Config, files store.FileRepository, clk clock.Clock)
 	}
 	renderer.Templates.PermitSystemKeys(cfg.Templating.PermittedSystemKeys)
 	renderer.MaxDelay = time.Duration(cfg.Limits.MaxDelay)
-	return renderer
+	return renderer, enableTemplateExtensions(cfg, renderer.Templates)
+}
+
+// enableTemplateExtensions switches on the template extensions the configuration asks for (FR-10.16).
+func enableTemplateExtensions(cfg config.Config, tpl *template.Engine) error {
+	for _, ext := range cfg.Templating.Extensions {
+		switch ext {
+		case config.ExtensionFaker:
+			tpl.EnableFaker()
+		case config.ExtensionJWT:
+			j := cfg.Templating.JWT
+			err := tpl.EnableJWT(template.JWTSettings{
+				HS256Secret: j.HS256Secret, KeyID: j.RS256PublicKeyID, PublicKeyPEM: j.RS256PublicKey, PrivateKeyPEM: j.RS256PrivateKey,
+			})
+			if err != nil {
+				return fmt.Errorf("templating.extensions: jwt: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+// extensionMatchers are the matchers the configuration switches on (FR-10.16).
+func extensionMatchers(cfg config.Config) []extension.RequestMatcher {
+	if slices.Contains(cfg.Matching.Extensions, config.ExtensionGraphQL) {
+		return []extension.RequestMatcher{graphql.Matcher()}
+	}
+	return nil
 }
 
 // sessionLimits are the session settings the registry enforces.

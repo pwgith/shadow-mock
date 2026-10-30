@@ -79,6 +79,9 @@ func (e *Engine) helpers() map[string]any {
 	maps.Copy(h, moreHelpers())
 	maps.Copy(h, e.stringHelpers())
 	maps.Copy(h, numberFormatVariants())
+	e.mu.RLock()
+	maps.Copy(h, e.extra)
+	e.mu.RUnlock()
 	return h
 }
 

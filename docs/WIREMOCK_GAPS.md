@@ -126,7 +126,7 @@ Every row below was checked again against WireMock 3.13.2 for workstream 4, and 
 
 ## 6. Beyond core WireMock (docs)
 
-* Extensions published separately: JWT helpers (`jwt`, `jwks`), GraphQL matching, Faker helpers (`random`), gRPC.
+* Extensions published separately: JWT helpers (`jwt`, `jwks`), GraphQL matching and Faker helpers (`random`) are closed by workstream 10 (FR-10.16). gRPC is not built.
 * WireMock 4.x beta only: messaging (`/__admin/message-mappings`, `/messages`, `/channels`), WebSockets,
   Server-Sent Events, the `proxied-hostname-rewrite` transformer, `jsonSort`.
 * Java-only features: JUnit and Spring integrations, WAR deployment, Java extension points, custom matchers by class.

@@ -257,6 +257,11 @@ type Templating struct {
 	Disabled bool `yaml:"disabled"`
 	// PermittedSystemKeys lists the environment variables the systemValue helper may read.
 	PermittedSystemKeys []string `yaml:"permittedSystemKeys"`
+	// Extensions lists the template extensions to switch on: jwt (the jwt, claims, claimsObject and jwks
+	// helpers) and faker (the random helper).
+	Extensions []string `yaml:"extensions"`
+	// JWT holds the keys of the jwt helper.
+	JWT JWT `yaml:"jwt"`
 }
 
 // Egress configures outbound calls made for mappings: webhooks and proxying.
@@ -301,6 +306,7 @@ type Config struct {
 	Mappings    Mappings   `yaml:"mappings"`
 	Proxy       Proxy      `yaml:"proxy"`
 	Templating  Templating `yaml:"templating"`
+	Matching    Matching   `yaml:"matching"`
 	Egress      Egress     `yaml:"egress"`
 	Log         Log        `yaml:"log"`
 	Tracing     Tracing    `yaml:"tracing"`
@@ -517,6 +523,7 @@ func (c *Config) Validate() error {
 		c.validateAuth(),
 		c.validateTLS(),
 		c.Proxy.Browser.validate(c.Proxy.Via),
+		c.validateExtensions(),
 	}
 	if err := errors.Join(checks...); err != nil {
 		return err

@@ -119,3 +119,55 @@ func TestBrowserProxyFlagsSetTheConfiguration(t *testing.T) {
 		t.Errorf("flags not applied: %+v", b)
 	}
 }
+
+func TestExtensionSettingsAreChecked(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		yaml string
+		want string // empty: accepted
+	}{
+		{"all three", "templating: { extensions: [jwt, faker] }\nmatching: { extensions: [graphql] }", ""},
+		{"jwt keys with jwt on", "templating: { extensions: [jwt], jwt: { hs256Secret: s, rs256PrivateKey: k, rs256PublicKey: p } }", ""},
+		{"an unknown template extension", "templating: { extensions: [nope] }", "templating.extensions"},
+		{"graphql among the template extensions", "templating: { extensions: [graphql] }", "templating.extensions"},
+		{"jwt among the matcher extensions", "matching: { extensions: [jwt] }", "matching.extensions"},
+		{"jwt keys without jwt", "templating: { jwt: { hs256Secret: s } }", "needs jwt in templating.extensions"},
+		{"a public key without a private one", "templating: { extensions: [jwt], jwt: { rs256PublicKey: p } }", "needs templating.jwt.rs256PrivateKey"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cfg := config.Default()
+			if err := config.Merge(&cfg, []byte(tt.yaml)); err != nil {
+				t.Fatal(err)
+			}
+			err := cfg.Validate()
+			switch {
+			case tt.want == "" && err != nil:
+				t.Errorf("want it accepted, got %v", err)
+			case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+				t.Errorf("want an error containing %q, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
+func TestTheExtensionsFlagTurnsOnTheExtensionsThatReplaceTheJavaOnes(t *testing.T) {
+	t.Parallel()
+	cfg, flags, err := config.Resolve([]string{
+		"--extensions", "org.wiremock.extension.jwt.JwtExtensionFactory,org.wiremock.RandomExtension,io.github.nilwurtz.GraphqlBodyMatcher,com.example.Mine",
+	}, func(string) (string, bool) { return "", false })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(cfg.Templating.Extensions, ",") != "jwt,faker" || strings.Join(cfg.Matching.Extensions, ",") != "graphql" {
+		t.Errorf("extensions = %v and %v", cfg.Templating.Extensions, cfg.Matching.Extensions)
+	}
+	if len(flags.Warnings) != 1 || !strings.Contains(flags.Warnings[0], "com.example.Mine") || strings.Contains(flags.Warnings[0], "JwtExtensionFactory") {
+		t.Errorf("want one warning about the unknown class only, got %v", flags.Warnings)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("the configuration the flag makes is not valid: %v", err)
+	}
+}

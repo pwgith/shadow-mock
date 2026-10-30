@@ -21,6 +21,8 @@ type wmFlag struct {
 	bool, optional bool
 	// apply changes the configuration; nil for a flag that is warned about or refused.
 	apply func(c *Config, v string) error
+	// note, when set, gives a warning about the value the flag was given.
+	note func(v string) string
 	// why, for a flag with no apply, says why nothing happens: "ignored" flags warn.
 	why string
 }
@@ -134,7 +136,15 @@ func wireMockFlags() []wmFlag {
 		{name: "disable-extensions-scanning", bool: true, why: ignored},
 		{name: "disable-optimize-xml-factories-loading", bool: true, why: ignored},
 		{name: "disable-strict-http-headers", why: ignored},
-		{name: "extensions", why: ignored},
+		{name: "extensions", apply: func(c *Config, v string) error {
+			known := javaExtensions()
+			for _, class := range list(v) {
+				if ext, ok := known[class]; ok {
+					c.enable(ext)
+				}
+			}
+			return nil
+		}, note: unknownExtensions},
 		{name: "supported-proxy-encodings", why: ignored},
 		{name: "use-chunked-encoding", why: ignored},
 		{name: "timeout", optional: true, why: ignored},
@@ -187,6 +197,11 @@ func wmFlags(fl *flag.FlagSet) func(c *Config) ([]string, error) {
 			if err := g.f.apply(c, g.v); err != nil {
 				return nil, fmt.Errorf("--%s: %w", g.f.name, err)
 			}
+			if g.f.note != nil {
+				if w := g.f.note(g.v); w != "" {
+					warnings = append(warnings, w)
+				}
+			}
 		}
 		return warnings, nil
 	}
@@ -217,4 +232,19 @@ func optionalArgs(args []string) []string {
 		out = append(out, a)
 	}
 	return out
+}
+
+// unknownExtensions warns about the classes given to --extensions that no extension of Shadow Mock stands in for.
+func unknownExtensions(v string) string {
+	known := javaExtensions()
+	var unknown []string
+	for _, class := range list(v) {
+		if _, ok := known[class]; !ok {
+			unknown = append(unknown, class)
+		}
+	}
+	if len(unknown) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("--extensions: %s is not an extension Shadow Mock has and is ignored; it has jwt, faker and graphql (templating.extensions and matching.extensions), and Go matchers through pkg/extension", strings.Join(unknown, ", "))
 }

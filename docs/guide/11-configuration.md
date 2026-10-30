@@ -61,12 +61,13 @@ line or a Docker `command:` copied from a WireMock setup starts. Each flag does 
 | `--enable-browser-proxying` | `proxy.browser.enabled`; see "Browser proxy" below |
 | `--ca-keystore`, `--ca-keystore-password`, `--ca-keystore-type` | `proxy.browser.caKeystore`, `caKeystorePassword`, `caKeystoreType` |
 | `--trust-all-proxy-targets`, `--trust-proxy-target` | `proxy.browser.trustAll`, `proxy.browser.trustTargets` |
+| `--extensions` | Turns on the extensions that replace these Java classes: `org.wiremock.extension.jwt.JwtExtensionFactory` (jwt), `org.wiremock.RandomExtension` (faker) and `io.github.nilwurtz.GraphqlBodyMatcher` (graphql). Any other class is ignored with a warning. See "Extensions" below |
 | `--disable-banner`, `--preserve-user-agent-proxy-header` | Nothing to change: Shadow Mock prints no banner and always passes the client's `User-Agent` on |
 
 **Accepted with a warning at start-up, and ignored,** because they tune WireMock's Java server:
 `--container-threads`, `--jetty-*`, `--async-response-enabled`, `--async-response-threads`,
 `--max-http-client-connections`, `--disable-connection-reuse`, `--disable-extensions-scanning`,
-`--disable-optimize-xml-factories-loading`, `--disable-strict-http-headers`, `--extensions`,
+`--disable-optimize-xml-factories-loading`, `--disable-strict-http-headers`,
 `--supported-proxy-encodings`, `--use-chunked-encoding`, `--timeout`, `--webhook-threadpool-size`,
 `--max-template-cache-entries` and `--load-resources-from-classpath`.
 
@@ -177,6 +178,15 @@ templating:
   global: false               # template every response
   disabled: false             # send every response as written, even one that asks for a template
   permittedSystemKeys: []     # environment variables the systemValue helper may read
+  extensions: []              # jwt, faker: see "Extensions" below
+  jwt:                        # keys of the jwt helper; whatever is empty is made at start-up
+    hs256Secret: ""
+    rs256PublicKeyId: ""
+    rs256PublicKey: ""        # PEM
+    rs256PrivateKey: ""       # PEM
+
+matching:
+  extensions: []              # graphql: see "Extensions" below
 
 egress:
   blockPrivate: false         # refuse proxy and webhook calls to private addresses
@@ -255,6 +265,32 @@ Durations are written as `30s`, `15m`, `1h`, `720h`.
   off. `adminRequireHttps` answers an admin call that arrived over plain HTTP with 403 and WireMock's
   error body `{"errors":[{"code":40,"title":"HTTPS is required for accessing the admin API"}]}`.
   The journal records `HTTP/2.0` as the protocol of an HTTP/2 request, as WireMock does.
+
+* **Extensions.** WireMock publishes the JWT helpers, the Faker helper and the GraphQL matcher as separate
+  extensions. Shadow Mock has its own, off until asked for: `templating.extensions: [jwt, faker]` and
+  `matching.extensions: [graphql]`, or `--extensions` with the Java class (see the table above). They were written from
+  the extensions' published sources, and what follows is what they do.
+  **jwt** adds `{{jwt}}`, `{{claims}}`, `{{claimsObject}}` and `{{jwks}}`. `{{jwt}}` makes a signed token:
+  `{{jwt maxAge='12 hours' iss='me' aud='you' sub='alice' role='admin' groups=(claims 'a' 'b')}}`. The claims
+  are `exp` (from `exp=(now offset='1 days')`, or `maxAge` as an amount and a unit in the plural: seconds, minutes, hours,
+  days; 100 years by default), `iat`, `iss` (wiremock), `aud` (wiremock.io), `sub` (user-123) and `nbf` when given. Every
+  other name is a claim of its own: text, number, true or false, a list made by `claims` (all text or all whole
+  numbers) or an object made by `claimsObject` (`profile=(claimsObject name='x')`). `alg='RS256'` signs with the RSA
+  key and names it in the `kid` header; the default is HS256. `{{jwks}}` is the JSON Web Key Set that holds the public key.
+  `templating.jwt` sets `hs256Secret`, `rs256PublicKeyId`, and the `rs256PrivateKey` (PKCS #8 or PKCS #1, PEM) with its
+  `rs256PublicKey`; what is not set is made when the server starts, so tokens are good only until it stops.
+  A mistake in the arguments is written into the response as `[ERROR: …]`, as WireMock writes it.
+  **faker** adds `{{random 'Name.firstName'}}`. The expression is `Class.method`, in camel or snake case (`Name.first_name`),
+  with arguments after a space (`Number.numberBetween '1','10'`, `Lorem.words 5`). The classes are `Name`, `Address`,
+  `Internet`, `Company`, `Lorem`, `Number`, `PhoneNumber`, `Bool` and `Color`, with the common methods of each; the values
+  come from Shadow Mock's own short word lists, not from Datafaker's. An expression it does not know is written as
+  `[ERROR: Unable to evaluate the expression …]`.
+  **graphql** is the `graphql-body-matcher` custom matcher:
+  `"customMatcher": { "name": "graphql-body-matcher", "parameters": { "query": "…", "variables": {…}, "operationName": "…" } }`.
+  The request body is JSON with a `query`; it matches when the query is the same apart from layout, comments and the order
+  of definitions, selections, arguments, directives, variable definitions and the fields of an object, when the
+  `variables` are the same JSON, and when the `operationName` is the same. Variables or an operation name the mapping
+  does not give must not be in the request either.
 
 * **Browser proxy.** With `proxy.browser.enabled` (or `--enable-browser-proxying`) a browser or an HTTP
   client can use Shadow Mock as its proxy server, on the mock port. A request sent through it is matched
