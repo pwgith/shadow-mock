@@ -246,6 +246,8 @@ type Proxy struct {
 	DenyTargets  []string `yaml:"denyTargets"`
 	// PassThrough is the starting value of the proxyPassThrough setting; true when not set.
 	PassThrough *bool `yaml:"passThrough"`
+	// Browser lets clients use Shadow Mock as a proxy server (FR-10.15).
+	Browser BrowserProxy `yaml:"browser"`
 }
 
 // Templating configures response templating (P3).
@@ -514,6 +516,7 @@ func (c *Config) Validate() error {
 		oneOf("sessions.detect.ambiguity", c.Sessions.Detect.Ambiguity, "first", "reject", "global"),
 		c.validateAuth(),
 		c.validateTLS(),
+		c.Proxy.Browser.validate(c.Proxy.Via),
 	}
 	if err := errors.Join(checks...); err != nil {
 		return err

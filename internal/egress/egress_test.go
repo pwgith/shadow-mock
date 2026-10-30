@@ -81,3 +81,33 @@ func TestClientDoesNotFollowRedirects(t *testing.T) {
 		t.Errorf("status = %d, want the redirect itself (302)", resp.StatusCode)
 	}
 }
+
+func TestClientTrustsOnlyTheServersItIsToldTo(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	t.Cleanup(srv.Close) // the subtests run in parallel, after this function returns
+	tests := []struct {
+		name string
+		opts egress.Options
+		ok   bool
+	}{
+		{"no trust: a certificate nobody vouches for is refused", egress.Options{}, false},
+		{"trust all", egress.Options{TrustAll: true}, true},
+		{"the host named", egress.Options{TrustedHosts: []string{"127.0.0.1"}}, true},
+		{"the host named in another case", egress.Options{TrustedHosts: []string{"127.0.0.1", "LOCALHOST"}}, true},
+		{"another host named: this one is still checked", egress.Options{TrustedHosts: []string{"example.com"}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tt.opts.Timeout = 5 * time.Second
+			resp, err := egress.New(tt.opts).Get(srv.URL) //nolint:noctx // a plain call is enough to test the client
+			if err == nil {
+				resp.Body.Close()
+			}
+			if (err == nil) != tt.ok {
+				t.Errorf("got error %v, want success %v", err, tt.ok)
+			}
+		})
+	}
+}

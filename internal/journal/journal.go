@@ -45,19 +45,22 @@ type Entry struct {
 	Request     *match.Request
 	AbsoluteURL string
 	// Stub is the mapping that served the request, or nil.
-	Stub       *model.StubMapping
-	StubScope  store.Scope
-	Definition *model.ResponseDefinition
-	Response   Response
-	Detection  *Detection
-	CallNumber int64
+	Stub *model.StubMapping
+	// PassThrough marks a request the browser proxy sent on to its origin because no mapping matched;
+	// WireMock counts that as matched too.
+	PassThrough bool
+	StubScope   store.Scope
+	Definition  *model.ResponseDefinition
+	Response    Response
+	Detection   *Detection
+	CallNumber  int64
 	// ProcessTime and AddedDelay are in milliseconds.
 	ProcessTime int64
 	AddedDelay  int64
 }
 
-// Matched reports whether a stub served the request.
-func (e *Entry) Matched() bool { return e.Stub != nil }
+// Matched reports whether a stub served the request, or the browser proxy passed it on.
+func (e *Entry) Matched() bool { return e.Stub != nil || e.PassThrough }
 
 // InScope reports whether the entry belongs to the journal of scope s.
 func (e *Entry) InScope(s store.Scope) bool {

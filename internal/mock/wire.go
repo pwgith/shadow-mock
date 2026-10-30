@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"io"
 	"mime"
@@ -148,12 +150,26 @@ func (s *Service) proxyFailure(w http.ResponseWriter, sv *served, target string,
 	for next := errors.Unwrap(root); next != nil; next = errors.Unwrap(root) {
 		root = next
 	}
-	body := []byte("Network failure trying to make a proxied request from Shadow Mock to " + target + "\r\n" + root.Error())
+	kind := "Network"
+	if certificateProblem(cause) {
+		kind = "SSL"
+	}
+	body := []byte(kind + " failure trying to make a proxied request from Shadow Mock to " + target + "\r\n" + root.Error())
 	sv.entry.Response = journal.Response{Status: http.StatusInternalServerError, Header: http.Header{}, Body: body}
 	s.finish(sv) // recorded before the client can see the response (FR-5.5)
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(http.StatusInternalServerError)
 	_, _ = w.Write(body) //nolint:gosec // the error text names the target and the cause, and is sent as plain text
+}
+
+// certificateProblem reports whether err is the upstream's certificate being refused, which WireMock
+// calls an SSL failure rather than a network one.
+func certificateProblem(err error) bool {
+	var unknown x509.UnknownAuthorityError
+	var invalid x509.CertificateInvalidError
+	var hostname x509.HostnameError
+	var verify *tls.CertificateVerificationError
+	return errors.As(err, &unknown) || errors.As(err, &invalid) || errors.As(err, &hostname) || errors.As(err, &verify)
 }
 
 // proxyDenied answers a request whose upstream the target rules refuse, with WireMock's words.

@@ -37,6 +37,8 @@ type request struct {
 	body   []byte
 	basic  [2]string
 	cookie [][2]string
+	// viaProxy sends the request to its own address through the engine, used as a proxy server.
+	viaProxy bool
 }
 
 func newRequest(method, target string) *request {
@@ -67,12 +69,23 @@ func (w *world) resolve(target string) (string, error) {
 	}
 }
 
+// destination is the URL r goes to and the client that sends it: the engine under test, or any address
+// through the engine when the request goes through the proxy.
+func (w *world) destination(r *request) (string, *http.Client, error) {
+	if r.viaProxy {
+		c, err := w.proxyClient()
+		return w.proxyTarget(r.target), c, err
+	}
+	target, err := w.resolve(r.target)
+	return target, w.client, err
+}
+
 // send sends r to the engine and records the reply as the scenario's last response.
 func (w *world) send(r *request) (*reply, error) {
 	if err := w.ensure(); err != nil {
 		return nil, err
 	}
-	target, err := w.resolve(r.target)
+	target, client, err := w.destination(r)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +111,7 @@ func (w *world) send(r *request) (*reply, error) {
 		req.AddCookie(&http.Cookie{Name: c[0], Value: w.sub(c[1])})
 	}
 	start := time.Now()
-	resp, err := w.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, &transportError{fmt.Errorf("%s %s: %w", r.method, target, err)}
 	}

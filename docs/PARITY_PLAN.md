@@ -269,6 +269,18 @@ What was planned:
 
 ### 9. Browser proxy (FR-10.15)
 
+**Status: done.** `TestBrowserProxyMatchesWireMock` runs against a real WireMock 3.13.2 started with `--enable-browser-proxying --trust-all-proxy-targets` (the fifth server `scripts/wiremock-reference.sh` starts, on :18084). Both servers are sent the same requests through them as a proxy and the answers and the journal are compared. What the probes found:
+
+* A request in absolute form is matched against the mappings by path, whatever host it names, and one that matches nothing goes on to the host it named. This is the same for `CONNECT` tunnels, where the TLS is ended with a certificate made for the host.
+* The journal entry has `browserProxyRequest: true`, `scheme`, `host` and `port` of the origin, `absoluteUrl` of the origin, and `wasMatched: true` for a request passed on, so it is not in the unmatched list.
+* An origin that cannot be reached is a 500 "Network failure trying to make a proxied request from … to <url>"; one whose certificate is not trusted is a 500 "SSL failure …". Without `--trust-all-proxy-targets` the origin's certificate is checked.
+* With the flag off, `CONNECT` is answered 200 and then the connection is of no use; Shadow Mock refuses it with 405.
+* Design: `internal/browserproxy` makes the authority (stored, or from a PKCS12 or JKS keystore) and a certificate for each host, bounded to 1024 kept, and serves the tunnel with the router. The unmatched request goes through a second forwarder whose client trusts the origins the settings name. The origin comes from the request and is never put through the template engine.
+* Threat review: off unless asked; tunnels are always opened up, never relayed raw, so every request in them passes through the router's allowlist, rate limit and the proxy target rules; a host name must be plain letters, digits, dots, hyphens and underscores; `egress.blockPrivate` applies to the onward call; the authority key stays in a 0600 file (or the keystore the user names); certificates for hosts are kept in memory only. The guide says what is at stake. Left out on purpose: `CONNECT` over HTTP/2, trust options with `proxy.via`.
+* Differences kept on purpose are in COMPATIBILITY.md.
+
+What was planned:
+
 `--enable-browser-proxying` with a CA keystore (`--ca-keystore*`), `CONNECT` handling, per-host
 certificates signed by that CA, and `--trust-all-proxy-targets` / `--trust-proxy-target`. The journal
 entry's `browserProxyRequest` becomes true. This is the largest security surface in the plan, so it

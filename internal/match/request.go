@@ -32,6 +32,8 @@ type Request struct {
 	Cookies  map[string][]string
 	Body     []byte
 	ClientIP string
+	// BrowserProxy is true for a request that reached the server as a proxy request.
+	BrowserProxy bool
 
 	jsonOnce sync.Once
 	jsonVal  any

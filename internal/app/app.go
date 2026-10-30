@@ -5,11 +5,14 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -17,6 +20,7 @@ import (
 
 	"github.com/pwgith/shadow-mock/internal/admin"
 	"github.com/pwgith/shadow-mock/internal/auth"
+	"github.com/pwgith/shadow-mock/internal/browserproxy"
 	"github.com/pwgith/shadow-mock/internal/clock"
 	"github.com/pwgith/shadow-mock/internal/config"
 	"github.com/pwgith/shadow-mock/internal/counter"
@@ -109,12 +113,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	}
 	mappings := store.SplitMappings{Global: global, Sessions: sessionMappings}
 	files := store.SplitFiles{Global: globalFiles, Sessions: memory.NewFiles()}
-	limits := session.Limits{
-		KeyBasedDefaultTTL: time.Duration(cfg.Sessions.DefaultTTL), KeyBasedMaxTTL: time.Duration(cfg.Sessions.MaxTTL),
-		URLBasedDefaultTTL: time.Duration(cfg.Sessions.URLBased.DefaultTTL), URLBasedMaxTTL: time.Duration(cfg.Sessions.URLBased.MaxTTL),
-		MinTokenLength: cfg.Sessions.Detect.MinTokenLength, KeyPrefix: cfg.Sessions.KeyPrefix, URLMockIDLength: cfg.Sessions.URLBased.IDLength,
-	}
-	registry := session.NewRegistry(o.Clock, limits)
+	registry := session.NewRegistry(o.Clock, sessionLimits(cfg))
 	detector := newDetector(cfg.Sessions.Detect)
 	detector.SetSource(registry.All)
 	tel, err := a.startTelemetry(cfg, o)
@@ -125,7 +124,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	detector.Observe(o.Clock.Now, mx.Rebuilt)
 	a.metrics = mx
 	renderer := newRenderer(cfg, files, o.Clock)
-	client, forwarder, err := newForwarder(cfg, tel)
+	client, forwarder, browserForwarder, err := newForwarders(cfg, tel)
 	if err != nil {
 		return nil, err
 	}
@@ -138,22 +137,23 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	jrnl.LimitBodies(cfg.Storage.Journal.Hot.MaxBodyBytes)
 	jrnl.LimitSize(cfg.Storage.Journal.Hot.MaxBytes)
 	svc := &mock.Service{
-		Mappings:  mappings,
-		Files:     files,
-		Sessions:  registry,
-		Layers:    engine.NewManager(mappings, registry, match.Options{Now: o.Clock.Now, CustomMatchers: custom}, o.Logger),
-		Detector:  detector,
-		Counters:  counter.NewMemory(),
-		Journal:   jrnl,
-		Renderer:  renderer,
-		Webhooks:  hooks,
-		Proxy:     forwarder,
-		Recorder:  record.NewRecorder(),
-		Stats:     stats.New(),
-		Metrics:   mx,
-		Telemetry: tel,
-		Clock:     o.Clock,
-		Logger:    o.Logger,
+		Mappings:     mappings,
+		Files:        files,
+		Sessions:     registry,
+		Layers:       engine.NewManager(mappings, registry, match.Options{Now: o.Clock.Now, CustomMatchers: custom}, o.Logger),
+		Detector:     detector,
+		Counters:     counter.NewMemory(),
+		Journal:      jrnl,
+		Renderer:     renderer,
+		Webhooks:     hooks,
+		Proxy:        forwarder,
+		BrowserProxy: browserForwarder,
+		Recorder:     record.NewRecorder(),
+		Stats:        stats.New(),
+		Metrics:      mx,
+		Telemetry:    tel,
+		Clock:        o.Clock,
+		Logger:       o.Logger,
 		Config: mock.Config{
 			MaxBodyBytes: cfg.Limits.MaxBodyBytes, MappingSetsDir: filepath.Join(cfg.Root, "mapping-sets"),
 			MatchedHeader: cfg.Respond.MatchedHeader, LogRequests: cfg.Log.Requests,
@@ -215,6 +215,13 @@ func (a *App) routers(cfg config.Config, o Options) error {
 
 		AdminRequireHTTPS: cfg.TLS.AdminRequireHTTPS,
 	}
+	if cfg.Proxy.Browser.Enabled {
+		bp, bpErr := a.browserProxy(cfg, o)
+		if bpErr != nil {
+			return bpErr
+		}
+		route.BrowserProxy = bp
+	}
 	a.mockRoute = &route
 	if cfg.Listen.Admin != "" {
 		adminRoute := route
@@ -223,6 +230,30 @@ func (a *App) routers(cfg config.Config, o Options) error {
 		a.mockRoute.Metrics = nil
 	}
 	return nil
+}
+
+// browserProxy loads the certificate authority and returns the proxy that ends the TLS of CONNECT tunnels
+// with certificates it signs (--enable-browser-proxying).
+func (a *App) browserProxy(cfg config.Config, o Options) (*browserproxy.Proxy, error) {
+	dir := cfg.Proxy.Browser.CADir
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("proxy.browser: find the home directory to keep the certificate authority in: %w", err)
+		}
+		dir = filepath.Join(home, ".shadowmock")
+	}
+	ca, err := browserproxy.Load(cfg.Proxy.Browser, dir, o.Clock)
+	if err != nil {
+		return nil, fmt.Errorf("proxy.browser: %w", err)
+	}
+	sum := sha256.Sum256(ca.Certificate().Raw)
+	where := "the keystore you configured"
+	if cfg.Proxy.Browser.CAKeystore == "" {
+		where = filepath.Join(dir, "ca.pem")
+	}
+	o.Logger.Info("browser proxying is on: tell clients to trust this certificate authority", "sha256", hex.EncodeToString(sum[:]), "certificate", where)
+	return &browserproxy.Proxy{CA: ca, Logger: o.Logger, WriteTimeout: time.Duration(cfg.Limits.MaxDelay) + time.Minute}, nil
 }
 
 func (a *App) globalStores(cfg config.Config, logger *slog.Logger) (store.MappingRepository, store.FileRepository, error) {
@@ -412,10 +443,33 @@ func newRenderer(cfg config.Config, files store.FileRepository, clk clock.Clock)
 	return renderer
 }
 
+// sessionLimits are the session settings the registry enforces.
+func sessionLimits(cfg config.Config) session.Limits {
+	return session.Limits{
+		KeyBasedDefaultTTL: time.Duration(cfg.Sessions.DefaultTTL), KeyBasedMaxTTL: time.Duration(cfg.Sessions.MaxTTL),
+		URLBasedDefaultTTL: time.Duration(cfg.Sessions.URLBased.DefaultTTL), URLBasedMaxTTL: time.Duration(cfg.Sessions.URLBased.MaxTTL),
+		MinTokenLength: cfg.Sessions.Detect.MinTokenLength, KeyPrefix: cfg.Sessions.KeyPrefix, URLMockIDLength: cfg.Sessions.URLBased.IDLength,
+	}
+}
+
+// newForwarders builds the outbound client and the forwarder for it, and when browser proxying is on the
+// second forwarder for what the browser proxy passes on.
+func newForwarders(cfg config.Config, tel *telemetry.Telemetry) (*http.Client, *proxy.Forwarder, *proxy.Forwarder, error) {
+	client, forwarder, err := newForwarder(cfg, tel, false)
+	if err != nil || !cfg.Proxy.Browser.Enabled {
+		return client, forwarder, nil, err
+	}
+	_, browser, err := newForwarder(cfg, tel, true)
+	return client, forwarder, browser, err
+}
+
 // newForwarder builds the outbound client, and the forwarder that proxies through it under the
-// proxy settings.
-func newForwarder(cfg config.Config, tel *telemetry.Telemetry) (*http.Client, *proxy.Forwarder, error) {
+// proxy settings. The browser proxy's forwarder is the same, but trusts the origins its settings name.
+func newForwarder(cfg config.Config, tel *telemetry.Telemetry, browser bool) (*http.Client, *proxy.Forwarder, error) {
 	opts := egress.Options{BlockPrivate: cfg.Egress.BlockPrivate, Timeout: time.Duration(cfg.Proxy.Timeout)}
+	if browser {
+		opts.TrustAll, opts.TrustedHosts = cfg.Proxy.Browser.TrustAll, cfg.Proxy.Browser.TrustTargets
+	}
 	if cfg.Proxy.Via != "" {
 		via, err := egress.ViaProxy(cfg.Proxy.Via)
 		if err != nil {

@@ -58,6 +58,9 @@ line or a Docker `command:` copied from a WireMock setup starts. Each flag does 
 | `--https-truststore`, `--truststore-type`, `--truststore-password`, `--https-require-client-cert` | `tls.truststore`, `tls.truststoreType`, `tls.truststorePassword`, `tls.requireClientCert` |
 | `--disable-http2-plain`, `--disable-http2-tls` | `tls.disableHttp2Plain`, `tls.disableHttp2Tls` |
 | `--admin-api-require-https` | `tls.adminRequireHttps` |
+| `--enable-browser-proxying` | `proxy.browser.enabled`; see "Browser proxy" below |
+| `--ca-keystore`, `--ca-keystore-password`, `--ca-keystore-type` | `proxy.browser.caKeystore`, `caKeystorePassword`, `caKeystoreType` |
+| `--trust-all-proxy-targets`, `--trust-proxy-target` | `proxy.browser.trustAll`, `proxy.browser.trustTargets` |
 | `--disable-banner`, `--preserve-user-agent-proxy-header` | Nothing to change: Shadow Mock prints no banner and always passes the client's `User-Agent` on |
 
 **Accepted with a warning at start-up, and ignored,** because they tune WireMock's Java server:
@@ -66,10 +69,6 @@ line or a Docker `command:` copied from a WireMock setup starts. Each flag does 
 `--disable-optimize-xml-factories-loading`, `--disable-strict-http-headers`, `--extensions`,
 `--supported-proxy-encodings`, `--use-chunked-encoding`, `--timeout`, `--webhook-threadpool-size`,
 `--max-template-cache-entries` and `--load-resources-from-classpath`.
-
-**Refused for now,** with "is not supported yet": the browser-proxy flags (`--enable-browser-proxying`,
-`--ca-keystore*`, `--trust-all-proxy-targets`, `--trust-proxy-target`). They are on the
-[parity plan](../PARITY_PLAN.md).
 
 `--port`, `--root-dir`, `--verbose`, `--version` and `--help` are as in the table above.
 
@@ -162,6 +161,14 @@ proxy:
   allowTargets: []            # addresses, a-b ranges, CIDR blocks and *.names that may be proxied to
   denyTargets: []             # the same, that may not (looked at after allowTargets)
   passThrough: true           # starting value of the proxyPassThrough setting
+  browser:                    # use Shadow Mock as a proxy server (see "Browser proxy" below)
+    enabled: false
+    caKeystore: ""            # the certificate authority, PKCS12 or JKS; empty makes one, kept in caDir
+    caKeystorePassword: ""    # password by default, as in WireMock
+    caKeystoreType: ""
+    caDir: ""                 # where the generated authority is kept; ~/.shadowmock when empty
+    trustAll: false           # accept any certificate an origin presents
+    trustTargets: []          # hosts whose certificate is accepted whatever it is
 
 mappings:
   unknownFields: reject       # reject | keep. reject answers 422 for a field a mapping may not have, as WireMock does
@@ -248,6 +255,27 @@ Durations are written as `30s`, `15m`, `1h`, `720h`.
   off. `adminRequireHttps` answers an admin call that arrived over plain HTTP with 403 and WireMock's
   error body `{"errors":[{"code":40,"title":"HTTPS is required for accessing the admin API"}]}`.
   The journal records `HTTP/2.0` as the protocol of an HTTP/2 request, as WireMock does.
+
+* **Browser proxy.** With `proxy.browser.enabled` (or `--enable-browser-proxying`) a browser or an HTTP
+  client can use Shadow Mock as its proxy server, on the mock port. A request sent through it is matched
+  against the mappings as if it had been sent to Shadow Mock, whatever host it names, and one no mapping
+  matches goes on to the host it named. The journal marks it `browserProxyRequest: true`, and counts a
+  request passed on as matched, as WireMock does. For HTTPS the client sends `CONNECT`, and Shadow Mock ends
+  the TLS itself: it makes a certificate for the host, signs it with a certificate authority, and answers
+  the requests inside the tunnel the same way. The client has to trust that authority. With no
+  `caKeystore` one is made the first time and kept in `caDir` (`~/.shadowmock` by default) as
+  `ca-keystore.p12`, with its certificate beside it as `ca.pem` to import into a browser or trust store;
+  the start-up log gives its SHA-256 fingerprint. Origins are checked: an origin whose certificate the system
+  does not trust is answered with a 500 whose body starts "SSL failure trying to make a proxied request", unless
+  `trustAll` is set or the host is in `trustTargets`. These two do not combine with `proxy.via`.
+  What goes on to an origin follows the same rules as other proxying: `proxy.allowTargets`,
+  `proxy.denyTargets`, `egress.blockPrivate`, `proxy.timeout`. A recording that is running records
+  what the browser proxy passes on. HTTP/1.1 only: `CONNECT` over HTTP/2 is not served.
+  **Think before turning this on.** It is off by default because a proxy that ends TLS sees everything its
+  clients send. Anyone who can reach the port can send traffic through it (`tenancy.local.ipAllowlist` and
+  `limits.requestsPerSecond` apply), anyone who gets the authority's key can impersonate any site to a client
+  that trusts it, so keep `ca-keystore.p12` private and trust the authority only in the clients you test with,
+  and `egress.blockPrivate` stops it being used to reach private addresses.
 
 * **`root`** is where `mappings/` and `__files/` live. Mapping sets for seeding sessions live in
   `<root>/mapping-sets`, and persisted sessions in `<root>/sessions`.

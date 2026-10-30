@@ -53,7 +53,24 @@ func (s *Service) forward(ctx context.Context, w http.ResponseWriter, r *http.Re
 		s.fail(w, sv, req, err)
 		return
 	}
-	res, err := s.Proxy.Forward(ctx, req, target, proxyOptions(def))
+	s.forwardTo(ctx, w, r, req, def, target, rec, sv)
+}
+
+// passThrough sends a browser proxy request no mapping matched on to the origin the client named. The
+// origin comes from the request, so it is not run through the template engine as a mapping's is.
+func (s *Service) passThrough(ctx context.Context, w http.ResponseWriter, r *http.Request, req *match.Request, stack engine.Stack, sv *served) {
+	def := &model.ResponseDefinition{ProxyBaseURL: req.Scheme + "://" + r.Host}
+	sv.entry.Definition, sv.entry.PassThrough = def, true
+	s.forwardTo(ctx, w, r, req, def, def.ProxyBaseURL, s.recordingFor(stack), sv)
+}
+
+// forwardTo sends the request to target and relays the answer.
+func (s *Service) forwardTo(ctx context.Context, w http.ResponseWriter, r *http.Request, req *match.Request, def *model.ResponseDefinition, target string, rec *record.Active, sv *served) {
+	forwarder := s.Proxy
+	if sv.entry.PassThrough {
+		forwarder = s.BrowserProxy
+	}
+	res, err := forwarder.Forward(ctx, req, target, proxyOptions(def))
 	if err != nil {
 		s.Logger.WarnContext(ctx, "proxy failed", "target", target, "error", err.Error())
 		code := proxy.CodeBadGateway

@@ -10,10 +10,9 @@ import (
 )
 
 // WireMock's command-line flags (FR-10.13). Every one is accepted, so a command line or a Docker
-// command copied from a WireMock setup starts. Each is one of three kinds: implemented, by setting
-// the configuration key that does the same; accepted with a warning, because it tunes the Java
-// server and has nothing to tune here; or refused with a clear message, because it belongs to
-// the browser-proxy workstream that is not built yet.
+// command copied from a WireMock setup starts. Each is one of two kinds: implemented, by setting
+// the configuration key that does the same; or accepted with a warning, because it tunes the Java
+// server and has nothing to tune here.
 
 // wmFlag is one WireMock flag.
 type wmFlag struct {
@@ -22,14 +21,11 @@ type wmFlag struct {
 	bool, optional bool
 	// apply changes the configuration; nil for a flag that is warned about or refused.
 	apply func(c *Config, v string) error
-	// why, for a flag with no apply, says why nothing happens: "ignored" flags warn, "not yet" refuse.
+	// why, for a flag with no apply, says why nothing happens: "ignored" flags warn.
 	why string
 }
 
-const (
-	ignored = "ignored"
-	notYet  = "not yet"
-)
+const ignored = "ignored"
 
 func setBool(f func(c *Config, on bool)) func(*Config, string) error {
 	return func(c *Config, v string) error {
@@ -70,7 +66,7 @@ func list(v string) []string {
 // wireMockFlags lists every WireMock flag except --port, --root-dir, --verbose, --version and
 // --help, which Resolve defines itself.
 func wireMockFlags() []wmFlag {
-	return []wmFlag{
+	return append([]wmFlag{
 		// Implemented.
 		{name: "global-response-templating", bool: true, apply: func(c *Config, _ string) error { c.Templating.Global = true; return nil }},
 		{name: "local-response-templating", bool: true, apply: func(c *Config, _ string) error { c.Templating.Global = false; return nil }},
@@ -145,14 +141,21 @@ func wireMockFlags() []wmFlag {
 		{name: "webhook-threadpool-size", why: ignored},
 		{name: "max-template-cache-entries", optional: true, why: ignored},
 		{name: "load-resources-from-classpath", why: ignored},
+	}, browserProxyFlags()...)
+}
 
-		// Refused until the browser-proxy workstream is built.
-		{name: "enable-browser-proxying", bool: true, why: notYet},
-		{name: "ca-keystore", why: notYet},
-		{name: "ca-keystore-password", why: notYet},
-		{name: "ca-keystore-type", why: notYet},
-		{name: "trust-all-proxy-targets", bool: true, why: notYet},
-		{name: "trust-proxy-target", why: notYet},
+// browserProxyFlags are the flags that turn on browser proxying and say whom it trusts (FR-10.15).
+func browserProxyFlags() []wmFlag {
+	return []wmFlag{
+		{name: "enable-browser-proxying", bool: true, apply: func(c *Config, _ string) error { c.Proxy.Browser.Enabled = true; return nil }},
+		{name: "ca-keystore", apply: func(c *Config, v string) error { c.Proxy.Browser.CAKeystore = v; return nil }},
+		{name: "ca-keystore-password", apply: func(c *Config, v string) error { c.Proxy.Browser.CAKeystorePassword = v; return nil }},
+		{name: "ca-keystore-type", apply: func(c *Config, v string) error { c.Proxy.Browser.CAKeystoreType = v; return nil }},
+		{name: "trust-all-proxy-targets", bool: true, apply: func(c *Config, _ string) error { c.Proxy.Browser.TrustAll = true; return nil }},
+		{name: "trust-proxy-target", apply: func(c *Config, v string) error {
+			c.Proxy.Browser.TrustTargets = append(c.Proxy.Browser.TrustTargets, list(v)...)
+			return nil
+		}},
 	}
 }
 
@@ -167,18 +170,12 @@ func wmFlags(fl *flag.FlagSet) func(c *Config) ([]string, error) {
 	known := map[string]wmFlag{}
 	for _, f := range wireMockFlags() {
 		known[f.name] = f
-		record := func(v string) error {
-			if f.why == notYet {
-				return fmt.Errorf("--%s is not supported yet, see docs/PARITY_PLAN.md", f.name)
-			}
-			seen = append(seen, given{f, v})
-			return nil
-		}
+		record := func(v string) { seen = append(seen, given{f, v}) }
 		if f.bool {
-			fl.BoolFunc(f.name, "WireMock flag; see docs/guide/11-configuration.md", func(string) error { return record("") })
+			fl.BoolFunc(f.name, "WireMock flag; see docs/guide/11-configuration.md", func(string) error { record(""); return nil })
 			continue
 		}
-		fl.Func(f.name, "WireMock flag; see docs/guide/11-configuration.md", record)
+		fl.Func(f.name, "WireMock flag; see docs/guide/11-configuration.md", func(v string) error { record(v); return nil })
 	}
 	return func(c *Config) ([]string, error) {
 		var warnings []string
