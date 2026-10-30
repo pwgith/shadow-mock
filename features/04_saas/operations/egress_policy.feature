@@ -1,4 +1,4 @@
-@saas @P5 @NFR-5.3 @security
+@saas @P5 @NFR-5.3 @FR-11.9 @security @TA-11
 Feature: Egress policy for proxying and webhooks
   Proxy and webhook targets pass an allow/deny policy that blocks private,
   link-local and metadata addresses, including after DNS resolution.

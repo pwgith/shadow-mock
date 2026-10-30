@@ -2,6 +2,8 @@
 
 Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it when tags change. Every requirement in [REQUIREMENTS.md](../docs/REQUIREMENTS.md) has at least one feature.
 
+The managed-mode features (`@saas @P5`) are not run by the acceptance suite yet, because it has no steps for tokens from a trusted issuer or Tool app keys. The in-process parts of FR-9.3 to FR-9.6b and FR-11.x are tested in Go instead, in `internal/app/managed_test.go` and the `internal/auth`, `internal/tenant`, `internal/usage` and `internal/audit` packages. The parts that need Postgres, Redis or S3 (shared runtime state, the change listener, the database contract, file storage, multi-instance) are not built.
+
 | Requirement | Feature files |
 |---|---|
 | FR-1.1 | `01_wiremock_parity/mappings/mapping_file_loading.feature` |
@@ -59,17 +61,17 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-8.7 | `02_shadow_mocks/common/seeding.feature` |
 | FR-9.1 | `03_standalone/standalone_mode.feature` |
 | FR-9.2 | `03_standalone/standalone_mode.feature`, `03_standalone/admin_auth.feature` |
-| FR-9.3 | `04_saas/auth/jwt_authentication.feature` |
-| FR-9.3a | `04_saas/auth/jwt_authentication.feature` |
-| FR-9.3b | `04_saas/auth/ci_tokens.feature`, `05_management_app/ci_keys.feature`, `05_management_app/ci_token_exchange.feature` |
+| FR-9.3 | `04_saas/auth/trusted_issuer.feature` |
+| FR-9.3a | `04_saas/auth/trusted_issuer.feature`, `04_saas/auth/tool_app_keys.feature` |
+| FR-9.3b | `04_saas/auth/tool_app_keys.feature` |
 | FR-9.4 | `04_saas/auth/roles_and_permissions.feature`, `04_saas/tenancy/tenant_isolation.feature` |
 | FR-9.5 | `04_saas/auth/roles_and_permissions.feature` |
 | FR-9.5a | `04_saas/auth/global_writes_restriction.feature`, `05_management_app/global_mappings.feature` |
 | FR-9.6 | `04_saas/tenancy/handle_aliases.feature`, `04_saas/tenancy/org_handle_routing.feature`, `05_management_app/org_settings.feature` |
 | FR-9.6a | `04_saas/auth/org_match.feature` |
 | FR-9.6b | `03_standalone/listeners_and_allowlist.feature`, `04_saas/network/client_ip.feature`, `04_saas/network/ip_allowlist.feature`, `05_management_app/org_settings.feature` |
-| FR-9.7 | `04_saas/tenancy/org_handle_routing.feature`, `04_saas/tenancy/tenant_isolation.feature` |
-| FR-9.8 | `04_saas/data_sync/change_propagation.feature`, `05_management_app/global_mappings.feature` |
+| FR-9.7 | `04_saas/tenancy/org_handle_routing.feature`, `04_saas/tenancy/tenant_isolation.feature`, `04_saas/tenancy/org_state.feature` |
+| FR-9.8 | `04_saas/data_sync/change_propagation.feature`, `04_saas/data_sync/change_listener.feature`, `05_management_app/global_mappings.feature` |
 | FR-10.1 | `01_wiremock_parity/request_matching/jsonpath_dialect.feature` (filters, functions and how their results print) |
 | FR-10.2 | `01_wiremock_parity/request_matching/jsonpath_dialect.feature` |
 | FR-10.3 | `01_wiremock_parity/responses/template_blocks.feature` |
@@ -87,6 +89,19 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-10.13 | `03_standalone/wiremock_flag_settings.feature` (every flag and the setting it makes, the Java-server flags, and the flags that need another), `03_standalone/wiremock_flags.feature` (what the settings do), and `internal/config/wmflags_test.go`, which checks every flag in WireMock's `--help` |
 | FR-10.12 | `01_wiremock_parity/record_playback/snapshot.feature` (and `test/conformance/recording_differential_test.go`) |
 | FR-10.15a to FR-10.15e | `03_standalone/browser_proxy.feature` (stubs and pass-through over HTTP and through a tunnel, a refused tunnel, the stored authority, trusted and untrusted origins, the journal, start-up checks), with the certificate chain checked end to end in `cmd/shadowmock/browserproxy_test.go` and the authority in `internal/browserproxy` |
+| FR-11.1, FR-11.9, FR-11.16 | `04_saas/operations/managed_mode_guards.feature`, `04_saas/operations/egress_policy.feature` |
+| FR-11.2 | `04_saas/auth/trusted_issuer.feature` |
+| FR-11.3 | `04_saas/auth/tool_app_keys.feature` |
+| FR-11.4 | `04_saas/auth/metadata_scope.feature` |
+| FR-11.5 | `04_saas/tenancy/org_state.feature` |
+| FR-11.6 | `04_saas/plans_and_limits/org_rate_limit.feature` |
+| FR-11.7 | `04_saas/operations/shared_runtime_state.feature` |
+| FR-11.8 | `04_saas/data_sync/change_listener.feature` |
+| FR-11.10, FR-11.11 | `05_management_app/admin_api_for_management_app.feature` |
+| FR-11.12 | `04_saas/plans_and_limits/usage_metering.feature` |
+| FR-11.13, FR-11.14 | `04_saas/operations/file_storage_and_degraded_operation.feature` |
+| FR-11.15 | `04_saas/operations/audit_purge_and_anonymise.feature` |
+| FR-11.17 | `03_standalone/console_and_cli.feature` (not built yet, `@wip`) |
 | FR-10.16a to FR-10.16d | `01_wiremock_parity/responses/extensions.feature` (jwt claims, signatures and key set; every kind of faker expression; graphql equality; start-up checks), with the helpers in `internal/respond/template/extensions_test.go` and the matcher in `internal/graphql` |
 | NFR-1.1 | `06_non_functional/compatibility.feature` |
 | NFR-1.2 | `02_shadow_mocks/key_based/session_scoped_admin.feature`, `06_non_functional/compatibility.feature` |
@@ -98,15 +113,50 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | NFR-3.1 | `03_standalone/storage_backends.feature`, `04_saas/journal/object_storage.feature` |
 | NFR-3.2 | `03_standalone/storage_backends.feature` |
 | NFR-3.3 | `03_standalone/storage_backends.feature`, `04_saas/data_sync/change_propagation.feature` |
-| NFR-4.1 | `04_saas/data_sync/change_propagation.feature` |
-| NFR-4.2 | `04_saas/plans_and_limits/rate_and_session_limits.feature` |
+| NFR-4.1 | `04_saas/data_sync/change_propagation.feature`, `04_saas/operations/shared_runtime_state.feature` |
+| NFR-4.2 | `04_saas/plans_and_limits/rate_and_session_limits.feature`, `04_saas/plans_and_limits/org_rate_limit.feature` |
 | NFR-4.3 | `04_saas/plans_and_limits/usage_metering.feature`, `05_management_app/billing_and_plans.feature` |
 | NFR-4.4 | `04_saas/journal/hot_journal.feature` |
 | NFR-5.1 | `02_shadow_mocks/key_based/lifecycle.feature`, `02_shadow_mocks/url_based/lifecycle.feature`, `06_non_functional/security.feature` |
 | NFR-5.2 | `03_standalone/listeners_and_allowlist.feature` |
 | NFR-5.3 | `01_wiremock_parity/responses/proxying.feature`, `01_wiremock_parity/responses/response_templating.feature`, `04_saas/operations/egress_policy.feature`, `06_non_functional/security.feature` |
 | NFR-5.4 | `06_non_functional/security.feature`, `03_standalone/server_settings.feature` |
+| NFR-5.5 | `03_standalone/browser_proxy.feature`, `04_saas/operations/managed_mode_guards.feature` |
+| NFR-5.6 | `01_wiremock_parity/responses/extensions.feature`, `04_saas/operations/managed_mode_guards.feature` |
+| NFR-5.7 | `04_saas/auth/trusted_issuer.feature`, `04_saas/auth/tool_app_keys.feature`, `04_saas/tenancy/tenant_isolation.feature`, `04_saas/auth/metadata_scope.feature` |
 | NFR-6.1 | `03_standalone/configuration.feature` |
 | NFR-6.2 | `03_standalone/configuration.feature` |
 | NFR-6.3 | `03_standalone/metrics.feature`, `03_standalone/tracing.feature` |
 | NFR-6.4 | `04_saas/operations/health_and_shutdown.feature` |
+
+## Platform requirements on the engine
+
+The Kaizentis platform's Shadow Mock requirements (`kaizentis-platform/apps/shadow-mock/docs/REQUIREMENTS.md`) list sixteen requirements on the engine, which it calls the Tool app. REQUIREMENTS.md §3.10 answers each as an FR-11 requirement. Features carry the `@TA-n` tag of the platform requirement, and the scenarios that follow its end-to-end flows (`docs/USE_CASES.md`) are in `08_platform_flows`, tagged `@flow-Fn`.
+
+| Platform requirement | Engine requirement | Feature files |
+|---|---|---|
+| TA-1 Global layer is the merge of the org's mock sets | FR-11.10 | `04_saas/tenancy/global_layer_merge.feature` |
+| TA-2 Tool app keys | FR-11.3 | `04_saas/auth/tool_app_keys.feature` |
+| TA-3 Complete admin API, global layer read-only when hosted | FR-11.11, FR-9.5a | `05_management_app/admin_api_for_management_app.feature`, `04_saas/auth/global_writes_restriction.feature` |
+| TA-4 No UI in managed mode | FR-11.16 | `04_saas/operations/managed_mode_guards.feature` |
+| TA-5 Creator shown as the key's label | FR-11.3 | `04_saas/auth/tool_app_keys.feature` |
+| TA-6 The owning set in the journal and near misses | FR-11.10 | `04_saas/tenancy/global_layer_merge.feature`, `05_management_app/admin_api_for_management_app.feature` |
+| TA-7 Embedded console, TA-8 command line | FR-11.17 | `03_standalone/console_and_cli.feature` (`@wip`) |
+| TA-9 Trusted issuer, org match, admin address | FR-9.3, FR-9.6, FR-9.6a, FR-11.2 | `04_saas/auth/trusted_issuer.feature`, `04_saas/auth/org_match.feature`, `04_saas/tenancy/handle_rules.feature` |
+| TA-10 Any instance answers any admin call | FR-11.7 | `04_saas/operations/shared_runtime_state.feature` |
+| TA-11 Egress policy | FR-11.9 | `04_saas/operations/egress_policy.feature`, `04_saas/operations/managed_mode_guards.feature` |
+| TA-12 A configuration change is never missed | FR-11.8 | `04_saas/data_sync/change_listener.feature`, `04_saas/data_sync/database_contract.feature` |
+| TA-13 The `metadata` scope | FR-11.4 | `04_saas/auth/metadata_scope.feature` |
+| TA-14 A deleted org stays deleted | FR-11.5 | `04_saas/tenancy/org_state.feature` |
+| TA-15 Real client address, protected metrics | FR-9.6b | `04_saas/network/client_ip.feature`, `04_saas/network/ip_allowlist.feature`, `04_saas/network/metrics_and_health_exposure.feature` |
+| TA-16 Per-org rate limit | FR-11.6 | `04_saas/plans_and_limits/org_rate_limit.feature` |
+| Usage endpoint, hourly buckets | FR-11.12 | `04_saas/plans_and_limits/usage_metering.feature` |
+| Object store, degraded operation | FR-11.13, FR-11.14 | `04_saas/operations/file_storage_and_degraded_operation.feature` |
+| Audit trail, org purge, person anonymise | FR-11.15 | `04_saas/operations/audit_purge_and_anonymise.feature` |
+
+| Platform flow | Feature |
+|---|---|
+| F1, F7, F11, F12, F13, F17, F30, F32 | `08_platform_flows/people_support_and_deletion_flows.feature` |
+| F4, F5, F6, F8, F10, F19 | `08_platform_flows/pipelines_and_debugging.feature` |
+| F9, F15, F16, F18, F22, F24 | `08_platform_flows/plans_and_limits_flows.feature` |
+| F2, F3, F14, F20, F21, F23, F25 to F29, F31, F33 | Not the engine's: the SaaS app and the management app own them |

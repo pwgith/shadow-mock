@@ -35,8 +35,10 @@ type Session struct {
 	ParentID  string
 	Name      string
 	CreatedBy string
-	CreatedAt time.Time
-	ExpiresAt time.Time
+	// CreatedByKey is the label of the Tool app key that made the session, when one did (FR-11.3).
+	CreatedByKey string
+	CreatedAt    time.Time
+	ExpiresAt    time.Time
 	// TTL is the session's lifetime, used by keepalive.
 	TTL      time.Duration
 	Masks    []model.Mask

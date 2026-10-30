@@ -46,14 +46,10 @@ Feature: Security properties
     And the database stores only a SHA-256 hash of the key
 
   @saas @P5
-  Scenario: The engine holds no Clerk secrets
+  Scenario: The engine holds no signing keys or platform secrets
     When I inspect the engine's environment and configuration
-    Then it contains only public JWKS URLs and no Clerk secret keys
-
-  @saas @P5
-  Scenario: The management app's Clerk machine secret never leaves the server
-    When I inspect every response and client bundle of the management app
-    Then none contains the Clerk machine secret key
+    Then it contains only the trusted issuers' public key locations or pinned public keys
+    And it contains no Clerk key, no launch-token key and no mock set key
 
   @P3
   Scenario: Template rendering cannot reach the network or file system

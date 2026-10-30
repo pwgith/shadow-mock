@@ -12,9 +12,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
+	"github.com/pwgith/shadow-mock/internal/audit"
 	"github.com/pwgith/shadow-mock/internal/auth"
 	"github.com/pwgith/shadow-mock/internal/mock"
 	"github.com/pwgith/shadow-mock/internal/store"
@@ -35,6 +37,10 @@ type Config struct {
 	// Shutdown stops the process (standalone only). Nil disables the endpoint.
 	Shutdown func()
 	SaaS     bool
+	// Managed is true in managed mode: no API docs pages, and a token from the trusted issuer is let past the
+	// admin allowlist. Audit, when set, keeps the audit trail of state-changing calls (FR-11.15).
+	Managed bool
+	Audit   *audit.Trail
 }
 
 // Handler is the admin API.
@@ -95,7 +101,30 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"Token is for org %s, URL is for org %s; switch active org.", p.OrgID, t).Write(w)
 		return
 	}
-	h.mux.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)))
+	if ip, denied := ipDenied(r.Context()); denied && p.Kind != auth.KindToken {
+		h.svc.Stats.RecordIPRejection(t, ip.String())
+		if h.svc.Usage != nil {
+			h.svc.Usage.IPRejected(t)
+		}
+		e := apierr.New(http.StatusForbidden, apierr.IPNotAllowed, "Requests from %s are not allowed for this org.", ip)
+		e.Details = map[string]any{"ip": ip.String()}
+		e.Write(w)
+		return
+	}
+	r = r.WithContext(context.WithValue(r.Context(), principalKey, p))
+	_, route := h.mux.Handler(r)
+	if p.Scope == auth.ScopeMetadata {
+		if !slices.Contains(metadataRoutes(), route) {
+			apierr.New(http.StatusForbidden, apierr.ScopeMetadata, "A session with the metadata scope cannot do this.").Write(w)
+			return
+		}
+		mw := newMetaWriter(w)
+		defer mw.flush()
+		w = mw
+	}
+	w, done := h.audited(w, r, p, route)
+	defer done()
+	h.mux.ServeHTTP(w, r)
 }
 
 func principal(ctx context.Context) auth.Principal {
@@ -114,12 +143,22 @@ const (
 	// configAccess changes configuration: mappings, files, recordings. On the global scope it
 	// is a global write, which SaaS rejects (FR-9.5a).
 	configAccess
+	// lifecycleAccess creates or lists shadow mocks on a global path: not a write to the global layer.
+	lifecycleAccess
+	// validateAccess checks a mapping or dry-runs a request, changing nothing.
+	validateAccess
+	// manageAccess is what only the management app does for itself (FR-11.15).
+	manageAccess
 )
 
 func (a access) action(global bool) auth.Action {
 	switch {
 	case a == readAccess:
 		return auth.Read
+	case a == validateAccess:
+		return auth.Validate
+	case a == manageAccess:
+		return auth.Manage
 	case a == configAccess && global:
 		return auth.GlobalWrite
 	default:
@@ -159,7 +198,7 @@ func (h *Handler) scoped(a access, fn scopedFunc, sessionPath bool) http.Handler
 		sc, err := h.scope(r, sessionPath)
 		if err == nil {
 			err = h.authz.Authorize(r.Context(), principal(r.Context()), a.action(sc.IsGlobal()),
-				auth.Resource{Tenant: sc.Tenant, Global: sc.IsGlobal()})
+				auth.Resource{Tenant: sc.Tenant, Global: sc.IsGlobal(), Lifecycle: a == lifecycleAccess})
 		}
 		if err == nil {
 			err = fn(w, r, sc)

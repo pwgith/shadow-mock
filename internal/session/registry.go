@@ -61,6 +61,8 @@ type CreateRequest struct {
 	Masks      []model.Mask
 	Metadata   map[string]any
 	CreatedBy  string
+	// CreatedByKey is the label of the Tool app key that made the session.
+	CreatedByKey string
 }
 
 // Create validates and registers a new session.
@@ -72,7 +74,7 @@ func (r *Registry) Create(_ context.Context, t tenant.ID, req CreateRequest) (Se
 	}
 	s := Session{
 		Kind: req.Kind, Tenant: t, Name: req.Name, ParentID: req.ParentID,
-		CreatedBy: req.CreatedBy, CreatedAt: now, ExpiresAt: now.Add(ttl), TTL: ttl,
+		CreatedBy: req.CreatedBy, CreatedByKey: req.CreatedByKey, CreatedAt: now, ExpiresAt: now.Add(ttl), TTL: ttl,
 		Masks: slices.Clone(req.Masks), Metadata: req.Metadata,
 	}
 	if req.Kind == KeyBased {
@@ -200,6 +202,37 @@ func (r *Registry) List(t tenant.ID, kind Kind) []Session {
 		return out[i].ID < out[j].ID
 	})
 	return out
+}
+
+// ListAll returns all the tenant's sessions, expired ones that have not been removed yet too, newest first.
+func (r *Registry) ListAll(t tenant.ID) []Session {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]Session, 0, len(r.sessions[t]))
+	for _, s := range r.sessions[t] {
+		out = append(out, s.clone())
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
+			return out[i].CreatedAt.After(out[j].CreatedAt)
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
+}
+
+// Anonymise replaces a person as the creator of the tenant's sessions with marker, and returns how many it changed.
+func (r *Registry) Anonymise(t tenant.ID, person, marker string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	n := 0
+	for _, s := range r.sessions[t] {
+		if s.CreatedBy == person {
+			s.CreatedBy = marker
+			n++
+		}
+	}
+	return n
 }
 
 // All returns every active session of every tenant, for building detection indexes.

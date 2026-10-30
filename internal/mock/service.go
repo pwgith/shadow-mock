@@ -26,6 +26,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/store"
 	"github.com/pwgith/shadow-mock/internal/telemetry"
 	"github.com/pwgith/shadow-mock/internal/tenant"
+	"github.com/pwgith/shadow-mock/internal/usage"
 	"github.com/pwgith/shadow-mock/internal/webhook"
 )
 
@@ -87,6 +88,8 @@ type Service struct {
 	BrowserProxy *proxy.Forwarder
 	Recorder     *record.Recorder
 	Stats        *stats.Tracker
+	// Usage counts what each org uses (managed mode); nil counts nothing.
+	Usage *usage.Meter
 	// Metrics receives one call per served request; nil disables it.
 	Metrics Observer
 	// Telemetry starts a span for each mock request; nil records nothing.

@@ -23,13 +23,13 @@ features/
 ├── 03_standalone/             standalone and central-server specifics
 ├── 04_saas/                   SaaS engine behaviour
 │   ├── tenancy/               org handle routing, aliases, isolation
-│   ├── auth/                  JWT, org match, roles, global-write restriction, CI tokens
+│   ├── auth/                  trusted issuer tokens, Tool app keys, metadata scope, org match, roles, global-write restriction
 │   ├── network/               IP allowlist, client IP
 │   ├── data_sync/             change propagation, lazy loading
 │   ├── journal/               hot and warm tiers, object storage, retention
 │   ├── plans_and_limits/      entitlements, rate and session limits, metering
-│   └── operations/            health, shutdown, SSRF
-├── 05_management_app/         SaaS management app (Next.js) behaviour that the engine depends on
+│   └── operations/            health, shutdown, SSRF, managed-mode guards, shared state, object storage, degraded operation, audit and purge
+├── 05_management_app/         what the management app needs from the engine's admin API (the app's own behaviour is specified in the platform repository)
 ├── 06_non_functional/         performance, security, compatibility
 └── 07_stateful_responses/     call-count responses (replace WireMock scenarios); scenario rejection
 ```
@@ -125,7 +125,7 @@ And I remember the response JSON at "$.id" as "ID"         # use later as ${ID}
 
 | Double | Used by |
 |---|---|
-| **Fake Clerk issuer** (JWKS endpoint, mints user and M2M JWTs with arbitrary claims) | `04_saas/auth`, `05_management_app` |
+| **Fake token issuer** (key set endpoint; mints management-app-style tokens with arbitrary claims and lifetimes, and Tool app keys) | `04_saas/auth`, `05_management_app` |
 | **Test clock** (injected `clock.Clock`) | TTLs, retention, counter expiry, templating `now` |
 | **Upstream stub server** (records requests, configurable responses) | Proxying, recording |
 | **Webhook receiver** | Webhooks |

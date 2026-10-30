@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -38,34 +39,28 @@ func (h *Handler) listRequests(w http.ResponseWriter, r *http.Request, sc store.
 		narrowed := keep
 		keep = func(e *journal.Entry) bool { return narrowed(e) && e.Stub != nil && strings.EqualFold(e.Stub.ID, stub) }
 	}
-	var since time.Time
-	if v := q.Get("since"); v != "" {
-		t, err := time.Parse(time.RFC3339, v)
-		if err != nil {
-			return badRequest("since must be an ISO 8601 date-time, not %q.", v)
-		}
-		since = t
+	keep, err := narrowJournal(q, keep)
+	if err != nil {
+		return err
 	}
-	limit := -1
-	if v := q.Get("limit"); v != "" {
-		l, err := strconv.Atoi(v)
-		if err != nil || l < 0 {
-			return badRequest("limit must be 0 or more, not %q.", v)
-		}
-		limit = l
+	since, limit, err := journalWindow(q)
+	if err != nil {
+		return err
 	}
 	all := h.svc.Journal.Query(sc, keep, 0)
 	shown := all
 	if !since.IsZero() {
 		shown = slices.DeleteFunc(slices.Clone(shown), func(e *journal.Entry) bool { return e.LoggedAt.Before(since) })
 	}
-	if limit >= 0 && limit < len(shown) {
-		shown = shown[:limit]
+	shown, next, err := cutPage(q, shown, limit)
+	if err != nil {
+		return err
 	}
 	out := serveEventList{
 		Requests: make([]serveEvent, 0, len(shown)), Meta: metaView{Total: len(all)},
 		RequestJournalDisabled: !h.svc.Journal.Enabled(),
 	}
+	out.Meta.NextCursor = next
 	for _, e := range shown {
 		out.Requests = append(out.Requests, eventView(e))
 	}
@@ -248,4 +243,111 @@ func (h *Handler) resetCounter(w http.ResponseWriter, r *http.Request, sc store.
 func (h *Handler) scenarios(_ http.ResponseWriter, _ *http.Request, _ store.Scope) error {
 	return apierr.New(http.StatusNotFound, apierr.NotSupported,
 		"WireMock scenarios are not supported. Use callResponses on the mapping to vary the response by call number.")
+}
+
+// journalWindow reads since and limit; limit is -1 when none was given.
+func journalWindow(q url.Values) (since time.Time, limit int, err error) {
+	limit = -1
+	if v := q.Get("since"); v != "" {
+		if since, err = time.Parse(time.RFC3339, v); err != nil {
+			return since, limit, badRequest("since must be an ISO 8601 date-time, not %q.", v)
+		}
+	}
+	if v := q.Get("limit"); v != "" {
+		if limit, err = strconv.Atoi(v); err != nil || limit < 0 {
+			return since, -1, badRequest("limit must be 0 or more, not %q.", v)
+		}
+	}
+	return since, limit, nil
+}
+
+// cutPage drops the entries before the cursor and keeps up to limit; next is the cursor for the page after.
+func cutPage(q url.Values, shown []*journal.Entry, limit int) (page []*journal.Entry, next string, err error) {
+	cursor := 0
+	if v := q.Get("cursor"); v != "" {
+		if cursor, err = strconv.Atoi(v); err != nil || cursor < 0 {
+			return nil, "", badRequest("cursor must be a number from a previous answer, not %q.", v)
+		}
+		cursor = min(cursor, len(shown))
+		shown = shown[cursor:]
+	}
+	if limit >= 0 && limit < len(shown) {
+		return shown[:limit], strconv.Itoa(cursor + limit), nil
+	}
+	return shown, "", nil
+}
+
+// narrowJournal adds the managed-mode filters to keep: status, method, path (a prefix), session, layer, matched, and
+// from and to (FR-11.11b).
+func narrowJournal(q url.Values, keep func(*journal.Entry) bool) (func(*journal.Entry) bool, error) {
+	var tests []func(*journal.Entry) bool
+	for _, build := range []func(url.Values) ([]func(*journal.Entry) bool, error){fieldFilters, stateFilters, rangeFilters} {
+		more, err := build(q)
+		if err != nil {
+			return nil, err
+		}
+		tests = append(tests, more...)
+	}
+	return func(e *journal.Entry) bool {
+		return keep(e) && !slices.ContainsFunc(tests, func(t func(*journal.Entry) bool) bool { return !t(e) })
+	}, nil
+}
+
+// fieldFilters match what the request and response said: status, method, path and layer.
+func fieldFilters(q url.Values) ([]func(*journal.Entry) bool, error) {
+	var tests []func(*journal.Entry) bool
+	if v := q.Get("status"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, badRequest("status must be a number, not %q.", v)
+		}
+		tests = append(tests, func(e *journal.Entry) bool { return e.Response.Status == n })
+	}
+	if v := q.Get("method"); v != "" {
+		tests = append(tests, func(e *journal.Entry) bool { return e.Request != nil && strings.EqualFold(e.Request.Method, v) })
+	}
+	if v := q.Get("path"); v != "" {
+		tests = append(tests, func(e *journal.Entry) bool { return e.Request != nil && strings.HasPrefix(e.Request.Path, v) })
+	}
+	if v := q.Get("layer"); v != "" {
+		tests = append(tests, func(e *journal.Entry) bool { return layerOf(e) == v })
+	}
+	return tests, nil
+}
+
+// stateFilters match what the engine did with the request: which shadow mock it was for, and whether a mapping matched.
+func stateFilters(q url.Values) ([]func(*journal.Entry) bool, error) {
+	var tests []func(*journal.Entry) bool
+	if v := q.Get("session"); v != "" {
+		tests = append(tests, func(e *journal.Entry) bool { return e.SessionID == v || slices.Contains(e.Sessions, v) })
+	}
+	if v := q.Get("matched"); v != "" {
+		want, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, badRequest("matched must be true or false, not %q.", v)
+		}
+		tests = append(tests, func(e *journal.Entry) bool { return e.Matched() == want })
+	}
+	return tests, nil
+}
+
+// rangeFilters keep the entries logged from the "from" time up to the "to" time.
+func rangeFilters(q url.Values) ([]func(*journal.Entry) bool, error) {
+	var tests []func(*journal.Entry) bool
+	for _, name := range []string{"from", "to"} {
+		v := q.Get(name)
+		if v == "" {
+			continue
+		}
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return nil, badRequest("%s must be an ISO 8601 date-time, not %q.", name, v)
+		}
+		if name == "to" {
+			tests = append(tests, func(e *journal.Entry) bool { return e.LoggedAt.Before(t) })
+		} else {
+			tests = append(tests, func(e *journal.Entry) bool { return !e.LoggedAt.Before(t) })
+		}
+	}
+	return tests, nil
 }

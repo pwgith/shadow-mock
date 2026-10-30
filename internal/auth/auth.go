@@ -6,6 +6,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"slices"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/tenant"
@@ -26,6 +27,13 @@ type Principal struct {
 	UserID string
 	OrgID  tenant.ID
 	Roles  []Role
+	// Managed mode only: where the principal came from and what it may reach.
+	Kind      Kind
+	Scope     string   // metadata, system or ""
+	Issuer    string   // the trusted issuer that signed a token
+	TokenID   string   // the token's jti
+	KeyLabel  string   // the label of a Tool app key
+	KeyScopes []string // the scopes of a Tool app key
 }
 
 // Has reports whether the principal holds role r or a more privileged one.
@@ -75,6 +83,10 @@ const (
 	SessionWrite  Action = "sessions:write"
 	GlobalWrite   Action = "global:write"
 	SystemControl Action = "system:control"
+	// Validate checks a mapping or dry-runs a request without changing anything (the `validate` scope).
+	Validate Action = "validate"
+	// Manage is what only the management app does for itself: purge an org, anonymise a person.
+	Manage Action = "manage"
 )
 
 // Resource is what an action applies to.
@@ -82,6 +94,9 @@ type Resource struct {
 	Tenant tenant.ID
 	// Global is true for the org's global session, false for a key-based or URL-based one.
 	Global bool
+	// Lifecycle is true for creating, listing or renewing a shadow mock, which a global path serves
+	// but which is not a write to the global layer.
+	Lifecycle bool
 }
 
 // Authorizer decides whether a principal may act on a resource.
@@ -104,6 +119,12 @@ func (a RoleAuthorizer) Authorize(_ context.Context, p Principal, act Action, re
 		return apierr.New(http.StatusForbidden, apierr.OrgMismatch,
 			"Token is for org %s, URL is for org %s; switch active org.", p.OrgID, res.Tenant)
 	}
+	if p.Kind == KindKey {
+		return authorizeKey(p, act, res)
+	}
+	if act == Manage && (p.Scope != ScopeSystem || !p.Has(Admin)) {
+		return apierr.New(http.StatusForbidden, apierr.Forbidden, "Only the management app can do this.")
+	}
 	need := required(act)
 	if !p.Has(need) {
 		return apierr.New(http.StatusForbidden, apierr.Forbidden, "This action needs the %s role.", need)
@@ -115,9 +136,31 @@ func (a RoleAuthorizer) Authorize(_ context.Context, p Principal, act Action, re
 	return nil
 }
 
+// authorizeKey decides what a Tool app key may do (FR-11.3). A key never writes the global layer,
+// the settings or the global journal, and never manages an org.
+func authorizeKey(p Principal, act Action, res Resource) error {
+	has := func(scope string) bool { return slices.Contains(p.KeyScopes, scope) }
+	allowed := false
+	switch act {
+	case Read:
+		allowed = has(ScopeRead) || has(ScopeSessions)
+	case Validate:
+		allowed = has(ScopeValidate)
+	case SessionWrite:
+		allowed = has(ScopeSessions) && (!res.Global || res.Lifecycle)
+	case GlobalWrite, SystemControl, Manage:
+		return apierr.New(http.StatusForbidden, apierr.GlobalWritesViaManagementApp,
+			"Global session changes are made in the management app.")
+	}
+	if !allowed {
+		return apierr.New(http.StatusForbidden, apierr.Forbidden, "This key's scopes do not allow that.")
+	}
+	return nil
+}
+
 func required(a Action) Role {
 	switch a {
-	case Read:
+	case Read, Validate:
 		return Viewer
 	case SessionWrite:
 		return Editor

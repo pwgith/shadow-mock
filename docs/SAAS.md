@@ -1,6 +1,8 @@
 # Shadow Mock on the Kaizentis SaaS Platform
 
-> Status: Draft v0.2, 2026-10-26. Background for the Go mock engine. Read with [REQUIREMENTS.md](REQUIREMENTS.md) (requirements and decisions log) and [DESIGN.md](DESIGN.md) (engine design).
+> Status: Draft v0.3, 2026-10-30. Background for the Go mock engine. Read with [REQUIREMENTS.md](REQUIREMENTS.md) (requirements and decisions log; **§3.10 and decision 21 are what the engine must do in managed mode**) and [DESIGN.md](DESIGN.md) (engine design).
+>
+> **Superseded in part (2026-10-30).** The platform now has its own repository and documents (`kaizentis-platform`: `docs/ARCHITECTURE.md`, `docs/USE_CASES.md`, `apps/shadow-mock/docs/REQUIREMENTS.md`). Where this file disagrees with REQUIREMENTS.md §3.10, §3.1 to §3.3 and §3.6 below are replaced as follows, and the original text is kept only as background. **Identity:** only the platform's SaaS app talks to Clerk; the engine trusts a configured issuer (the management app) and Tool app keys (`smt_`), and never sees Clerk, launch tokens or mock set keys. **CI:** there is no token exchange; pipelines use a Tool app key for shadow mocks and a mock set key with the management app for the global layer. **Usage:** the management app reads hourly buckets from `GET /__admin/usage` and reports to the platform; the engine does not report. **Addressing:** `https://mocks.kaizentis.xyz/<handle>/…`, admin at `/<handle>/__admin/…`. **Files and journal bodies:** an object store, content-addressed. **Mock sets** are the management app's concept; the engine sees mappings and a `metadata.source` label.
 
 **Contents:** 1 Overview · 2 Addressing · 3 Identity and access · 4 IP allowlist · 5 Management app vs engine · 6 Data · 7 Journal · 8 Object storage · 9 Hosting · 10 Stats and metering · 11 Cost model · 12 Pricing and billing · 13 Verify before launch · 14 Engine impact · Appendix A: alternatives considered
 
@@ -80,13 +82,16 @@ Every engine URL starts with the org's handle: `https://shadowmock.kaizentis.xyz
 
 | Caller | Credential | Verified by the engine |
 |---|---|---|
-| Human, through the management app (runtime calls, §5.2) | Clerk session JWT from the `shadowmock` JWT template, forwarded by the Next.js server | Clerk JWKS signature; `iss`, `aud`, `exp`/`nbf`; `azp` in the allowed-origins list |
-| CI pipelines and test code | Short-lived **Clerk M2M JWT**, obtained by exchanging a CI key (§3.6) | Clerk JWKS signature, same code path |
+| Human, through the management app (runtime calls, §5.2) | A token of about 60 seconds that the management app signs for the user and org (claims `sub`, `org_id`, `app_role`, `scope`, `iss`, `aud`, `exp`, `jti`) | Signature against the trusted issuer's keys, `iss`, `aud`, `exp` and a lifetime of at most about 2 minutes, `org_id` equal to the org in the path (REQUIREMENTS.md FR-11.2) |
+| CI pipelines and test code | A **Tool app key**, `smt_<id>_<secret>`, with scopes `sessions`, `validate` and `read` | SHA-256 lookup in `engine.api_keys`, constant-time compare, 60-second cache, org match (FR-11.3) |
+| Support "view as" | A token with `scope: metadata` | The same checks, then only metadata routes (FR-11.4) |
 | SUT mock traffic | None | Org from the path handle; optional IP allowlist (§4) |
 
-**The engine accepts JWTs only, and trusts only Clerk.** It has no API-key table and no opaque-token lookup.
+**The engine accepts these two credential kinds only,** and trusts an issuer only because its configuration says so. A mock set key (`smk_`) is never accepted.
 
-### 3.2 JWT verification and claim mapping
+### 3.2 JWT verification and claim mapping (superseded; see §3.1 and FR-11.2)
+
+The design below was written for Clerk tokens and is kept as background. In managed mode the issuer is the management app, the `shadowmock` template and the `clerk-ci` issuer do not exist, and `roleMap` maps `app_role` (`admin`, `member`, `viewer`).
 
 Clerk's default session token has changed shape between versions: organisation claims are `org_id`, `org_role` and `org_slug` in v1, and nested under `o` in v2. To avoid depending on that, the management app requests a **Clerk JWT template** named `shadowmock`:
 
@@ -161,7 +166,9 @@ Teams are a **platform** concept owned by the platform shell and reused by every
 
 In SaaS mode the engine's admin API rejects global-scope writes with `403 global_writes_via_management_app` (`admin.globalWrites: deny`). In standalone mode they are allowed, for WireMock parity.
 
-### 3.6 CI credentials: CI key → short-lived Clerk M2M JWT
+### 3.6 CI credentials: CI key → short-lived Clerk M2M JWT (dropped)
+
+**Dropped on 2026-10-30.** There is no exchange endpoint. A pipeline uses a Tool app key (§3.1) for shadow mocks, and a mock set key with the management app's upload API for the global layer. `api/ci-token.openapi.yaml` was removed. The design below is kept as background.
 
 ```
  CI job                         Management app (Vercel)                     Clerk                 Engine
@@ -499,6 +506,8 @@ Read from `stats_minute`, or live via `GET /__admin/stats/live`:
 
 ### 10.2 Meters (`usage_daily`, reported daily to platform billing, §12.5)
 
+> **Changed 2026-10-30.** The engine does not report. It counts hourly buckets and answers `GET /__admin/usage` (REQUIREMENTS.md FR-11.12); the management app reads them and posts them to the platform's metering ledger every few minutes with deterministic ids and a revision. The meters below are still the ones counted; "daily" becomes "hourly" and the p95 is taken by the ledger over each hour's highest concurrent session count.
+
 | Meter | Aggregation | Billed? |
 |---|---|---|
 | `mock_requests` | Sum. Excludes admin calls, IP rejections and rate-limited requests | **Yes**: included per tier, then overage |
@@ -707,14 +716,17 @@ Free orgs inactive for 90 days are archived, because Clerk charges per retained 
 What the SaaS setup means for the Go engine (detail in DESIGN.md):
 
 * **Storage providers:** `postgres` for configuration and journal rows, `redis` for call counters, session registry, hot journal and change fan-out, and `s3` for `BlobStore`.
-* **Auth:** JWT only, with a list of trusted Clerk issuers. No `jti` denylist by default.
+* **Auth:** tokens from configured issuers (the management app) and Tool app keys, nothing else; no Clerk. Optional `jti` replay check in Redis. The `metadata` scope for support (FR-11.2 to FR-11.4).
 * **Tenancy:** the org always comes from `/<org-handle>` via an in-memory org directory with aliases, and admin calls must have a matching JWT org.
 * **Request path:** the per-org IP allowlist runs before the body is read, and detection uses the org's own index.
 * **Stateful responses:** WireMock scenarios are not supported. Call-count responses use one Redis `INCR` per call, only for stubs that need it.
 * **Journal:** a Redis hot tier for verification, plus a warm tier of batched rows and shared body objects.
 * **Response compression:** gzip by default.
 * **Metering:** meters go to `usage_daily`, and limits come from `orgs.limits`.
-* **New admin endpoints** under `/<org-handle>`: `mappings/validate`, `mappings/dry-run`, `stats/live`, `usage`.
+* **New admin endpoints** under `/<org-handle>`: `mappings/validate`, `mappings/dry-run`, `stats/live`, `usage`, and (FR-11.11, FR-11.15) `stats` with history, `org/purge`, `people/{id}/anonymise`, session and journal filters, and the schema version in `version`.
+* **Org state and limits:** suspended and deleted orgs, a per-org rate limit with `Retry-After`, hard caps with a stated reason (FR-11.5, FR-11.6).
+* **Managed-mode guards:** it refuses to start with the browser proxy, a TLS listener, `egress.blockPrivate` off, `unknownFields: reject`, in-memory stores or a console; and serves no pages (FR-11.1, FR-11.16).
+* **Degraded operation:** serve cached files and the last configuration when the object store or database is down (FR-11.14).
 * **Configurable client-IP source**, for portability between hosts.
 
 ## Appendix A. Alternatives considered

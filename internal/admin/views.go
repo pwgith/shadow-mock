@@ -17,6 +17,8 @@ import (
 
 type metaView struct {
 	Total int `json:"total"`
+	// NextCursor, when set, is the cursor to send for the next page of a journal listing.
+	NextCursor string `json:"nextCursor,omitempty"`
 }
 
 type mappingList struct {
@@ -154,6 +156,8 @@ type serveEvent struct {
 	Timing             timingView                `json:"timing"`
 	SubEvents          []subEvent                `json:"subEvents"`
 	ShadowMock         shadowView                `json:"shadowMock"`
+	// Source is the label the management app stamped on the mapping that served the request (FR-11.10).
+	Source string `json:"source,omitempty"`
 }
 
 // layerOf returns the layer that served an entry, or for an unmatched entry the most
@@ -187,6 +191,7 @@ func eventView(e *journal.Entry) serveEvent {
 		Timing:     timingView{AddedDelay: e.AddedDelay, ProcessTime: e.ProcessTime, ServeTime: e.ProcessTime, TotalTime: e.ProcessTime + e.AddedDelay},
 		ShadowMock: shadowView{Tenant: string(e.Tenant), Layer: layerOf(e), CallNumber: e.CallNumber},
 		SubEvents:  subEventsOf(e),
+		Source:     sourceOf(e.Stub),
 	}
 	v.Response.Body = bodyText(e.Response.Body)
 	v.Response.BodyAsBase64 = base64.StdEncoding.EncodeToString(e.Response.Body)
@@ -207,7 +212,7 @@ func subEventsOf(e *journal.Entry) []subEvent {
 		return []subEvent{}
 	}
 	return []subEvent{{Type: "REQUEST_NOT_MATCHED", Data: map[string]any{
-		"status": e.Response.Status, "contentType": e.Response.Header.Get("Content-Type"), "report": bodyText(e.Response.Body),
+		keyStatus: e.Response.Status, "contentType": e.Response.Header.Get("Content-Type"), "report": bodyText(e.Response.Body),
 	}}}
 }
 
@@ -253,6 +258,8 @@ type nearMissView struct {
 	StubMapping    *model.StubMapping    `json:"stubMapping,omitempty"`
 	Layer          string                `json:"layer,omitempty"`
 	MatchResult    matchResult           `json:"matchResult"`
+	// Source is the label the management app stamped on the candidate mapping (FR-11.10).
+	Source string `json:"source,omitempty"`
 }
 
 type nearMissList struct {
@@ -266,7 +273,7 @@ func stubNearMisses(req *match.Request, nms []engine.NearMiss, e *journal.Entry)
 		m := nm.Stub.Mapping
 		out = append(out, nearMissView{
 			Request: &lr, StubMapping: &m, Layer: string(nm.Layer.Kind),
-			MatchResult: matchResult{Distance: round(nm.Distance)},
+			MatchResult: matchResult{Distance: round(nm.Distance)}, Source: sourceOf(&m),
 		})
 	}
 	return out
@@ -301,6 +308,7 @@ type sessionView struct {
 	Name         string         `json:"name,omitempty"`
 	Tenant       string         `json:"tenant"`
 	CreatedBy    string         `json:"createdBy"`
+	CreatedByKey string         `json:"createdByKey,omitempty"`
 	CreatedAt    time.Time      `json:"createdAt"`
 	ExpiresAt    time.Time      `json:"expiresAt"`
 	TTLSeconds   int64          `json:"ttlSeconds"`
@@ -326,4 +334,13 @@ func baseURLFor(public string, r *http.Request, id string) string {
 		base = scheme + "://" + r.Host + basePath(r.Context())
 	}
 	return base + "/d/" + id
+}
+
+// sourceOf is the metadata.source label of a mapping, or "".
+func sourceOf(m *model.StubMapping) string {
+	if m == nil {
+		return ""
+	}
+	s, _ := m.Metadata["source"].(string) //nolint:errcheck // a label of another type is no label
+	return s
 }

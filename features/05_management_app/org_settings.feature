@@ -5,7 +5,7 @@ Feature: Org settings in the management app
 
   Background:
     Given the org "acme" with handle "acme" on plan "Team"
-    And I am signed in to the management app as "carol" in org "acme" with role "org:admin"
+    And I am signed in to the management app as "carol" in org "acme" with app role "admin"
 
   Scenario: The settings page shows the engine base URL built from the handle
     When I open the org settings page
@@ -49,6 +49,6 @@ Feature: Org settings in the management app
     Then within 1 s the engine applies all three settings for org "acme"
 
   Scenario: Members cannot change org settings
-    Given I am signed in to the management app as "erin" in org "acme" with role "org:member"
+    Given I am signed in to the management app as "erin" in org "acme" with app role "member"
     When I try to change the handle
     Then the result is "forbidden: org admins only"

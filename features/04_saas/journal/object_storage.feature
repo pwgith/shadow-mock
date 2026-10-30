@@ -34,6 +34,6 @@ Feature: Object storage for files, exports and journal bodies
     Then access is denied
 
   Scenario: Exports are written under the org's prefix
-    Given I am "alice" in org "acme" with role "org:member"
+    Given I am "alice" in org "acme" with app role "member"
     When I request a journal export for session "S1"
     Then an object is written under "exports/<acme org id>/"

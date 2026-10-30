@@ -48,7 +48,7 @@ Feature: Other WireMock admin endpoints: files, settings, reset, health and shut
 
   @saas @P5
   Scenario Outline: Endpoints that are disabled or restricted in SaaS
-    Given I am "alice" in org "acme" with role "org:admin"
+    Given I am "alice" in org "acme" with app role "admin"
     When I call admin "<method>" "<path>"
     Then the response status is <status>
     And the response JSON at "$.error" is "<error>"

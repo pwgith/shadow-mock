@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -20,11 +21,13 @@ import (
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/auth"
 	"github.com/pwgith/shadow-mock/internal/browserproxy"
+	"github.com/pwgith/shadow-mock/internal/clock"
 	"github.com/pwgith/shadow-mock/internal/mock"
 	"github.com/pwgith/shadow-mock/internal/ratelimit"
 	"github.com/pwgith/shadow-mock/internal/stats"
 	"github.com/pwgith/shadow-mock/internal/telemetry"
 	"github.com/pwgith/shadow-mock/internal/tenant"
+	"github.com/pwgith/shadow-mock/internal/usage"
 )
 
 // Router is the engine's HTTP handler.
@@ -62,7 +65,20 @@ type Router struct {
 	// opened up, and requests in absolute form are answered as mock traffic that falls through to the
 	// origin when no mapping matches (--enable-browser-proxying).
 	BrowserProxy *browserproxy.Proxy
+	// Managed mode (FR-11): Usage counts what each org uses, Clock drives the per-org limiter, and
+	// ExemptAdminTokens lets a token from a trusted issuer past the admin allowlist.
+	Usage             *usage.Meter
+	Clock             clock.Clock
+	ExemptAdminTokens bool
+	// OrgLimits holds each org's rate limiter; nil means no per-org limit.
+	OrgLimits *OrgLimiters
 }
+
+// OrgLimiters are the per-org rate limiters, shared by every Router made from the same configuration.
+type OrgLimiters struct{ m sync.Map } // tenant.ID -> *orgLimiter
+
+// NewOrgLimiters returns an empty set.
+func NewOrgLimiters() *OrgLimiters { return &OrgLimiters{} }
 
 var _ http.Handler = (*Router)(nil)
 
@@ -98,13 +114,12 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		apierr.New(http.StatusNotFound, apierr.NotFound, "This listener does not serve %s.", rest).Write(w)
 		return
 	}
+	if rt.refuseOrgState(w, org, isAdmin, r.Method, adminPath) {
+		return
+	}
 	ip := rt.ClientIP.From(r)
-	// The allowlist runs before the body is read, so refused callers cost almost nothing.
-	if (!isAdmin || org.AllowlistAdmin) && !org.Allows(ip) {
-		rt.Stats.RecordIPRejection(org.ID, ip.String())
-		e := apierr.New(http.StatusForbidden, apierr.IPNotAllowed, "Requests from %s are not allowed for this org.", ip)
-		e.Details = map[string]any{"ip": ip.String()}
-		e.Write(w)
+	r, ok = rt.checkAllowlist(w, r, org, ip, isAdmin)
+	if !ok {
 		return
 	}
 	if isAdmin && rt.AdminRequireHTTPS && r.TLS == nil {
@@ -114,7 +129,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if isAdmin && !rt.adminGate(w, r) {
 		return
 	}
-	if !isAdmin && !rt.withinRate(w, ip) {
+	if !isAdmin && !rt.admitMock(w, org, ip) {
 		return
 	}
 	ctx := tenant.With(r.Context(), org.ID)
@@ -129,6 +144,21 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		tr.URLMockID, tr.Path = id, inner
 	}
 	rt.Service.ServeMock(w, r.WithContext(ctx), tr)
+}
+
+// checkAllowlist applies the org's allowlist before the body is read, so refused callers cost almost nothing. A caller
+// outside it is refused, except for an admin call when tokens from the trusted issuer are let past: the management
+// app calls from the host's servers, not the customer's networks, so the admin handler decides once it knows the
+// credential.
+func (rt *Router) checkAllowlist(w http.ResponseWriter, r *http.Request, org *tenant.Org, ip netip.Addr, isAdmin bool) (*http.Request, bool) {
+	if (isAdmin && !org.AllowlistAdmin) || org.Allows(ip) {
+		return r, true
+	}
+	if !isAdmin || !rt.ExemptAdminTokens {
+		rt.rejectIP(w, org, ip)
+		return r, false
+	}
+	return r.WithContext(admin.WithIPDenied(r.Context(), ip)), true
 }
 
 // viaProxy reports whether a request reached this listener as a proxy request: sent in absolute form,
@@ -347,6 +377,110 @@ func (rt *Router) serveAdmin(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, http.StatusText(sw.status))
 	}
 	span.End()
+}
+
+// rejectIP answers a request the allowlist refuses, and counts it.
+func (rt *Router) rejectIP(w http.ResponseWriter, org *tenant.Org, ip netip.Addr) {
+	rt.Stats.RecordIPRejection(org.ID, ip.String())
+	if rt.Usage != nil {
+		rt.Usage.IPRejected(org.ID)
+	}
+	e := apierr.New(http.StatusForbidden, apierr.IPNotAllowed, "Requests from %s are not allowed for this org.", ip)
+	e.Details = map[string]any{"ip": ip.String()}
+	e.Write(w)
+}
+
+// refuseOrgState answers for an org that is not served (FR-11.5): suspended and cancelled orgs get 403
+// and say why; a deleted one gets 410 for everything but the management app's purge. It reports whether
+// it answered.
+func (rt *Router) refuseOrgState(w http.ResponseWriter, org *tenant.Org, isAdmin bool, method, adminPath string) bool {
+	switch {
+	case org.Status.Serves():
+		return false
+	case org.Status == tenant.StatusDeleted:
+		if isAdmin && method == http.MethodPost && adminPath == "/__admin/org/purge" {
+			return false
+		}
+		w.Header().Set(ReasonHeader, string(apierr.OrgDeleted))
+		apierr.New(http.StatusGone, apierr.OrgDeleted, "This org has been deleted.").Write(w)
+	default:
+		w.Header().Set(ReasonHeader, string(apierr.OrgSuspended))
+		apierr.New(http.StatusForbidden, apierr.OrgSuspended, "This org is suspended.").Write(w)
+	}
+	return true
+}
+
+// ReasonHeader names the header that says why the engine refused a request.
+const ReasonHeader = "X-Shadow-Mock-Reason"
+
+// LimitHeader names the header that says which limit applied to a rate-limited request.
+const LimitHeader = "X-Shadow-Mock-Limit"
+
+// orgLimiter is an org's rate limiter and the limits it was made with, so a plan change makes a new one.
+type orgLimiter struct {
+	limits tenant.Limits
+	l      *ratelimit.Limiter
+}
+
+// admitMock lets a mock request in, or answers it: the client's own rate, the org's rate, and the org's
+// monthly cap (FR-11.5, FR-11.6). A request let in is counted as served.
+func (rt *Router) admitMock(w http.ResponseWriter, org *tenant.Org, ip netip.Addr) bool {
+	if !rt.withinRate(w, ip) {
+		if rt.Usage != nil {
+			rt.Usage.RateLimited(org.ID)
+		}
+		return false
+	}
+	if !rt.withinOrgRate(w, org) || !rt.withinCap(w, org) {
+		return false
+	}
+	if rt.Usage != nil {
+		rt.Usage.Request(org.ID)
+	}
+	return true
+}
+
+// withinOrgRate takes a token from the org's bucket. An org over its rate gets 429, Retry-After and the
+// name of the limit, before its body is read, and other orgs are not affected.
+func (rt *Router) withinOrgRate(w http.ResponseWriter, org *tenant.Org) bool {
+	lim := org.Limits
+	if lim.RequestsPerSecond <= 0 || rt.Clock == nil || rt.OrgLimits == nil {
+		return true
+	}
+	cur, _ := rt.OrgLimits.m.Load(org.ID)
+	ol, found := cur.(*orgLimiter)
+	if !found || ol.limits != lim {
+		ol = &orgLimiter{limits: lim, l: ratelimit.New(rt.Clock, lim.RequestsPerSecond, lim.Burst)}
+		rt.OrgLimits.m.Store(org.ID, ol)
+	}
+	ok, wait := ol.l.Allow(string(org.ID))
+	if ok {
+		return true
+	}
+	seconds := max(int(math.Ceil(wait.Seconds())), 1)
+	if rt.Usage != nil {
+		rt.Usage.RateLimited(org.ID)
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	w.Header().Set(LimitHeader, "requests-per-second")
+	e := apierr.New(http.StatusTooManyRequests, apierr.RateLimited, "This org is over its limit of %g requests a second; try again in %d s.", lim.RequestsPerSecond, seconds)
+	e.Details = map[string]any{"retryAfterSeconds": seconds, "limit": "requests-per-second"}
+	e.Write(w)
+	return false
+}
+
+// withinCap refuses mock traffic once the org has used its monthly cap and the plan's grace.
+func (rt *Router) withinCap(w http.ResponseWriter, org *tenant.Org) bool {
+	lim := org.Limits
+	if lim.MonthlyRequestCap <= 0 || rt.Usage == nil || rt.Clock == nil {
+		return true
+	}
+	if rt.Usage.Month(org.ID, rt.Clock.Now()) < lim.MonthlyRequestCap+lim.Grace {
+		return true
+	}
+	w.Header().Set(ReasonHeader, string(apierr.MonthlyRequestCap))
+	apierr.New(http.StatusTooManyRequests, apierr.MonthlyRequestCap, "This org has used its %d requests for the month.", lim.MonthlyRequestCap).Write(w)
+	return false
 }
 
 // withinRate takes a token for the client from the rate limiter. A client over its rate gets 429 and

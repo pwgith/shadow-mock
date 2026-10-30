@@ -23,10 +23,10 @@ func loadSpec(t *testing.T) *contract.Spec {
 	return s
 }
 
-// TestSpecsAreValidOpenAPI31 validates both spec files against the OpenAPI 3.1 meta-schema.
+// TestSpecsAreValidOpenAPI31 validates the spec file against the OpenAPI 3.1 meta-schema.
 func TestSpecsAreValidOpenAPI31(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"openapi.yaml", "ci-token.openapi.yaml"} {
+	for _, name := range []string{"openapi.yaml"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			data, err := os.ReadFile(filepath.Join(contract.RepoRoot(), "api", name))

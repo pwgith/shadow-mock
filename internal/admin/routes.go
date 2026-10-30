@@ -33,8 +33,8 @@ func (h *Handler) mappingRoutes() {
 	h.handle("DELETE", "/mappings/unmatched", configAccess, h.deleteUnmatchedMappings)
 	h.handle("POST", "/mappings/find-by-metadata", readAccess, h.findByMetadata)
 	h.handle("POST", "/mappings/remove-by-metadata", configAccess, h.removeByMetadata)
-	h.handleGlobal("POST", "/mappings/validate", readAccess, h.validateMapping)
-	h.handleGlobal("POST", "/mappings/dry-run", readAccess, h.dryRun)
+	h.handleGlobal("POST", "/mappings/validate", validateAccess, h.validateMapping)
+	h.handleGlobal("POST", "/mappings/dry-run", validateAccess, h.dryRun)
 
 	// Files.
 	h.handle("GET", "/files", readAccess, h.listFiles)
@@ -87,8 +87,8 @@ func (h *Handler) systemRoutes() {
 
 	// Sessions.
 	h.handleGlobal("GET", "/sessions", readAccess, h.listSessions)
-	h.handleGlobal("POST", "/sessions/key-based", stateAccess, h.createKeyBased)
-	h.handleGlobal("POST", "/sessions/url-based", stateAccess, h.createURLBased)
+	h.handleGlobal("POST", "/sessions/key-based", lifecycleAccess, h.createKeyBased)
+	h.handleGlobal("POST", "/sessions/url-based", lifecycleAccess, h.createURLBased)
 	h.handleSession("GET", "", readAccess, h.getSession)
 	h.handleSession("PATCH", "", stateAccess, h.updateSession)
 	h.handleSession("DELETE", "", stateAccess, h.deleteSession)
@@ -97,12 +97,21 @@ func (h *Handler) systemRoutes() {
 	// Runtime.
 	h.handleGlobal("GET", "/stats/live", readAccess, h.liveStats)
 	h.handleGlobal("GET", "/usage", readAccess, h.usage)
+	h.handleGlobal("GET", "/stats", readAccess, h.historyStats)
+
+	// What only the management app does for itself (FR-11.15).
+	h.handleGlobal("GET", "/audit", manageAccess, h.listAudit)
+	h.handleGlobal("POST", "/org/purge", manageAccess, h.purgeOrg)
+	h.handleGlobal("POST", "/people/{personId}/anonymise", manageAccess, h.anonymisePerson)
 }
 
 // docsRoutes registers the API documents and the alias WireMock gives the mappings list.
 func (h *Handler) docsRoutes() {
 	h.handleGlobal("GET", "", readAccess, redirectToDirectory)
 	h.handleGlobal("GET", "/{$}", readAccess, h.listMappings)
+	if h.cfg.Managed {
+		return // managed mode serves no pages of its own (FR-11.16)
+	}
 	h.handleGlobal("GET", "/docs", readAccess, h.docsIndex)
 	h.handleGlobal("GET", "/docs/swagger", readAccess, h.openAPI)
 	h.handleGlobal("GET", "/swagger-ui", readAccess, redirectToDirectory)

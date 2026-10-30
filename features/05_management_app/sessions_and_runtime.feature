@@ -5,7 +5,7 @@ Feature: Sessions and runtime operations from the management app
 
   Background:
     Given the org "acme" with handle "acme" on plan "Team"
-    And I am signed in to the management app as "erin" in org "acme" with role "org:member"
+    And I am signed in to the management app as "erin" in org "acme" with app role "member"
 
   Scenario: Create a URL-based shadow mock from the UI
     When I create a URL-based shadow mock named "claims-api-ci" with a TTL of 30 days
