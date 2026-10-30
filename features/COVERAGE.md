@@ -70,7 +70,7 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-9.6b | `03_standalone/listeners_and_allowlist.feature`, `04_saas/network/client_ip.feature`, `04_saas/network/ip_allowlist.feature`, `05_management_app/org_settings.feature` |
 | FR-9.7 | `04_saas/tenancy/org_handle_routing.feature`, `04_saas/tenancy/tenant_isolation.feature` |
 | FR-9.8 | `04_saas/data_sync/change_propagation.feature`, `05_management_app/global_mappings.feature` |
-| FR-10.1 | `01_wiremock_parity/request_matching/jsonpath_dialect.feature` |
+| FR-10.1 | `01_wiremock_parity/request_matching/jsonpath_dialect.feature` (filters, functions and how their results print) |
 | FR-10.2 | `01_wiremock_parity/request_matching/jsonpath_dialect.feature` |
 | FR-10.3 | `01_wiremock_parity/responses/template_blocks.feature` |
 | FR-10.4, FR-10.5 | `01_wiremock_parity/responses/template_helper_parity.feature` |
@@ -80,11 +80,14 @@ Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it
 | FR-10.9, FR-1.4 | `01_wiremock_parity/mappings/strict_mappings.feature` |
 | FR-10.10 | `01_wiremock_parity/responses/response_framing.feature`, `01_wiremock_parity/responses/gzip.feature` |
 | FR-10.11 | `01_wiremock_parity/responses/server_behaviours.feature`, `01_wiremock_parity/responses/proxying.feature` |
-| FR-10.14 | `03_standalone/tls.feature` and `01_wiremock_parity/request_matching/auth_host_port_scheme.feature` (scheme and port), with the listeners themselves in `cmd/shadowmock/tls_test.go` and the keystores in `internal/tlsconf` |
-| FR-10.13 | `03_standalone/wiremock_flags.feature` (and `internal/config/wmflags_test.go`, which checks every flag in WireMock's `--help`) |
+| FR-10.14a, FR-10.14e | `03_standalone/tls.feature` and `01_wiremock_parity/request_matching/auth_host_port_scheme.feature` (scheme and port); `--disable-http` and the separate admin listener in `cmd/shadowmock/tls_test.go` |
+| FR-10.14b | `03_standalone/tls.feature` (PEM, PKCS12 and JKS, wrong passwords, missing files) and `internal/tlsconf` |
+| FR-10.14c | `03_standalone/tls.feature` (PKCS12 and JKS truststores, required and not) and `cmd/shadowmock/tls_test.go` |
+| FR-10.14d | `03_standalone/tls.feature` (HTTP/2 over TLS, the journal's protocol, switching it off); h2c in `cmd/shadowmock/tls_test.go` |
+| FR-10.13 | `03_standalone/wiremock_flag_settings.feature` (every flag and the setting it makes, the Java-server flags, and the flags that need another), `03_standalone/wiremock_flags.feature` (what the settings do), and `internal/config/wmflags_test.go`, which checks every flag in WireMock's `--help` |
 | FR-10.12 | `01_wiremock_parity/record_playback/snapshot.feature` (and `test/conformance/recording_differential_test.go`) |
-| FR-10.15 | `03_standalone/browser_proxy.feature`, with the tunnels and the certificate checks in `cmd/shadowmock/browserproxy_test.go` and the authority in `internal/browserproxy` |
-| FR-10.16 | `01_wiremock_parity/responses/extensions.feature`, with the helpers in `internal/respond/template/extensions_test.go` and the matcher in `internal/graphql` |
+| FR-10.15a to FR-10.15e | `03_standalone/browser_proxy.feature` (stubs and pass-through over HTTP and through a tunnel, a refused tunnel, the stored authority, trusted and untrusted origins, the journal, start-up checks), with the certificate chain checked end to end in `cmd/shadowmock/browserproxy_test.go` and the authority in `internal/browserproxy` |
+| FR-10.16a to FR-10.16d | `01_wiremock_parity/responses/extensions.feature` (jwt claims, signatures and key set; every kind of faker expression; graphql equality; start-up checks), with the helpers in `internal/respond/template/extensions_test.go` and the matcher in `internal/graphql` |
 | NFR-1.1 | `06_non_functional/compatibility.feature` |
 | NFR-1.2 | `02_shadow_mocks/key_based/session_scoped_admin.feature`, `06_non_functional/compatibility.feature` |
 | NFR-2.1 | `06_non_functional/performance.feature` |

@@ -123,7 +123,7 @@ func (m *jsonEqual) equalObject(want, got map[string]any) bool {
 	for k, wv := range want {
 		gv, ok := got[k]
 		if !ok {
-			if s, isString := wv.(string); isString && (s == phIgnore || s == phIgnoreElement) {
+			if s, isString := wv.(string); isString && s == phIgnoreElement {
 				continue
 			}
 			return false

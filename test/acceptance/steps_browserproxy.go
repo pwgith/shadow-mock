@@ -2,8 +2,10 @@ package acceptance
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,6 +17,15 @@ import (
 func (w *world) initBrowserProxy(sc *godog.ScenarioContext) {
 	sc.Step(`^Shadow Mock is running as a browser proxy$`, func() error { return w.browserProxy(false) })
 	sc.Step(`^Shadow Mock is running as a browser proxy that trusts every origin$`, func() error { return w.browserProxy(true) })
+	sc.Step(`^Shadow Mock is running as a browser proxy that trusts the origin "([^"]*)"$`, func(host string) error {
+		return w.reconfigure("proxy: { browser: { enabled: true, caDir: '" + filepath.Join(w.root, "ca") + "', trustTargets: [" + host + "] } }")
+	})
+	sc.Step(`^the certificate authority is stored as "([^"]*)"$`, func(file string) error {
+		if _, err := os.Stat(filepath.Join(w.root, "ca", file)); err != nil {
+			return fmt.Errorf("the authority was not stored: %w", err)
+		}
+		return nil
+	})
 	sc.Step(`^I send a "([A-Z]+)" request to "([^"]*)" through the proxy$`, func(method, target string) error {
 		r := newRequest(method, target)
 		r.viaProxy = true

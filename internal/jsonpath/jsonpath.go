@@ -31,6 +31,14 @@ func (p *Path) String() string { return p.src }
 // slice or union). Jayway returns the value itself for a definite path and a list otherwise.
 func (p *Path) Definite() bool { return p.definite }
 
+// Function returns the name of the function the path ends in (sum, keys and so on), or "".
+func (p *Path) Function() string {
+	if p.function == nil {
+		return ""
+	}
+	return p.function.name
+}
+
 // Parse compiles an expression. Like Jayway, an expression that does not start with $ or @ is
 // read as if it started with "$.".
 func Parse(expr string) (*Path, error) {
