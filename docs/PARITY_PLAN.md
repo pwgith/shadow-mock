@@ -288,6 +288,16 @@ gets its own threat review and is off unless asked for.
 
 ### 10. Replacements for common extensions (FR-10.16)
 
+**Status: done, from the extensions' sources.** There is no differential test for this workstream. The three extensions are separate jars that need their dependencies (Datafaker, java-jwt, jose4j, graphql-java) and a build tool to assemble them, and `wiremock-standalone` shades the classes they extend. Instead the SHA-1-checked source jars of wiremock-jwt-extension 0.3.0, wiremock-faker-extension 0.2.0 and wiremock-graphql-extension 0.9.0 were read and the behaviour copied from them:
+
+* **jwt.** The helpers are `jwt`, `claims`, `claimsObject` and `jwks`. Defaults, the reserved claims, the claim types, the array rules, the `maxAge` parser (and its messages, including that units are plural) and `[ERROR: …]` for a mistake are the extension's. Keys live in `templating.jwt` and are generated when absent. The key format WireMock writes ("RSA PRIVATE KEY" around PKCS #8) is read.
+* **faker.** `random` evaluates `Class.method` expressions. Datafaker is a Java library with its own data; no Go port has the same names, so a short set of word lists and generators for the common classes is built in, with no new dependency. Both camel and snake case work.
+* **graphql.** `graphql-body-matcher` as a custom matcher with parameters `query`, `variables` and `operationName`. A GraphQL reader of our own (no new dependency) compares queries after sorting, and is fuzzed.
+* `--extensions` with the Java class of each turns the replacement on; other classes warn.
+* Differences kept on purpose are in COMPATIBILITY.md. Left out: gRPC.
+
+What was planned:
+
 Built in, off by default, switched on by `templating.extensions: [jwt, faker]` and
 `matching.extensions: [graphql]`:
 

@@ -54,6 +54,7 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | `/__admin/mappings/validate`, `dry-run`, `stats/live`, `counters` | Admin endpoints WireMock does not have |
 | Request and response `shadowMock` block in journal entries | Which layer and session served a request |
 | Custom matchers in Go | `pkg/extension`, instead of Java extensions |
+| Built-in `jwt`, `faker` and `graphql` extensions | Stand in for WireMock's separately published extensions; off until `templating.extensions` or `matching.extensions` turns them on, or `--extensions` names the Java class |
 
 ## Not supported
 
@@ -133,6 +134,10 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | The admin listener of `listen.admin` | (WireMock has no second listener) | Plain HTTP. HTTPS serves what the mock listener serves |
 | A TLS handshake that fails | Logged at debug | Logged by Go's HTTP server on standard error |
 | The certificate authority when `--ca-keystore` is not given | One kept in `~/.wiremock/ca-keystore.jks` | One made on first use, stored in `~/.shadowmock` (or `proxy.browser.caDir`) with `ca.pem` beside it. Its SHA-256 is logged at start-up |
+| The JWT keys | In the extended global settings, made on first start and kept with them | In `templating.jwt`; what is not set is made at each start, so tokens do not outlive the server. `POST /__admin/settings` does not carry them |
+| A date other than `exp` and `nbf` given to `{{jwt}}` as a claim | A date claim, in seconds | The text of the date. The `now` helper gives text here, not a date |
+| The `random` helper's values | Datafaker's, in every locale | Shadow Mock's own short word lists, in English, for `Name`, `Address`, `Internet`, `Company`, `Lorem`, `Number`, `PhoneNumber`, `Bool` and `Color`; another class or method is an `[ERROR: …]` |
+| The graphql matcher's reading of a query | graphql-java's | Executable documents only (operations and fragments); a schema definition is a syntax error and so no match. Selections are compared in sorted order, as the extension sorts them |
 | `CONNECT` when browser proxying is off | Answers 200, and then the connection is of no use | 405, naming the setting |
 | `CONNECT` over HTTP/2, and `CONNECT` to a host name with characters other than letters, digits, dots, hyphens and underscores | Served | Refused (501 and 400) |
 | Browser proxying and `--proxy-via` with `--trust-all-proxy-targets` or `--trust-proxy-target` | Accepted | Refused at start-up: the trust is applied to connections Shadow Mock makes itself |
