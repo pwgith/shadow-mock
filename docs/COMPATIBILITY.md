@@ -136,6 +136,7 @@ These are not in WireMock. Mappings that use them do not load in WireMock.
 | The certificate authority when `--ca-keystore` is not given | One kept in `~/.wiremock/ca-keystore.jks` | One made on first use, stored in `~/.shadowmock` (or `proxy.browser.caDir`) with `ca.pem` beside it. Its SHA-256 is logged at start-up |
 | `additionalProxyRequestHeaders` for a header the client also sent | Adds it, so the upstream receives both and a server that reads the first sees the client's | Replaces the client's |
 | `removeProxyRequestHeaders` | Removes a header only when the name is written in lower case (`cookie`, not `Cookie`) | Removes the header whatever the case of either name |
+| `keys()` at the end of a JSONPath | Lists the names in the order they are written in the document | Lists them in alphabetical order, because a decoded object does not keep its order |
 | The JWT keys | In the extended global settings, made on first start and kept with them | In `templating.jwt`; what is not set is made at each start, so tokens do not outlive the server. `POST /__admin/settings` does not carry them |
 | A date other than `exp` and `nbf` given to `{{jwt}}` as a claim | A date claim, in seconds | The text of the date. The `now` helper gives text here, not a date |
 | The `random` helper's values | Datafaker's, in every locale | Shadow Mock's own short word lists, in English, for `Name`, `Address`, `Internet`, `Company`, `Lorem`, `Number`, `PhoneNumber`, `Bool` and `Color`; another class or method is an `[ERROR: …]` |

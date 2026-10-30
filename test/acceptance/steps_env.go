@@ -133,6 +133,10 @@ func (w *world) initConfigSteps(sc *godog.ScenarioContext) {
 		}
 		return nil
 	})
+	sc.Step(`^the command-line flags are "([^"]*)"$`, func(args string) error {
+		w.cfgFlags = append(w.cfgFlags, strings.Fields(args)...)
+		return nil
+	})
 	sc.Step(`^Shadow Mock starts$`, func() error {
 		path := filepath.Join(w.root, "shadowmock.yaml")
 		if err := os.WriteFile(path, []byte(w.configYAML()), 0o600); err != nil {

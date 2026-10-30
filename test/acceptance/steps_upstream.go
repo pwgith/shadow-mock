@@ -39,7 +39,19 @@ type upstream struct {
 
 func newUpstream() *upstream {
 	u := &upstream{routes: map[string][]canned{}, calls: map[string]int{}}
-	u.srv = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	u.srv = httptest.NewServer(u.handler())
+	return u
+}
+
+// newTLSUpstream is an upstream that speaks HTTPS with a certificate nobody vouches for.
+func newTLSUpstream() *upstream {
+	u := &upstream{routes: map[string][]canned{}, calls: map[string]int{}}
+	u.srv = httptest.NewTLSServer(u.handler())
+	return u
+}
+
+func (u *upstream) handler() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		_, _ = io.Copy(io.Discard, r.Body) //nolint:errcheck // the body is not used
 		key := r.Method + " " + r.URL.RequestURI()
 		u.mu.Lock()
@@ -60,8 +72,7 @@ func newUpstream() *upstream {
 		}
 		rw.WriteHeader(rep.status)
 		_, _ = io.WriteString(rw, rep.body) //nolint:errcheck // the proxy may hang up
-	}))
-	return u
+	})
 }
 
 func (u *upstream) set(route string, replies ...canned) {
@@ -109,6 +120,15 @@ func (w *world) closeUpstreams() {
 
 // initUpstream registers the steps for upstream stub servers.
 func (w *world) initUpstream(sc *godog.ScenarioContext) {
+	sc.Step(`^the upstream stub server "([^"]*)" uses HTTPS with a certificate nobody trusts$`, func(name string) error {
+		if w.upstreams == nil {
+			w.upstreams = map[string]*upstream{}
+		}
+		u := newTLSUpstream()
+		w.upstreams[name] = u
+		w.vars["upstream."+name] = u.srv.URL
+		return nil
+	})
 	sc.Step(`^the upstream stub server "([^"]*)" returns (\d+) with body "([^"]*)" for "([^"]*)"$`, func(name string, status int, body, route string) error {
 		w.stubUpstream(name, route, canned{status: status, body: body, contentType: "text/plain"})
 		return nil

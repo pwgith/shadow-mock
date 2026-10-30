@@ -25,6 +25,18 @@ Feature: Template block helpers and variables
       | [{{val 10 assign='v'}}]{{#lt v 20}}Less{{else}}More{{/lt}} | []Less   |
       | {{val missing or='dflt' assign='v'}}{{v}}                | dflt     |
 
+  Scenario: formData reads a form body into variables
+    Given the global mapping:
+      """json
+      { "request": { "method": "POST", "urlPath": "/form" },
+        "response": { "status": 200, "body": "{{formData request.body 'f'}}{{f.name}} is {{f.age}}", "transformers": ["response-template"] } }
+      """
+    When I send a "POST" request to "/form" with body:
+      """
+      name=Ann&age=30
+      """
+    Then the response body equals 'Ann is 30'
+
   Scenario Outline: Helpers that read the text between their tags
     Given the global mapping:
       """json

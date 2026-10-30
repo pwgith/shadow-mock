@@ -28,6 +28,9 @@ func jsonPath(doc, expr any, o *raymond.Options) any {
 		return inlineError("%s is not a valid JSONPath expression", text(expr))
 	}
 	res := x.Get(document(doc))
+	if fn := x.Function(); fn != "" {
+		return functionResult(fn, res, o)
+	}
 	if !x.Definite() {
 		if len(res) == 0 {
 			return jsonList{}
@@ -36,6 +39,26 @@ func jsonPath(doc, expr any, o *raymond.Options) any {
 	}
 	if len(res) == 0 || res[0] == nil {
 		return safe(o.HashStr("default"))
+	}
+	return jsonResult(res[0])
+}
+
+// functionResult prints what a path that ends in a function found, as WireMock prints it: the aggregates give a
+// Java double ("10.0"), keys gives a Java list ("[a, b]"), and a function with nothing to work on gives nothing.
+func functionResult(fn string, res []any, o *raymond.Options) any {
+	if len(res) == 0 || res[0] == nil {
+		return safe(o.HashStr("default"))
+	}
+	switch v := res[0].(type) {
+	case float64:
+		switch fn {
+		case "sum", "avg", "min", "max", "stddev":
+			return safe(javaDouble(v))
+		}
+	case []any:
+		if fn == "keys" {
+			return list(v)
+		}
 	}
 	return jsonResult(res[0])
 }

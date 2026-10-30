@@ -120,9 +120,11 @@ type world struct {
 	adminSrv *httptest.Server // set when listen.admin gives the admin API its own listener
 	tlsSrv   *httptest.Server // set when tls.port gives the engine an HTTPS listener
 	tlsPort  int
-	cancel   context.CancelFunc
-	stopOnce sync.Once
-	stopped  chan struct{}
+	// clientCert is the certificate made by the client-certificate steps.
+	clientCert *tls.Certificate
+	cancel     context.CancelFunc
+	stopOnce   sync.Once
+	stopped    chan struct{}
 
 	// replay re-applies the scenario's setup steps after the engine is reconfigured, because
 	// a changed configuration needs a new engine (for example "running with configuration").

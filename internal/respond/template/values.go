@@ -1,6 +1,7 @@
 package template
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -45,4 +46,28 @@ func javaString(v any) string {
 	default:
 		return text(v)
 	}
+}
+
+// javaDouble prints a number the way Java's Double.toString does: "10.0", "2.5", and "1.0E7" from ten million.
+func javaDouble(f float64) string {
+	if f == 0 {
+		return "0.0"
+	}
+	abs := math.Abs(f)
+	if abs >= 1e-3 && abs < 1e7 {
+		s := strconv.FormatFloat(f, 'f', -1, 64)
+		if !strings.Contains(s, ".") {
+			s += ".0"
+		}
+		return s
+	}
+	mantissa, exp, _ := strings.Cut(strconv.FormatFloat(f, 'E', -1, 64), "E")
+	if !strings.Contains(mantissa, ".") {
+		mantissa += ".0"
+	}
+	n, err := strconv.Atoi(exp) // "+07" is 7
+	if err != nil {
+		return strconv.FormatFloat(f, 'g', -1, 64)
+	}
+	return mantissa + "E" + strconv.Itoa(n)
 }

@@ -33,6 +33,9 @@ func (d *Duration) UnmarshalYAML(n *yaml.Node) error {
 	return nil
 }
 
+// MarshalYAML writes a duration the way it is read.
+func (d Duration) MarshalYAML() (any, error) { return time.Duration(d).String(), nil }
+
 // Listen sets the listener addresses.
 type Listen struct {
 	Mock  string `yaml:"mock"`

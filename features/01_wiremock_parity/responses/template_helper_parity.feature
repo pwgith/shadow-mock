@@ -167,6 +167,17 @@ Feature: Template helpers and how they print their values
       | {{truncateDate (parseDate '2020-03-04T05:06:07Z') 'first minute of hour'}}                    | 2020-03-04T05:00:00Z |
       | {{truncateDate (parseDate '2020-03-04T05:06:07Z') 'first second of minute'}}                  | 2020-03-04T05:06:00Z |
       | {{truncateDate (parseDate '2020-03-04T05:06:07Z') 'first hour of day'}}                       | 2020-03-04T00:00:00Z |
+      | {{dateFormat (parseDate '2020-01-02T03:04:05Z') format='yyyy/MM/dd'}}                         | 2020/01/02           |
+      | {{dateFormat (parseDate '2020-01-02T03:04:05Z') format='HH:mm'}}                              | 03:04                |
+
+  Scenario: hostname is the name of the machine
+    Given the global mapping:
+      """json
+      { "request": { "urlPath": "/h" },
+        "response": { "status": 200, "body": "{{hostname}}", "transformers": ["response-template"] } }
+      """
+    When I send a "GET" request to "/h"
+    Then the response body matches ".+"
 
   Scenario: truncateDate refuses a truncation WireMock does not have
     Given the global mapping:
