@@ -119,8 +119,8 @@ func (w *world) initTLS(sc *godog.ScenarioContext) {
 }
 
 // turnedAway is how a client sees a server refuse its certificate: an alert, or a connection closed
-// before the alert is read, depending on the timing.
-var turnedAway = regexp.MustCompile(`(?i)certificate|forcibly closed|reset|EOF`)
+// before the alert is read, or an HTTP/2 client that never got its connection up, depending on the timing.
+var turnedAway = regexp.MustCompile(`(?i)certificate|forcibly closed|reset|EOF|client conn could not be established`)
 
 // serverCert makes a certificate for the server's key material.
 func (w *world) serverCert() (tls.Certificate, *x509.Certificate, error) {
