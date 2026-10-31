@@ -51,7 +51,9 @@ func TestManagedModeOnPostgresRedisAndObjectStorage(t *testing.T) {
 	if err := backend.CreateBucket("mocks"); err != nil {
 		t.Fatal(err)
 	}
-	objects := httptest.NewServer(gofakes3.New(backend).Server())
+	// The engine here runs on a fake clock, and the fake rejects requests more than 15 minutes from real time, as a
+	// real store does. The engine runs on the real clock in production.
+	objects := httptest.NewServer(gofakes3.New(backend, gofakes3.WithTimeSkewLimit(0)).Server())
 	t.Cleanup(objects.Close)
 	mr := miniredis.RunT(t)
 
