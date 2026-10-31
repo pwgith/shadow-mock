@@ -48,6 +48,7 @@ const (
 	OrgDeleted                   Code = "org_deleted"
 	ScopeMetadata                Code = "scope_metadata"
 	MonthlyRequestCap            Code = "monthly_request_cap"
+	ObjectStoreUnavailable       Code = "object_store_unavailable"
 )
 
 // Error is an API error with an HTTP status.
@@ -157,3 +158,6 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	// The status is already sent, so an encoding failure can only be a broken connection.
 	_ = enc.Encode(v) //nolint:errcheck // nothing useful to do once headers are written
 }
+
+// ReasonHeader names the header that says why the engine refused or could not serve a request.
+const ReasonHeader = "X-Shadow-Mock-Reason"

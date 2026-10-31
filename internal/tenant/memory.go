@@ -60,6 +60,18 @@ func (m *Memory) Lookup(handle string) (*Org, bool) {
 	return o, ok
 }
 
+// IDs returns the ids of all the orgs, deleted ones too, in order.
+func (m *Memory) IDs() []ID {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]ID, 0, len(m.byID))
+	for id := range m.byID {
+		out = append(out, id)
+	}
+	slices.Sort(out)
+	return out
+}
+
 // ByID returns the org with the id.
 func (m *Memory) ByID(id ID) (*Org, bool) {
 	m.mu.RLock()

@@ -1805,6 +1805,7 @@ components:
         - body_too_large
         - rate_limited
         - monthly_request_cap
+        - object_store_unavailable
         - session_limit_reached
         - mapping_limit_reached
         # mock traffic only

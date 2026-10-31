@@ -40,7 +40,7 @@ type Config struct {
 	// Managed is true in managed mode: no API docs pages, and a token from the trusted issuer is let past the
 	// admin allowlist. Audit, when set, keeps the audit trail of state-changing calls (FR-11.15).
 	Managed bool
-	Audit   *audit.Trail
+	Audit   audit.Store
 }
 
 // Handler is the admin API.
@@ -86,6 +86,7 @@ func basePath(ctx context.Context) string {
 // ServeHTTP authenticates the caller, checks the org (FR-9.6a) and dispatches. The tenant must
 // already be in the context (tenant.With).
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	p, err := h.authn.Authenticate(r)
 	if err != nil {
 		var ae *apierr.Error
@@ -122,8 +123,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer mw.flush()
 		w = mw
 	}
-	w, done := h.audited(w, r, p, route)
-	defer done()
+	if sw := h.auditing(w, r); sw != nil {
+		w = sw
+		defer h.record(ctx, r, p, route, sw)
+	}
 	h.mux.ServeHTTP(w, r)
 }
 

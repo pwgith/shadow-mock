@@ -32,8 +32,8 @@ type IssuerConfig struct {
 // Managed holds the settings of managed mode (FR-11.1).
 type Managed struct {
 	// SingleInstance lets managed mode run on in-memory stores, on one instance. It is for development,
-	// tests and trials: without it managed mode needs the postgres, redis and s3 drivers, which are not
-	// built yet, so it does not start.
+	// tests and trials: without it managed mode needs the postgres, redis and s3 drivers, so that several
+	// instances behave as one (FR-11.1). Any of the three can still be set on a single instance.
 	SingleInstance bool `yaml:"singleInstance"`
 }
 
@@ -83,7 +83,7 @@ func (c *Config) validateManaged() error {
 		add("mode: managed needs templating.jwt keys (hs256Secret and rs256PrivateKey) with the jwt extension: keys made at start-up differ between instances")
 	}
 	if !c.Managed.SingleInstance {
-		errs = append(errs, c.requireSharedStores())
+		errs = append(errs, c.requireSharedStores(), c.requireSecureLinks())
 	}
 	return errors.Join(errs...)
 }
@@ -94,7 +94,7 @@ func (c *Config) requireSharedStores() error {
 	if c.Storage.Counters.Driver != "redis" {
 		missing = append(missing, "storage.counters.driver: redis")
 	}
-	if c.Storage.Global.Driver != "postgres" {
+	if c.Storage.Global.Driver != driverPostgres {
 		missing = append(missing, "storage.global.driver: postgres")
 	}
 	if c.Storage.Blobs.Driver != "s3" {

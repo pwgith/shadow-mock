@@ -140,8 +140,14 @@ storage:
       maxBytes: 536870912     # memory budget for the whole journal (512 MiB); the oldest entries go first
       maxBodyBytes: 0         # cut request and response bodies to this size; 0 keeps them whole
   blobs:
-    driver: fs                # fs | memory
+    driver: fs                # fs | memory | s3 (managed mode)
     dir: ./blobs
+    # s3 (R2, AWS S3, MinIO and other S3-compatible stores). The credentials come from environment variables.
+    # s3: { endpoint: "https://<account>.r2.cloudflarestorage.com", region: auto, bucket: shadowmock,
+    #       accessKeyEnv: S3_ACCESS_KEY, secretKeyEnv: S3_SECRET_KEY, pathStyle: false, timeout: 10s }
+  # Managed mode only (mode: managed). Each is read from the environment, never from this file.
+  # postgres: { dsnEnv: DATABASE_URL, migrate: true, pollInterval: 30s }   # with global.driver: postgres
+  # redis: { addr: "host:6380", passwordEnv: REDIS_PASSWORD, tls: true, prefix: "sm:" }   # with counters.driver: redis
   global:
     filenameTemplate: ""     # names new mapping files, for example "{{{lower method}}}-{{{id}}}.json"
 

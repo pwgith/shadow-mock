@@ -38,6 +38,22 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # The database tests need a real Postgres. They skip without the DSN, and the coverage gate counts them.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shadowmock
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SHADOWMOCK_TEST_POSTGRES_DSN: postgres://postgres:postgres@localhost:5432/shadowmock?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -45,6 +61,28 @@ jobs:
           go-version-file: go.mod
       - name: Unit and acceptance tests with race detector and coverage targets
         run: make cover-check
+
+  # The S3 driver's fault tests use Shadow Mock as a failing object store. They run against the engine built from this
+  # tree in the test job; this job runs them again against the latest published edge build, a separate binary.
+  s3-against-edge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Download the latest edge build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/edge"
+          gh release download edge --repo "$GITHUB_REPOSITORY" --pattern '*_linux_amd64.tar.gz' --pattern SHA256SUMS --dir "$RUNNER_TEMP/edge"
+          cd "$RUNNER_TEMP/edge"
+          sha256sum --check --ignore-missing SHA256SUMS
+          tar -xzf ./*_linux_amd64.tar.gz
+          echo "SHADOWMOCK_EDGE_BIN=$(find "$RUNNER_TEMP/edge" -name shadowmock -type f | head -1)" >> "$GITHUB_ENV"
+      - name: S3 driver against the edge build
+        run: go test ./internal/blob/s3/... -count=1 -v
 
   # Real WireMock is the reference. Every corpus request is replayed against Shadow Mock and
   # WireMock and the replies and journals compared, and the client suite must pass on both.

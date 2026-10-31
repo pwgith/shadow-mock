@@ -245,20 +245,29 @@ type JournalRepository interface {
     Reset(ctx context.Context, s Scope) error
 }
 
-// BlobStore holds bulky bytes: journal bodies, __files bodies, recordings and exports.
-// SaaS: S3-compatible (R2 by default). Standalone: local directory. Tests: memory.
-// Keys are opaque. Callers build them: files/ and exports/ keys include the org; shared
-// journal objects do not, and are reached only through org-filtered journal rows.
-type BlobStore interface {
-    Put(ctx context.Context, key string, r io.Reader, meta BlobMeta) error
-    Get(ctx context.Context, key string, rng *ByteRange) (io.ReadCloser, error) // rng nil = whole object
-    Delete(ctx context.Context, key string) error
-    PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error)
-    PresignPut(ctx context.Context, key string, ttl time.Duration, meta BlobMeta) (string, error)
+// package blob. Store holds bulky bytes: file bodies, journal bodies, recordings and exports.
+// Hosted: S3-compatible (R2 by default). Standalone: local directory. Tests: memory.
+// Keys are opaque. Callers build them: files/<org>/<sha256> for file bodies, which never change.
+type Store interface {
+    Put(ctx context.Context, key string, data []byte, meta Meta) error
+    Get(ctx context.Context, key string, rng *Range) (io.ReadCloser, error) // rng nil = whole object
+    Stat(ctx context.Context, key string) (Info, error)                     // ErrNotFound if absent
+    Delete(ctx context.Context, key string) error                           // absent is not an error
+    List(ctx context.Context, prefix string) ([]string, error)
 }
 
-type ByteRange struct{ Off, Len int64 }
-type BlobMeta struct{ ContentType string; SHA256 []byte }
+// Errors are the engine's own, so no SDK type leaks: ErrNotFound, ErrUnavailable (the store cannot be reached or
+// answers 5xx, 429 or times out: the engine serves what it has cached and answers 503 object_store_unavailable),
+// and ErrBadKey.
+type Range struct{ Off, Len int64 }
+type Meta struct{ ContentType string }
+type Info struct {
+    Size        int64
+    ContentType string
+}
+
+// Presigned URLs are not part of Store. They are an S3 idea that other mechanisms cannot honour, so a caller that
+// wants one asks whether the store also implements a Presigner.
 
 type ChangeEvent struct {
     Kind  string // "mapping" | "session" | "token" | "file" | "org" (orgs, aliases, allowlist, settings/limits)
@@ -281,6 +290,15 @@ type Provider interface {
 
 func Open(cfg config.Storage) (Provider, error) // registry: store.Register("fs", fs.New)
 ```
+
+**Switching the object store.** The engine asks a store only for what every object store can do, and writes each file
+body once under its content address, so a driver needs no versioning, locking or ordering between keys. One S3 driver
+covers R2, AWS S3, MinIO, Backblaze B2 and Supabase Storage through its `endpoint`, `region` and `pathStyle` options.
+A mechanism with a different API (Azure Blob, native GCS) is a new package under `internal/blob/` that satisfies
+`Store` and passes the suite in `internal/blob/blobtest`, plus one case in the opener (`openBlobs` in
+`internal/app/shared.go`). Nothing else changes. Bounded caching and SHA-256 checks sit above the store, in
+`internal/blobfiles`, so every driver gets them. Moving to another store is a copy of the `files/` prefix: the keys
+are the same on both.
 
 ### 5.1 Backend behaviour
 

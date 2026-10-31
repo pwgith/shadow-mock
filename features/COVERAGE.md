@@ -2,7 +2,7 @@
 
 Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it when tags change. Every requirement in [REQUIREMENTS.md](../docs/REQUIREMENTS.md) has at least one feature.
 
-The managed-mode features (`@saas @P5`) are not run by the acceptance suite yet, because it has no steps for tokens from a trusted issuer or Tool app keys. The in-process parts of FR-9.3 to FR-9.6b and FR-11.x are tested in Go instead, in `internal/app/managed_test.go` and the `internal/auth`, `internal/tenant`, `internal/usage` and `internal/audit` packages. The parts that need Postgres, Redis or S3 (shared runtime state, the change listener, the database contract, file storage, multi-instance) are not built.
+The managed-mode features (`@saas @P5`) are not run by the acceptance suite yet, because it has no steps for tokens from a trusted issuer or Tool app keys. The in-process parts of FR-9.3 to FR-9.6b and FR-11.x are tested in Go instead, in `internal/app/managed_test.go` and the `internal/auth`, `internal/tenant`, `internal/usage` and `internal/audit` packages. The Postgres, Redis and S3 drivers are built and tested in Go: the object-store drivers share one contract suite (`internal/blob/blobtest`) and are tested against an S3 fake and, for failures, against Shadow Mock itself as a failing store; the counters share a suite with the in-memory ones (`internal/countertest`); the Postgres tests and the full managed-mode test on Postgres, Redis and object storage run in CI against a Postgres service container. Not built yet: Redis for shadow-mock sessions and the hot journal, the warm journal, and persisting usage.
 
 | Requirement | Feature files |
 |---|---|
