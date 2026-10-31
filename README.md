@@ -152,4 +152,7 @@ modify and run it freely, including inside your company and as a test tool. If y
 offer it to others over a network, you must make your modified source available under the same
 licence.
 
+Shadow Mock is an independent project. It is not affiliated with or endorsed by WireMock Inc.; "WireMock" is
+a trademark of its owner, used here only to describe compatibility. See [NOTICE](NOTICE).
+
 Contributions are accepted under a Developer Certificate of Origin sign-off and a licence grant to the project owner, so the project can also be offered under commercial terms. See [CONTRIBUTING.md](CONTRIBUTING.md). Commercial licences for other terms are available from the project owner.

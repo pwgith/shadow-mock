@@ -1,0 +1,23 @@
+Shadow Mock
+Copyright (c) the Shadow Mock contributors
+
+Shadow Mock is licensed under the GNU Affero General Public License v3.0 (see LICENSE).
+
+WireMock
+--------
+Shadow Mock is an independent implementation. It is not affiliated with, endorsed by or sponsored by
+WireMock Inc. or the WireMock project.
+
+"WireMock" is a trademark of its owner. This project uses the name only to say what it is compatible with:
+it reads WireMock's mapping and __files layout, answers WireMock's admin API, and matches requests and
+renders responses the way WireMock 3.x does.
+
+WireMock is distributed under the Apache License, Version 2.0 (https://github.com/wiremock/wiremock).
+Shadow Mock is written in Go and does not include or link WireMock's Java code, and the WireMock jar used
+for differential testing is not part of this repository. Where any material from WireMock is included, it
+keeps its original notice and licence.
+
+Third-party software
+--------------------
+Shadow Mock depends on the Go modules listed in go.mod and go.sum. Each is used under its own licence,
+which you can read in the module's source.
