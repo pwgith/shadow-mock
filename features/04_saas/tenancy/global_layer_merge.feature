@@ -1,4 +1,4 @@
-@saas @P5 @FR-11.10 @FR-9.5a @FR-9.7 @TA-1
+@managed @P5 @FR-11.10 @FR-9.5a @FR-9.7 @TA-1
 Feature: The org's global layer is whatever the management app wrote
   The management app groups an org's mappings into mock sets. The engine has no notion of a set: the global layer is
   the mappings stored for the org, matched by the usual priority rules. A `metadata.source` label says which set a

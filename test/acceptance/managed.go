@@ -49,6 +49,10 @@ type managedWorld struct {
 	defaultOrg string
 	lastBearer string
 	cfgIndex   int
+	// writeErr is how the management app's last write to the org directory went.
+	writeErr error
+	// lastMetadata is the metadata the management app last wrote, for a step that reads it back.
+	lastMetadata map[string]any
 }
 
 type orgRecord struct {
@@ -310,8 +314,10 @@ func (w *world) managedAdminCall(method, path, body string, org string, cred *cr
 	if err = w.ensure(); err != nil {
 		return nil, err
 	}
+	seg := "" // the handle in the URL, when the step gave a whole URL
 	if mm := fullAdminURL.FindStringSubmatch(path); mm != nil {
-		org, path = m.orgOfHandle(mm[1]), mm[2]
+		seg, path = mm[1], mm[2]
+		org = m.orgOfHandle(w, mm[1])
 	}
 	if org == "" {
 		switch {
@@ -321,9 +327,11 @@ func (w *world) managedAdminCall(method, path, body string, org string, cred *cr
 			org = m.defaultOrg
 		}
 	}
-	target, err := m.adminURL(w, org, path)
-	if err != nil {
-		return nil, err
+	target := w.srv.URL + "/" + seg + w.adminPrefix() + w.sub(path)
+	if seg == "" {
+		if target, err = m.adminURL(w, org, path); err != nil {
+			return nil, err
+		}
 	}
 	if body == "a minimal mapping" {
 		body = `{"request":{"url":"/a"},"response":{"status":200}}`
@@ -380,6 +388,8 @@ func (w *world) initManaged(sc *godog.ScenarioContext) {
 	w.initManagedAuth(sc)
 	w.initManagedOrg(sc)
 	w.initManagedKeys(sc)
+	w.initManagedTenancy(sc)
+	w.initManagedLayers(sc)
 }
 
 // eventually runs check until it passes or the time is up, waiting in real time between tries. It returns the last

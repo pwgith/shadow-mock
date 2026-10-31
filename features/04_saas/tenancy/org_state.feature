@@ -1,4 +1,4 @@
-@saas @P5 @FR-11.5 @FR-9.7 @security @TA-14
+@managed @P5 @FR-11.5 @FR-9.7 @security @TA-14
 Feature: Suspended and deleted orgs
   An org's plan, limits and status are ordinary configuration rows. A suspended org is refused but kept; a deleted
   org is a tombstone that nothing recreates.
@@ -35,6 +35,7 @@ Feature: Suspended and deleted orgs
 
   Scenario: Other orgs are not affected
     Given the org "globex" with handle "globex" on plan "Team"
+    And a mapping "hello" in the global layer for "GET /hello" in both orgs
     When the management app sets the status of org "acme" to "suspended"
     Then "GET /globex/hello" is served
 

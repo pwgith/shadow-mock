@@ -220,7 +220,7 @@ func (w *world) initManagedOrg(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		return w.callEveryAdminOperation(m.orgOfHandle(handle), m.cred)
+		return w.callEveryAdminOperation(m.orgOfHandle(w, handle), m.cred)
 	})
 	sc.Step(`^every response status is (\d+) or (\d+), except the health check, which is open$`, func(a, b int) error {
 		for i, r := range w.batch {
@@ -289,7 +289,12 @@ func (w *world) initManagedOrg(sc *godog.ScenarioContext) {
 }
 
 // orgOfHandle finds the org name that has the handle.
-func (m *managedWorld) orgOfHandle(handle string) string {
+func (m *managedWorld) orgOfHandle(w *world, handle string) string {
+	if w.app != nil {
+		if o, ok := w.app.Directory().Lookup(handle); ok {
+			return string(o.ID)
+		}
+	}
 	for name, o := range m.orgs {
 		if o.handle == handle {
 			return name
@@ -314,4 +319,22 @@ func (w *world) noteSession(name string, rep *reply) error {
 		}
 	}
 	return nil
+}
+
+// removeBySource deletes the org's global mappings whose metadata.source is src, as the management app removes a set.
+func (w *world) removeBySource(org, src string) error {
+	svc := w.app.Service()
+	scope := store.Global(tenant.ID(org))
+	list, err := svc.Mappings.List(ctxBackground(), scope)
+	if err != nil {
+		return err
+	}
+	for _, sm := range list {
+		if s, _ := sm.Metadata["source"].(string); s == src { //nolint:errcheck // a label of another type is no label
+			if err = svc.Mappings.Delete(ctxBackground(), scope, sm.ID); err != nil {
+				return err
+			}
+		}
+	}
+	return svc.Layers.Rebuild(ctxBackground(), scope)
 }

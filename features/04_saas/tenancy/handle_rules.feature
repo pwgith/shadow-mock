@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.6 @FR-11.5 @TA-9
+@managed @P5 @FR-9.6 @FR-11.5 @TA-9
 Feature: What a handle can be, and what the reserved prefix protects
   The handle is the first path segment of every hosted URL. The prefix `/__` belongs to the engine: admin, health,
   readiness and metrics. No handle can start with `_`, and no mapping can reach it.

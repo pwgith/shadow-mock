@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.4 @FR-9.7 @security
+@managed @P5 @FR-9.4 @FR-9.7 @security
 Feature: Tenant isolation
   No org can read, change or influence another org's mappings, sessions,
   journals, call counters, files or stats.
@@ -37,6 +37,8 @@ Feature: Tenant isolation
     When I send a "GET" request to "https://shadowmock.test/acme/n"
     Then the response status is 201
 
+  # Needs the warm journal (Postgres rows and shared body objects), which is not built.
+  @saas
   Scenario: Shared journal body objects are unreachable except through the owner's rows
     Given org "globex" has a journal entry with a 10 KB body stored in a shared body object
     When org "acme" tries to read that body by guessing its object key and range

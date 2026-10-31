@@ -52,6 +52,8 @@ func (w *world) resolve(target string) (string, error) {
 	switch {
 	case strings.HasPrefix(target, "/"):
 		return w.srv.URL + target, nil
+	case strings.HasPrefix(target, "https://shadowmock.test"):
+		return w.srv.URL + strings.TrimPrefix(target, "https://shadowmock.test"), nil
 	case strings.HasPrefix(target, "http://localhost:8080"):
 		return w.srv.URL + strings.TrimPrefix(target, "http://localhost:8080"), nil
 	case w.tlsSrv != nil && strings.HasPrefix(target, "https://localhost:"+strconv.Itoa(w.tlsPort)):
