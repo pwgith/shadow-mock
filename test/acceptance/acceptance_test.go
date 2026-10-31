@@ -10,14 +10,14 @@ import (
 	"github.com/pwgith/shadow-mock/test/acceptance"
 )
 
-// phases lists the delivery phases the engine implements (DESIGN.md §15). Scenarios for
-// later phases are tagged @P5 and are not run.
-var phases = []string{"@P0", "@P1", "@P2", "@P3", "@P4"}
+// phases lists the delivery phases the engine implements (DESIGN.md §15). Managed mode is P5; its scenarios run when
+// they are tagged @managed and are excluded by @saas until the harness can run them.
+var phases = []string{"@P0", "@P1", "@P2", "@P3", "@P4", "@P5"}
 
 // excluded lists what this harness does not run: SaaS and multi-instance behaviour, the
 // performance pipeline, later phases, and scenarios marked @wip with the reason beside them.
 var excluded = []string{
-	"@saas", "@multi-instance", "@perf", "@P5", "@wip",
+	"@saas", "@multi-instance", "@perf", "@wip",
 }
 
 // defaultTags selects the standalone scenarios of the implemented phases. Godog tag filters are a comma-separated
@@ -40,11 +40,15 @@ func TestFeatures(t *testing.T) {
 	if v := os.Getenv("ACCEPTANCE_TAGS"); v != "" {
 		tags = v
 	}
+	paths := []string{"../../features"}
+	if v := os.Getenv("ACCEPTANCE_PATHS"); v != "" {
+		paths = strings.Split(v, ",")
+	}
 	suite := godog.TestSuite{
 		ScenarioInitializer: acceptance.InitializeScenario,
 		Options: &godog.Options{
 			Format:      "progress",
-			Paths:       []string{"../../features"},
+			Paths:       paths,
 			Tags:        tags,
 			Strict:      true,
 			NoColors:    true,

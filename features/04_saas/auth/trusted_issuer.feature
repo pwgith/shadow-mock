@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.3 @FR-9.3a @FR-11.2 @security @TA-9
+@managed @P5 @FR-9.3 @FR-9.3a @FR-11.2 @security @TA-9
 Feature: Admin calls carry a token from a trusted issuer
   In managed mode the admin API accepts a short-lived token signed by the management app, or a Tool app key
   (tool_app_keys.feature), and nothing else. Trust exists only in the engine's configuration: an issuer name, an

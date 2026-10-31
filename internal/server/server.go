@@ -132,7 +132,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !isAdmin && !rt.admitMock(w, org, ip) {
 		return
 	}
-	ctx := tenant.With(r.Context(), org.ID)
+	ctx := tenant.With(auth.WithClientIP(r.Context(), ip), org.ID) // the key-usage record needs the resolved address
 	if isAdmin {
 		r2 := r.Clone(admin.WithBasePath(ctx, prefix))
 		setPath(r2.URL, adminPath)

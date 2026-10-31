@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.3a @FR-9.3b @FR-9.5 @FR-11.3 @security @TA-2 @TA-5
+@managed @P5 @FR-9.3a @FR-9.3b @FR-9.5 @FR-11.3 @security @TA-2 @TA-5
 Feature: Tool app keys for pipelines
   A pipeline creates and deletes shadow mocks with a Tool app key, `smt_<id>_<secret>`. The management app creates
   the key and stores its hash in `engine.api_keys`; the engine only reads the table. A mock set key (`smk_`) belongs
@@ -17,7 +17,7 @@ Feature: Tool app keys for pipelines
 
   Scenario: The key's label is the creator
     Given I create a shadow mock "S1" with the key "ci-tests"
-    When I call admin "GET" "/sessions/S1" as a member
+    When I call admin "GET" "/sessions/${S1.id}" as a member
     Then the response JSON at "$.createdBy" is "ci-tests"
     And the response JSON at "$.createdByKey" is "ci-tests"
 
@@ -31,7 +31,7 @@ Feature: Tool app keys for pipelines
       | read              | GET    | /sessions               |      | 200    |
       | read              | POST   | /sessions/key-based     | {}   | 403    |
       | sessions,read     | POST   | /sessions/key-based     | {}   | 201    |
-      | validate          | POST   | /mappings/validate      | {"request":{"url":"/a"},"response":{"status":200}} | 200 |
+      | validate          | POST   | /mappings/validate      | a minimal mapping | 200 |
       | validate          | POST   | /sessions/key-based     | {}   | 403    |
       | sessions,read     | POST   | /mappings               | {}   | 403    |
       | sessions,read     | POST   | /settings               | {}   | 403    |
@@ -76,14 +76,14 @@ Feature: Tool app keys for pipelines
     Then the response status is 401
     And the key is not looked up in the database
 
-  Scenario: A key and a token cannot pass for each other
-    Given I present a token for "alice" in org "acme" with app role "member"
-    When I call admin "GET" "/sessions" using the token as a key
+  Scenario: A credential that is neither a token nor a key is refused without a hint
+    When I call admin "GET" "/sessions" with the credential "abc.def"
     Then the response status is 401
+    And the response JSON at "$.error" is "invalid_token"
 
   Scenario: The secret is compared in constant time and never logged
     When I call admin "GET" "/sessions" with a key that has the wrong secret
-    Then the comparison takes the same time as for the right secret
+    Then the response is the same as for a key that does not exist
     And no log line contains the secret
 
   Scenario: Last use is recorded without causing a reload

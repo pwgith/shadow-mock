@@ -133,9 +133,11 @@ type world struct {
 	vars   map[string]string
 	client *http.Client
 
-	last    *reply
-	batch   []*reply
-	history []*reply
+	last  *reply
+	batch []*reply
+	// batchPaths are the admin paths the replies in batch came from, when a step called every admin operation.
+	batchPaths []string
+	history    []*reply
 
 	// state for individual steps
 	receivers      map[string]*receiver
@@ -144,9 +146,10 @@ type world struct {
 	sendErr        error  // the last request failed on the wire
 	scrape         string // the last metrics scrape
 	spans          *tracetest.InMemoryExporter
-	traceID        string // the trace id of the last traceparent the scenario sent
-	parentSpanID   string // the span id in it
-	adminToken     string // sent as a bearer token on admin calls and scrapes, when not empty
+	traceID        string        // the trace id of the last traceparent the scenario sent
+	parentSpanID   string        // the span id in it
+	adminToken     string        // sent as a bearer token on admin calls and scrapes, when not empty
+	m              *managedWorld // set in managed mode
 	sessionNumbers map[string][]int
 
 	createdSession map[string]any
@@ -271,6 +274,9 @@ func (w *world) stop() error {
 
 // close ends the scenario and removes its files.
 func (w *world) close() error {
+	if w.m != nil && w.m.jwks != nil {
+		w.m.jwks.Close()
+	}
 	w.closeReceivers()
 	w.closeUpstreams()
 	err := w.stop()

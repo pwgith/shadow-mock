@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.5a @FR-6.5 @TA-3
+@managed @P5 @FR-9.5a @FR-6.5 @TA-3
 Feature: Global session writes only through the management app
   In SaaS mode, the engine rejects global-scope writes from anyone, including
   org admins. The management app makes them, after checking team grants.
@@ -48,4 +48,4 @@ Feature: Global session writes only through the management app
       """json
       { "request": { "urlPath": "/from-ui" }, "response": { "status": 200, "body": "ui" } }
       """
-    Then within 1 s a "GET" request to "/from-ui" returns body "ui"
+    Then within 1 s a "GET" request to "/acme/from-ui" returns body "ui"

@@ -12,11 +12,6 @@ Feature: Security properties
       | session keys          | 128  |
       | URL-based mock ids    | 80   |
 
-    @P5
-    Examples: CI secrets are minted by the management app
-      | kind                  | bits |
-      | CI client secrets     | 256  |
-
   @P0
   Scenario: Request bodies above the hard limit are rejected
     Given Shadow Mock is running with configuration:

@@ -132,6 +132,9 @@ func (w *world) send(r *request) (*reply, error) {
 
 // adminCall sends an admin request (relative to the configured admin prefix).
 func (w *world) adminCall(method, path, body string, header http.Header) (*reply, error) {
+	if w.m != nil {
+		return w.managedAdminCall(method, path, body, "", w.m.cred, header)
+	}
 	if err := w.ensure(); err != nil {
 		return nil, err
 	}
@@ -157,7 +160,13 @@ func (w *world) adminCall(method, path, body string, header http.Header) (*reply
 
 // mustAdmin sends an admin request and fails unless the status is one of want.
 func (w *world) mustAdmin(method, path, body string, want ...int) (*reply, error) {
-	rep, err := w.adminCall(method, path, body, nil)
+	var rep *reply
+	var err error
+	if w.m != nil {
+		rep, err = w.managedAdminCall(method, path, body, "", w.setupCred(w.m.defaultOrg), nil)
+	} else {
+		rep, err = w.adminCall(method, path, body, nil)
+	}
 	if err != nil {
 		return nil, err
 	}
