@@ -1,4 +1,4 @@
-@saas @P5 @FR-11.4 @security @TA-13
+@managed @P5 @FR-11.4 @security @TA-13
 Feature: The metadata scope for support
   A support "view as" session reaches the engine with a token carrying `scope: metadata`. It can see how an org is
   set up and nothing it holds: no bodies, no mapping or file content, no dry-run output, no near-miss detail, no

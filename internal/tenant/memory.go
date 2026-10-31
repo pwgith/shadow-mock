@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -23,16 +24,24 @@ var handlePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,38}[a-z0-9]$`)
 
 // reservedHandles can never be a handle, because they name something of the platform or the engine.
 func reservedHandles() []string {
-	return []string{"www", "api", "admin", "app", "mail", "static", "root", "status", "support", "console", "docs", "health", "metrics"}
+	return []string{"www", "api", "admin", "app", "mail", "static", "root", "status", "support", "console", "docs", "health", "metrics", "d"}
 }
 
-// ValidateHandle checks a handle against the rules, not against other orgs.
+// ValidateHandle checks a handle against the rules, not against other orgs. The error says which rule was broken.
 func ValidateHandle(h string) error {
-	if !handlePattern.MatchString(h) {
-		return fmt.Errorf("%w: a handle is 3 to 40 characters of a-z, 0-9 and -, starts with a letter and does not end with a hyphen", ErrHandleInvalid)
-	}
-	if slices.Contains(reservedHandles(), h) {
+	switch {
+	case slices.Contains(reservedHandles(), h):
 		return fmt.Errorf("%w: %q is reserved", ErrHandleReserved, h)
+	case strings.HasPrefix(h, "_"):
+		return fmt.Errorf("%w: a handle cannot start with _, which is reserved for the engine's own paths", ErrHandleInvalid)
+	case len(h) < 3 || len(h) > 40:
+		return fmt.Errorf("%w: a handle is 3 to 40 characters", ErrHandleInvalid)
+	case h != strings.ToLower(h):
+		return fmt.Errorf("%w: a handle is lowercase only", ErrHandleInvalid)
+	case h[0] < 'a' || h[0] > 'z':
+		return fmt.Errorf("%w: a handle must start with a letter", ErrHandleInvalid)
+	case !handlePattern.MatchString(h):
+		return fmt.Errorf("%w: a handle is a-z, 0-9 and -, and does not end with a hyphen", ErrHandleInvalid)
 	}
 	return nil
 }

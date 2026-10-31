@@ -2,6 +2,7 @@ package tenant_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/pwgith/shadow-mock/internal/tenant"
@@ -21,7 +22,7 @@ func TestHandleRules(t *testing.T) {
 			t.Errorf("%q should be invalid, got %v", h, err)
 		}
 	}
-	for _, h := range []string{"www", "api", "admin", "app", "mail", "static"} {
+	for _, h := range []string{"www", "api", "admin", "app", "mail", "static", "d"} {
 		if err := tenant.ValidateHandle(h); !errors.Is(err, tenant.ErrHandleReserved) {
 			t.Errorf("%q should be reserved, got %v", h, err)
 		}
@@ -86,6 +87,24 @@ func TestStatusServes(t *testing.T) {
 	for s, want := range serves {
 		if s.Serves() != want {
 			t.Errorf("%q serves = %v, want %v", s, s.Serves(), want)
+		}
+	}
+}
+
+func TestHandleErrorsSayWhichRuleWasBroken(t *testing.T) {
+	t.Parallel()
+	tests := map[string]string{
+		"ab":      "3 to 40 characters",
+		"Acme":    "lowercase only",
+		"9lives":  "must start with a letter",
+		"__admin": "reserved for the engine",
+		"api":     "reserved",
+		"d":       "reserved",
+	}
+	for handle, want := range tests {
+		err := tenant.ValidateHandle(handle)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: %v, want it to say %q", handle, err, want)
 		}
 	}
 }

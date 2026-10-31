@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.6a @security @TA-9
+@managed @P5 @FR-9.6a @security @TA-9
 Feature: The JWT org must match the org in the path
   The JWT is the source of truth for identity, and the path must agree with
   it. A token for one org can never act on another.
@@ -37,4 +37,4 @@ Feature: The JWT org must match the org in the path
   Scenario: The check cannot be skipped by any admin endpoint
     Given I am "alice" in org "globex" with app role "admin"
     When I call every admin endpoint under "https://shadowmock.test/acme/__admin"
-    Then every response status is 403 or 404
+    Then every response status is 403 or 404, except the health check, which is open

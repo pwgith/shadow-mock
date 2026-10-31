@@ -63,6 +63,11 @@ func (i *Issuer) Token(c Claims) string {
 	return i.sign(map[string]any{"alg": "ES256", "kid": i.Kid, "typ": "JWT"}, claims)
 }
 
+// SignClaims signs exactly these claims and adds none, for a test that builds a whole token itself.
+func (i *Issuer) SignClaims(c Claims) string {
+	return i.sign(map[string]any{"alg": "ES256", "kid": i.Kid, "typ": "JWT"}, c)
+}
+
 // TokenFor signs a token for a person in an org with an app role.
 func (i *Issuer) TokenFor(sub, org, appRole string, extra Claims) string {
 	c := Claims{"sub": sub, "org_id": org, "app_role": appRole}

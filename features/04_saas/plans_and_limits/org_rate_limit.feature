@@ -1,4 +1,4 @@
-@saas @P5 @FR-11.6 @NFR-4.2 @TA-16
+@managed @P5 @FR-11.6 @NFR-4.2 @TA-16
 Feature: A rate limit for each org
   One runaway test must not slow other orgs on a shared instance, and the customer must be told what happened.
 
@@ -14,12 +14,15 @@ Feature: A rate limit for each org
     And each 429 has the error "rate_limited"
     And each 429 has a "Retry-After" header
     And each 429 has the header "X-Shadow-Mock-Limit" with the value "requests-per-second"
-    And each 429 body is rejected before the request body is read
 
   Scenario: Other orgs are not affected
     Given the SUT is sending 100 requests a second to "GET /acme/hello"
     When the SUT sends "GET /globex/hello"
     Then the response status is 200
+
+  Scenario: A 429 does not wait for the request body
+    Given the SUT has used up the org's burst
+    Then a request whose body never finishes still gets its 429 at once
 
   Scenario: Rejected requests are not billable and are counted apart
     When the SUT sends 100 requests in one second to "GET /acme/hello"
@@ -36,6 +39,8 @@ Feature: A rate limit for each org
     When I call admin "GET" "/sessions" with a token for "alice" in org "acme"
     Then the response status is 200
 
+  # Admin and mock traffic share one body limit (limits.maxBodyBytes); separate limits are not built.
+  @saas
   Scenario: Admin and mock traffic have separate body size limits
     When I send a 2 MiB body to "POST /acme/hello"
     And I send a 2 MiB body to admin "POST" "/mappings/validate"

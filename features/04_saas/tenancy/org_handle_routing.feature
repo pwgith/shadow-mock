@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.6 @FR-9.7
+@managed @P5 @FR-9.6 @FR-9.7
 Feature: Org handle routing
   Every SaaS engine URL starts with the org handle. The engine strips the
   segment before matching, and never routes one org's traffic to another.

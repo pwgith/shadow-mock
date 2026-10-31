@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.4 @FR-9.5
+@managed @P5 @FR-9.4 @FR-9.5
 Feature: Roles and permissions on the engine admin API
   Any org member with the editor role can create and manage any of the org's
   sessions. Viewers are read-only. Teams are never checked by the engine.
@@ -10,19 +10,19 @@ Feature: Roles and permissions on the engine admin API
 
   Scenario Outline: What each role can do with sessions
     Given I am "<user>" in org "acme" with role "<role>"
-    When I call admin "<method>" "<path>"
+    When I call admin "<method>" "<path>" with body "<body>"
     Then the response status is <status>
 
     Examples:
-      | user  | role       | method | path                         | status |
-      | alice | member     | GET    | /sessions                    | 200    |
-      | alice | member     | POST   | /sessions/key-based          | 201    |
-      | alice | member     | DELETE | /sessions/${S1.id}           | 200    |
-      | alice | member     | POST   | /sessions/${S1.id}/mappings  | 201    |
-      | carol | admin      | DELETE | /sessions/${S1.id}           | 200    |
-      | vic   | viewer     | GET    | /sessions/${S1.id}/requests  | 200    |
-      | vic   | viewer     | POST   | /sessions/key-based          | 403    |
-      | vic   | viewer     | POST   | /sessions/${S1.id}/mappings  | 403    |
+      | user  | role       | method | path                         | body | status |
+      | alice | member     | GET    | /sessions                    |  | 200 |
+      | alice | member     | POST   | /sessions/key-based          | {} | 201 |
+      | alice | member     | DELETE | /sessions/${S1.id}           |  | 200 |
+      | alice | member     | POST   | /sessions/${S1.id}/mappings  | a minimal mapping | 201 |
+      | carol | admin      | DELETE | /sessions/${S1.id}           |  | 200 |
+      | vic   | viewer     | GET    | /sessions/${S1.id}/requests  |  | 200 |
+      | vic   | viewer     | POST   | /sessions/key-based          | {} | 403 |
+      | vic   | viewer     | POST   | /sessions/${S1.id}/mappings  | a minimal mapping | 403 |
 
   Scenario: Sessions record who created them, including the label of a Tool app key
     Given I am the Tool app key "ci-tests" in org "acme"

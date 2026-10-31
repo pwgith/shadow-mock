@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pwgith/shadow-mock/internal/clock"
@@ -68,9 +69,10 @@ type KeyUse struct {
 
 // MemoryKeys is a KeyStore held in memory. The management app's database table replaces it.
 type MemoryKeys struct {
-	mu   sync.RWMutex
-	keys []APIKey
-	used map[[sha256.Size]byte]KeyUse
+	mu      sync.RWMutex
+	keys    []APIKey
+	used    map[[sha256.Size]byte]KeyUse
+	lookups atomic.Int64
 }
 
 var _ KeyStore = (*MemoryKeys)(nil)
@@ -102,6 +104,7 @@ func (m *MemoryKeys) Revoke(hash [sha256.Size]byte) {
 
 // Lookup compares the hash with every stored key, so the time taken does not say which was close.
 func (m *MemoryKeys) Lookup(_ context.Context, hash [sha256.Size]byte) (APIKey, bool) {
+	m.lookups.Add(1)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var found APIKey
@@ -113,6 +116,9 @@ func (m *MemoryKeys) Lookup(_ context.Context, hash [sha256.Size]byte) (APIKey, 
 	}
 	return found, ok
 }
+
+// Lookups is how many times a key has been looked up, for tests that check a credential is refused on sight.
+func (m *MemoryKeys) Lookups() int64 { return m.lookups.Load() }
 
 // Touch records a use, at most once a minute for each key.
 func (m *MemoryKeys) Touch(_ context.Context, hash [sha256.Size]byte, ip string, at time.Time) {

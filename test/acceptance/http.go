@@ -52,6 +52,8 @@ func (w *world) resolve(target string) (string, error) {
 	switch {
 	case strings.HasPrefix(target, "/"):
 		return w.srv.URL + target, nil
+	case strings.HasPrefix(target, "https://shadowmock.test"):
+		return w.srv.URL + strings.TrimPrefix(target, "https://shadowmock.test"), nil
 	case strings.HasPrefix(target, "http://localhost:8080"):
 		return w.srv.URL + strings.TrimPrefix(target, "http://localhost:8080"), nil
 	case w.tlsSrv != nil && strings.HasPrefix(target, "https://localhost:"+strconv.Itoa(w.tlsPort)):
@@ -132,6 +134,9 @@ func (w *world) send(r *request) (*reply, error) {
 
 // adminCall sends an admin request (relative to the configured admin prefix).
 func (w *world) adminCall(method, path, body string, header http.Header) (*reply, error) {
+	if w.m != nil {
+		return w.managedAdminCall(method, path, body, "", w.m.cred, header)
+	}
 	if err := w.ensure(); err != nil {
 		return nil, err
 	}
@@ -157,7 +162,13 @@ func (w *world) adminCall(method, path, body string, header http.Header) (*reply
 
 // mustAdmin sends an admin request and fails unless the status is one of want.
 func (w *world) mustAdmin(method, path, body string, want ...int) (*reply, error) {
-	rep, err := w.adminCall(method, path, body, nil)
+	var rep *reply
+	var err error
+	if w.m != nil {
+		rep, err = w.managedAdminCall(method, path, body, "", w.setupCred(w.m.defaultOrg), nil)
+	} else {
+		rep, err = w.adminCall(method, path, body, nil)
+	}
 	if err != nil {
 		return nil, err
 	}

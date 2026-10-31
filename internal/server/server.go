@@ -132,7 +132,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !isAdmin && !rt.admitMock(w, org, ip) {
 		return
 	}
-	ctx := tenant.With(r.Context(), org.ID)
+	ctx := tenant.With(auth.WithClientIP(r.Context(), ip), org.ID) // the key-usage record needs the resolved address
 	if isAdmin {
 		r2 := r.Clone(admin.WithBasePath(ctx, prefix))
 		setPath(r2.URL, adminPath)
@@ -504,6 +504,7 @@ func (rt *Router) withinOrgRate(w http.ResponseWriter, org *tenant.Org) bool {
 	if rt.Usage != nil {
 		rt.Usage.RateLimited(org.ID)
 	}
+	rt.Stats.RecordRateLimited(org.ID)
 	w.Header().Set("Retry-After", strconv.Itoa(seconds))
 	w.Header().Set(LimitHeader, "requests-per-second")
 	e := apierr.New(http.StatusTooManyRequests, apierr.RateLimited, "This org is over its limit of %g requests a second; try again in %d s.", lim.RequestsPerSecond, seconds)

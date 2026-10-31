@@ -2558,6 +2558,7 @@ components:
           properties:
             keyBased: { type: integer }
             urlBased: { type: integer }
+        rateLimited: { type: integer, description: Requests refused for being over the org's rate limit, apart from the ones served. }
         ipRejections:
           type: array
           items:

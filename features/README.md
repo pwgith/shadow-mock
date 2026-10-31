@@ -40,7 +40,8 @@ features/
 |---|---|
 | *(no mode tag)* | Runs in **both** modes. The harness runs it once as `@standalone` and once as `@saas` |
 | `@standalone` | Standalone or central-server mode only |
-| `@saas` | SaaS mode only |
+| `@saas` | Managed (hosted) mode, **not run yet**: the harness cannot run it, or the engine does not build what it describes. A comment above says which |
+| `@managed` | Managed mode, **run**: the engine is started with `mode: managed` on one instance, with the stores in memory, and the management app is played by the scenario (`test/acceptance/managed*.go`) |
 | `@central-server` | Standalone binary deployed as a shared server |
 | `@management-app` | Exercised through the management app (UI or its API), not the engine directly |
 | `@wiremock` | WireMock parity behaviour |
@@ -187,7 +188,7 @@ root directory and test clock, and drives it over HTTP. It runs what the engine 
 |---|---|
 | `@saas`, `@multi-instance` | SaaS needs the Postgres, Redis and Clerk work in P5 |
 | `@P4` | The central server (DESIGN.md §15) |
-| `@P5` | The hosted service, not run here (DESIGN.md §15) |
+| `@P5` | The hosted service (DESIGN.md §15). It runs when the scenario is also `@managed`, and is excluded by `@saas` |
 | `@perf` | Runs in the benchmark pipeline |
 | `@wip` | Not runnable yet. The comment above each tag says what is missing: a TLS listener in the harness, the audit log, detection metrics, a counting store wrapper, the blob store, key redaction, the Docker image, a WireMock Java client, and a separate process to measure memory |
 

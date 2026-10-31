@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.6
+@managed @P5 @FR-9.6
 Feature: Immutable handles and aliases
   The handle is Shadow Mock's own identifier for the org. It is unaffected by
   platform slug renames. A changed handle keeps the old one as a permanent alias.
@@ -27,7 +27,7 @@ Feature: Immutable handles and aliases
   Scenario: An alias cannot be claimed by another org
     Given the org admin changed the handle of "org_123" to "acme-insurance"
     When another org tries to take the handle "acme"
-    Then the change is rejected with "handle unavailable"
+    Then the change is rejected with "handle_taken"
 
   Scenario: Admin calls through an alias pass the org-match check
     Given the org admin changed the handle of "org_123" to "acme-insurance"
