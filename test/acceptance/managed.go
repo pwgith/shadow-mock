@@ -125,7 +125,7 @@ func (w *world) reconfigureManaged() error {
 	if w.app == nil {
 		return nil
 	}
-	if err = w.stop(); err != nil {
+	if err := w.stop(); err != nil {
 		return err
 	}
 	return w.startWithReplay()
@@ -135,9 +135,6 @@ func (w *world) reconfigureManaged() error {
 func (m *managedWorld) serveJWKS(rw http.ResponseWriter, _ *http.Request) {
 	m.jwksMu.Lock()
 	defer m.jwksMu.Unlock()
-	type jwk struct {
-		Kty, Crv, Kid, Alg, Use, X, Y string
-	}
 	set := struct {
 		Keys []map[string]string `json:"keys"`
 	}{}
@@ -273,26 +270,6 @@ func (w *world) presentToken(sp tokenSpec) error {
 	return nil
 }
 
-// presentKey makes a Tool app key the scenario's credential.
-func (w *world) presentKey(label string) error {
-	m, err := w.mgd()
-	if err != nil {
-		return err
-	}
-	rec := ""
-	if err = w.ensure(); err != nil {
-		return err
-	}
-	m.cred = &credential{org: rec, bearer: func() (string, error) {
-		k, ok := m.keys[label]
-		if !ok {
-			return "", fmt.Errorf("no Tool app key %q has been created", label)
-		}
-		return k, nil
-	}}
-	return nil
-}
-
 // adminURL is the admin URL of an org (by its name here, resolved to its handle).
 func (m *managedWorld) adminURL(w *world, org, path string) (string, error) {
 	o, err := m.org(org)
@@ -306,13 +283,13 @@ func (m *managedWorld) adminURL(w *world, org, path string) (string, error) {
 func (w *world) adminPrefixOnly() string { return w.adminPrefix() }
 
 // managedAdminCall sends an admin request to an org with a credential.
-func (w *world) managedAdminCall(method, path, body string, org string, cred *credential, header http.Header) (*reply, error) {
+func (w *world) managedAdminCall(method, path, body, org string, cred *credential, header http.Header) (*reply, error) {
 	m, err := w.mgd()
 	if err != nil {
 		return nil, err
 	}
-	if err = w.ensure(); err != nil {
-		return nil, err
+	if ensureErr := w.ensure(); ensureErr != nil {
+		return nil, ensureErr
 	}
 	seg := "" // the handle in the URL, when the step gave a whole URL
 	if mm := fullAdminURL.FindStringSubmatch(path); mm != nil {
@@ -390,6 +367,8 @@ func (w *world) initManaged(sc *godog.ScenarioContext) {
 	w.initManagedKeys(sc)
 	w.initManagedTenancy(sc)
 	w.initManagedLayers(sc)
+	w.initManagedLimits(sc)
+	w.initManagedLimits2(sc)
 }
 
 // eventually runs check until it passes or the time is up, waiting in real time between tries. It returns the last

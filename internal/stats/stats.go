@@ -25,10 +25,11 @@ type Event struct {
 
 // Tracker records events in memory.
 type Tracker struct {
-	keep   time.Duration
-	mu     sync.Mutex
-	events map[tenant.ID][]Event
-	ipRej  map[tenant.ID]map[string]int
+	keep    time.Duration
+	mu      sync.Mutex
+	events  map[tenant.ID][]Event
+	ipRej   map[tenant.ID]map[string]int
+	rateLim map[tenant.ID]int
 }
 
 // New returns an empty tracker.
@@ -36,7 +37,7 @@ func New() *Tracker { return NewKeeping(defaultKeep) }
 
 // NewKeeping returns a tracker that holds events for d, which the history endpoint can reach back over.
 func NewKeeping(d time.Duration) *Tracker {
-	return &Tracker{keep: max(d, defaultKeep), events: map[tenant.ID][]Event{}, ipRej: map[tenant.ID]map[string]int{}}
+	return &Tracker{keep: max(d, defaultKeep), events: map[tenant.ID][]Event{}, ipRej: map[tenant.ID]map[string]int{}, rateLim: map[tenant.ID]int{}}
 }
 
 // Record adds an event and drops history older than an hour.
@@ -58,6 +59,7 @@ func (t *Tracker) Forget(org tenant.ID) {
 	defer t.mu.Unlock()
 	delete(t.events, org)
 	delete(t.ipRej, org)
+	delete(t.rateLim, org)
 }
 
 // RecordIPRejection counts a request refused by the IP allowlist.
@@ -68,6 +70,13 @@ func (t *Tracker) RecordIPRejection(org tenant.ID, ip string) {
 		t.ipRej[org] = map[string]int{}
 	}
 	t.ipRej[org][ip]++
+}
+
+// RecordRateLimited counts a request refused because the org was over its rate limit.
+func (t *Tracker) RecordRateLimited(org tenant.ID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.rateLim[org]++
 }
 
 // Minute is a per-minute, per-layer count.
@@ -112,6 +121,8 @@ type Live struct {
 	DetectionHits     map[string]int `json:"detectionHits"`
 	ActiveSessions    ActiveSessions `json:"activeSessions"`
 	IPRejections      []IPCount      `json:"ipRejections"`
+	// RateLimited counts the requests refused for being over the org's rate limit, apart from the ones served.
+	RateLimited int `json:"rateLimited"`
 }
 
 // Live summarises the org's events in the window ending at now.
@@ -124,7 +135,9 @@ func (t *Tracker) Live(org tenant.ID, window string, d time.Duration, now time.T
 			evs = append(evs, e)
 		}
 	}
-	return summarise(evs, window, active, t.ipRej[org])
+	out := summarise(evs, window, active, t.ipRej[org])
+	out.RateLimited = t.rateLim[org]
+	return out
 }
 
 // Point is the stats of one step of a range.

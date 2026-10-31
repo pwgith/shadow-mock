@@ -1,6 +1,7 @@
 package acceptance
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -42,7 +43,7 @@ func (w *world) initManagedKeys(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		real, err := secretOf("ci-tests")
+		genuine, err := secretOf("ci-tests")
 		if err != nil {
 			return err
 		}
@@ -50,14 +51,14 @@ func (w *world) initManagedKeys(sc *godog.ScenarioContext) {
 		case "made up":
 			testKey = authtest.RandomKey()
 		case "the right id and a wrong secret":
-			id := strings.SplitN(real, "_", 3)[1]
+			id := strings.SplitN(genuine, "_", 3)[1]
 			testKey = "smt_" + id + "_" + strings.SplitN(authtest.RandomKey(), "_", 3)[2]
 		case "expired":
 			testKey, _ = authtest.NewKeyWith(w.app.Keys(), tenant.ID(m.defaultOrg), "expired", w.clk.Now().Add(-time.Hour), "sessions", "read")
 		default: // revoked longer than a minute ago
-			w.app.Keys().Revoke(auth.HashKey(real))
+			w.app.Keys().Revoke(auth.HashKey(genuine))
 			w.clk.advance(2 * time.Minute)
-			testKey = real
+			testKey = genuine
 		}
 		return nil
 	})
@@ -109,7 +110,7 @@ func (w *world) initManagedKeys(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		if first.status != unknown.status || string(first.body) != string(unknown.body) {
+		if first.status != unknown.status || !bytes.Equal(first.body, unknown.body) {
 			return fmt.Errorf("a wrong secret is told apart from an unknown key: %d %s against %d %s", first.status, truncate(first.body), unknown.status, truncate(unknown.body))
 		}
 		return nil

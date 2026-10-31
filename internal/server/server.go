@@ -504,6 +504,7 @@ func (rt *Router) withinOrgRate(w http.ResponseWriter, org *tenant.Org) bool {
 	if rt.Usage != nil {
 		rt.Usage.RateLimited(org.ID)
 	}
+	rt.Stats.RecordRateLimited(org.ID)
 	w.Header().Set("Retry-After", strconv.Itoa(seconds))
 	w.Header().Set(LimitHeader, "requests-per-second")
 	e := apierr.New(http.StatusTooManyRequests, apierr.RateLimited, "This org is over its limit of %g requests a second; try again in %d s.", lim.RequestsPerSecond, seconds)

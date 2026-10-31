@@ -28,17 +28,14 @@ func (w *world) setupCred(org string) *credential {
 }
 
 // putGlobalMapping writes a mapping into an org's global layer, as the management app does.
-func (w *world) putGlobalMapping(org, name, method, url, body string, metadata map[string]any) error {
+func (w *world) putGlobalMapping(org, name, method, url, body string) error {
 	return w.record(func() error {
 		h := fnv.New64a()
-		_, _ = h.Write([]byte(org + "/" + name)) //nolint:errcheck // a hash never fails
+		_, _ = h.Write([]byte(org + "/" + name))
 		doc := map[string]any{
 			"id": fmt.Sprintf("00000000-0000-4000-8000-%012x", h.Sum64()&0xffffffffffff), "name": name,
 			"request":  map[string]any{"method": method, "url": url},
 			"response": map[string]any{"status": 200, "body": body},
-		}
-		if metadata != nil {
-			doc["metadata"] = metadata
 		}
 		raw, err := json.Marshal(doc)
 		if err != nil {
@@ -132,7 +129,7 @@ func (w *world) initManagedOrg(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		return w.putGlobalMapping(m.defaultOrg, name, method, url, name, nil)
+		return w.putGlobalMapping(m.defaultOrg, name, method, url, name)
 	})
 	sc.Step(`^a mapping "([^"]*)" in the global layer for "([A-Z]+) ([^"]*)" in both orgs$`, func(name, method, url string) error {
 		m, err := w.mgd()
@@ -140,8 +137,8 @@ func (w *world) initManagedOrg(sc *godog.ScenarioContext) {
 			return err
 		}
 		for org := range m.orgs {
-			if err = w.putGlobalMapping(org, name, method, url, name, nil); err != nil {
-				return err
+			if putErr := w.putGlobalMapping(org, name, method, url, name); putErr != nil {
+				return putErr
 			}
 		}
 		return nil
@@ -151,7 +148,7 @@ func (w *world) initManagedOrg(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		return w.putGlobalMapping(m.defaultOrg, name, "GET", "/"+name, body, nil)
+		return w.putGlobalMapping(m.defaultOrg, name, "GET", "/"+name, body)
 	})
 	sc.Step(`^org "([^"]*)" has the global mapping:$`, func(org string, doc *godog.DocString) error {
 		return w.record(func() error { return w.putGlobalMappingJSON(org, []byte(doc.Content)) })
@@ -331,8 +328,8 @@ func (w *world) removeBySource(org, src string) error {
 	}
 	for _, sm := range list {
 		if s, _ := sm.Metadata["source"].(string); s == src { //nolint:errcheck // a label of another type is no label
-			if err = svc.Mappings.Delete(ctxBackground(), scope, sm.ID); err != nil {
-				return err
+			if delErr := svc.Mappings.Delete(ctxBackground(), scope, sm.ID); delErr != nil {
+				return delErr
 			}
 		}
 	}

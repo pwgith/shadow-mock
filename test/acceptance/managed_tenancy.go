@@ -209,9 +209,9 @@ func (w *world) initManagedTenancy(sc *godog.ScenarioContext) {
 			return err
 		}
 		// Writing the org again, without its aliases, is the nearest thing to removing one.
-		o, _ := w.app.Directory().ByID(tenant.ID(m.defaultOrg)) //nolint:errcheck // the org exists
-		if err = w.app.Directory().Put(tenant.Org{ID: o.ID, Handle: o.Handle}); err != nil {
-			return err
+		o, _ := w.app.Directory().ByID(tenant.ID(m.defaultOrg))
+		if putErr := w.app.Directory().Put(tenant.Org{ID: o.ID, Handle: o.Handle}); putErr != nil {
+			return putErr
 		}
 		if _, ok := w.app.Directory().Lookup("acme"); !ok {
 			return fmt.Errorf("the alias no longer resolves")
@@ -223,7 +223,7 @@ func (w *world) initManagedTenancy(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		return w.putGlobalMapping(m.defaultOrg, name, method, url, body, nil)
+		return w.putGlobalMapping(m.defaultOrg, name, method, url, body)
 	})
 	sc.Step(`^I request "([^"]*)"$`, func(path string) error { _, err := w.send(newRequest("GET", path)); return err })
 	sc.Step(`^the response is not "([^"]*)"$`, func(not string) error {
@@ -270,7 +270,7 @@ func (w *world) initManagedTenancy(sc *godog.ScenarioContext) {
 		if err := w.addOrg(name, handle, "Team", 0, 0); err != nil {
 			return err
 		}
-		return w.putGlobalMapping(name, "from-"+name, method, url, name, nil)
+		return w.putGlobalMapping(name, "from-"+name, method, url, name)
 	})
 	sc.Step(`^no restart, DNS change or certificate was needed$`, func() error { return nil })
 
@@ -321,8 +321,8 @@ func (w *world) initManagedTenancy(sc *godog.ScenarioContext) {
 			if err != nil {
 				return err
 			}
-			if err = w.noteSession(name, rep); err != nil {
-				return err
+			if noteErr := w.noteSession(name, rep); noteErr != nil {
+				return noteErr
 			}
 			rep, err = w.managedAdminCall("POST", "/sessions/"+w.vars[name+".id"]+"/mappings", doc.Content, org, w.setupCred(org), nil)
 			if err != nil {

@@ -109,8 +109,8 @@ func (w *world) initManagedAuth(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		if err = w.ensure(); err != nil {
-			return err
+		if ensureErr := w.ensure(); ensureErr != nil {
+			return ensureErr
 		}
 		// Make the engine read the key set once, so that the new key is a rotation and not the first read.
 		if _, err = w.managedAdminCall("GET", "/sessions", "", m.defaultOrg, &credential{bearer: func() (string, error) {
@@ -171,8 +171,8 @@ func (w *world) initManagedAuth(sc *godog.ScenarioContext) {
 		}
 		sp := w.tokenOf("alice", m.defaultOrg, "member")
 		for _, row := range t.Rows[1:] {
-			if err = claimChange(&sp, w.sub(row.Cells[0].Value), w.sub(row.Cells[1].Value)); err != nil {
-				return err
+			if claimErr := claimChange(&sp, w.sub(row.Cells[0].Value), w.sub(row.Cells[1].Value)); claimErr != nil {
+				return claimErr
 			}
 		}
 		return w.presentToken(sp)
@@ -183,8 +183,8 @@ func (w *world) initManagedAuth(sc *godog.ScenarioContext) {
 			return err
 		}
 		if _, ok := m.keys[label]; !ok {
-			if err = w.addKey(label, org, []string{"sessions", "read"}); err != nil {
-				return err
+			if keyErr := w.addKey(label, org, []string{"sessions", "read"}); keyErr != nil {
+				return keyErr
 			}
 		}
 		c := m.keyCred(label)
@@ -292,7 +292,7 @@ func (w *world) initManagedAuth(sc *godog.ScenarioContext) {
 		}
 		var doc map[string]any
 		if json.Unmarshal(w.last.body, &doc) != nil {
-			return nil // not a document with lists
+			return nil //nolint:nilerr // not a document with lists, so it has none
 		}
 		for _, k := range []string{"mappings", "sessions", "requests"} {
 			if _, ok := doc[k]; ok {
@@ -304,7 +304,7 @@ func (w *world) initManagedAuth(sc *godog.ScenarioContext) {
 	sc.Step(`^the response JSON at "([^"]*)" is not "([^"]*)"$`, func(path, not string) error {
 		got, found, err := w.jsonOne(path)
 		if err != nil {
-			return nil // a body that is not a JSON document has nothing at the path, so it is not that value
+			return nil //nolint:nilerr // a body that is not a JSON document has nothing at the path, so it is not that value
 		}
 		if found && text(got) == not {
 			return fmt.Errorf("%s is %q, want anything else", path, got)

@@ -1,6 +1,7 @@
 package acceptance
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -28,7 +29,7 @@ func (w *world) writeLayerMapping(lm layerMapping) error {
 	}
 	return w.record(func() error {
 		h := fnv.New64a()
-		_, _ = h.Write([]byte(m.defaultOrg + "/" + lm.name)) //nolint:errcheck // a hash never fails
+		_, _ = h.Write([]byte(m.defaultOrg + "/" + lm.name))
 		doc := map[string]any{
 			"id": fmt.Sprintf("00000000-0000-4000-8000-%012x", h.Sum64()&0xffffffffffff), "name": lm.name,
 			"request":  map[string]any{"method": lm.method, "url": lm.url},
@@ -101,7 +102,7 @@ func (w *world) initManagedLayers(sc *godog.ScenarioContext) {
 			return err
 		}
 		h := fnv.New64a()
-		_, _ = h.Write([]byte(m.defaultOrg + "/" + name)) //nolint:errcheck // a hash never fails
+		_, _ = h.Write([]byte(m.defaultOrg + "/" + name))
 		_, err = w.managedAdminCall("GET", fmt.Sprintf("/mappings/00000000-0000-4000-8000-%012x", h.Sum64()&0xffffffffffff), "", "", w.setupCred(m.defaultOrg), nil)
 		return err
 	})
@@ -114,7 +115,7 @@ func (w *world) initManagedLayers(sc *godog.ScenarioContext) {
 		}
 		want, _ := json.Marshal(w.m.lastMetadata) //nolint:errcheck // plain values
 		have, _ := json.Marshal(got.Metadata)     //nolint:errcheck // plain values
-		if string(want) != string(have) {
+		if !bytes.Equal(want, have) {
 			return fmt.Errorf("metadata is %s, want %s", have, want)
 		}
 		return nil
@@ -225,8 +226,8 @@ func (w *world) initManagedLayers(sc *godog.ScenarioContext) {
 			if err != nil {
 				return err
 			}
-			if err = w.noteSession(name, rep); err != nil {
-				return err
+			if noteErr := w.noteSession(name, rep); noteErr != nil {
+				return noteErr
 			}
 			doc := fmt.Sprintf(`{"request":{"method":%q,"url":%q},"response":{"status":200,"body":"shadow"}}`, method, url)
 			rep, err = w.managedAdminCall("POST", "/sessions/"+w.vars[name+".id"]+"/mappings", doc, "", w.setupCred(m.defaultOrg), nil)
