@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/pwgith/shadow-mock/internal/counter"
-	"github.com/pwgith/shadow-mock/internal/counter/countertest"
+	"github.com/pwgith/shadow-mock/internal/countertest"
 )
 
 func TestMemoryPassesTheSuite(t *testing.T) {

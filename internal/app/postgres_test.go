@@ -51,9 +51,7 @@ func TestManagedModeOnPostgresRedisAndObjectStorage(t *testing.T) {
 	if err := backend.CreateBucket("mocks"); err != nil {
 		t.Fatal(err)
 	}
-	// The engine here runs on a fake clock, and the fake rejects requests more than 15 minutes from real time, as a
-	// real store does. The engine runs on the real clock in production.
-	objects := httptest.NewServer(gofakes3.New(backend, gofakes3.WithTimeSkewLimit(0)).Server())
+	objects := httptest.NewServer(gofakes3.New(backend).Server())
 	t.Cleanup(objects.Close)
 	mr := miniredis.RunT(t)
 
@@ -95,7 +93,9 @@ func TestManagedModeOnPostgresRedisAndObjectStorage(t *testing.T) {
 		}
 	}
 
-	clk := clock.NewFake(epoch)
+	// The real clock: the object store rejects requests that are signed with a time far from its own, as a real
+	// store does, so the engine must not run on a fake one here.
+	clk := clock.Real{}
 	issuer := authtest.NewIssuer("management-app", "https://shadowmock.example", "mocks-test", clk)
 	m := newManagedWith(t, clk, issuer, func(c *config.Config) {
 		c.Storage.Global.Driver = "postgres"

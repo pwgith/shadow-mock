@@ -35,7 +35,7 @@ func newManaged(t *testing.T, change func(*config.Config)) *managed {
 }
 
 // newManagedWith starts an engine that trusts the issuer, so that two engines can trust the same one.
-func newManagedWith(t *testing.T, clk *clock.Fake, issuer *authtest.Issuer, change func(*config.Config)) *managed {
+func newManagedWith(t *testing.T, clk clock.Clock, issuer *authtest.Issuer, change func(*config.Config)) *managed {
 	t.Helper()
 	cfg := config.Default()
 	cfg.Mode, cfg.Root = "managed", t.TempDir()
@@ -56,7 +56,8 @@ func newManagedWith(t *testing.T, clk *clock.Fake, issuer *authtest.Issuer, chan
 	}
 	srv := httptest.NewServer(a.Handler())
 	t.Cleanup(srv.Close)
-	return &managed{t: t, app: a, srv: srv, issuer: issuer, clk: clk}
+	fake, _ := clk.(*clock.Fake) //nolint:errcheck // nil for a real clock, which tests do not advance
+	return &managed{t: t, app: a, srv: srv, issuer: issuer, clk: fake}
 }
 
 func (m *managed) org(handle string) {

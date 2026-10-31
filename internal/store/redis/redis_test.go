@@ -9,7 +9,7 @@ import (
 
 	"github.com/pwgith/shadow-mock/internal/clock"
 	"github.com/pwgith/shadow-mock/internal/counter"
-	"github.com/pwgith/shadow-mock/internal/counter/countertest"
+	"github.com/pwgith/shadow-mock/internal/countertest"
 	"github.com/pwgith/shadow-mock/internal/store"
 	"github.com/pwgith/shadow-mock/internal/store/redis"
 )
