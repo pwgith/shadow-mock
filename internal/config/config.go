@@ -63,7 +63,7 @@ type Driver struct {
 
 // GlobalStorage selects the global mapping backend.
 type GlobalStorage struct {
-	Driver string `yaml:"driver"` // fs | memory
+	Driver string `yaml:"driver"` // fs | memory | postgres (managed mode)
 	Watch  bool   `yaml:"watch"`
 	// FilenameTemplate names the files mappings are written to, as a template over id, name,
 	// method and url (WireMock's --filename-template). Empty means the name, or the method and URL,
@@ -89,6 +89,7 @@ type Journal struct {
 type Blobs struct {
 	Driver string `yaml:"driver"` // fs | memory | s3
 	Dir    string `yaml:"dir"`
+	S3     S3     `yaml:"s3"`
 }
 
 // Storage selects backends per concern.
@@ -98,6 +99,8 @@ type Storage struct {
 	Journal  Journal       `yaml:"journal"`
 	Counters Driver        `yaml:"counters"` // memory | redis
 	Blobs    Blobs         `yaml:"blobs"`
+	Postgres Postgres      `yaml:"postgres"`
+	Redis    Redis         `yaml:"redis"`
 }
 
 // Respond controls responses.
@@ -333,6 +336,8 @@ func Default() Config {
 			Journal:  Journal{Hot: HotJournal{Driver: "memory", MaxEntries: 10000, MaxBytes: 512 << 20}, Warm: Driver{Driver: "none"}},
 			Counters: Driver{Driver: "memory"},
 			Blobs:    Blobs{Driver: "fs", Dir: "./blobs"},
+			Postgres: Postgres{Migrate: true, PollInterval: Duration(defaultPollInterval)},
+			Redis:    Redis{Prefix: "sm:"},
 		},
 		Respond:  Respond{Gzip: "auto"},
 		Mappings: Mappings{UnknownFields: "reject"},
@@ -518,18 +523,19 @@ func (c *Config) Validate() error {
 	checks := []error{
 		oneOf("mode", c.Mode, "standalone", "server", "managed"),
 		oneOf("admin.globalWrites", c.Admin.GlobalWrites, "allow", "deny"),
-		oneOf("storage.global.driver", c.Storage.Global.Driver, "fs", "memory"),
+		oneOf("storage.global.driver", c.Storage.Global.Driver, "fs", "memory", "postgres"),
 		oneOf("storage.sessions.driver", c.Storage.Sessions.Driver, "memory", "fs"),
 		oneOf("storage.journal.hot.driver", c.Storage.Journal.Hot.Driver, "memory"),
 		oneOf("storage.journal.warm.driver", c.Storage.Journal.Warm.Driver, "none"),
-		oneOf("storage.counters.driver", c.Storage.Counters.Driver, "memory"),
-		oneOf("storage.blobs.driver", c.Storage.Blobs.Driver, "fs", "memory"),
+		oneOf("storage.counters.driver", c.Storage.Counters.Driver, "memory", "redis"),
+		oneOf("storage.blobs.driver", c.Storage.Blobs.Driver, "fs", "memory", "s3"),
 		oneOf("auth.driver", c.Auth.Driver, "noop", "token", "basic"),
 		oneOf("tenancy.directory", c.Tenancy.Directory, "static"),
 		oneOf("respond.gzip", c.Respond.Gzip, "auto", "off"),
 		oneOf("mappings.unknownFields", c.Mappings.UnknownFields, "reject", "keep"),
 		oneOf("sessions.detect.ambiguity", c.Sessions.Detect.Ambiguity, "first", "reject", "global"),
 		c.validateAuth(),
+		c.validateShared(),
 		c.validateTLS(),
 		c.Proxy.Browser.validate(c.Proxy.Via),
 		c.validateExtensions(),

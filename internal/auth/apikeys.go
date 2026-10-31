@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"regexp"
@@ -54,9 +55,9 @@ func (k APIKey) Has(scope string) bool {
 // KeyStore finds Tool app keys by the hash of the whole key.
 type KeyStore interface {
 	// Lookup returns the key with the hash, comparing in constant time.
-	Lookup(hash [sha256.Size]byte) (APIKey, bool)
+	Lookup(ctx context.Context, hash [sha256.Size]byte) (APIKey, bool)
 	// Touch records that a key was used, from a source address.
-	Touch(hash [sha256.Size]byte, ip string, at time.Time)
+	Touch(ctx context.Context, hash [sha256.Size]byte, ip string, at time.Time)
 }
 
 // KeyUse is when and from where a key was last used.
@@ -100,7 +101,7 @@ func (m *MemoryKeys) Revoke(hash [sha256.Size]byte) {
 }
 
 // Lookup compares the hash with every stored key, so the time taken does not say which was close.
-func (m *MemoryKeys) Lookup(hash [sha256.Size]byte) (APIKey, bool) {
+func (m *MemoryKeys) Lookup(_ context.Context, hash [sha256.Size]byte) (APIKey, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var found APIKey
@@ -114,7 +115,7 @@ func (m *MemoryKeys) Lookup(hash [sha256.Size]byte) (APIKey, bool) {
 }
 
 // Touch records a use, at most once a minute for each key.
-func (m *MemoryKeys) Touch(hash [sha256.Size]byte, ip string, at time.Time) {
+func (m *MemoryKeys) Touch(_ context.Context, hash [sha256.Size]byte, ip string, at time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if last, ok := m.used[hash]; ok && at.Sub(last.At) < usageGap {
@@ -151,7 +152,7 @@ type cacheEntry struct {
 const maxCachedKeys = 4096
 
 // Lookup answers from the cache for up to keyCacheTTL, so a revoked key stops within a minute.
-func (c *cachedKeys) Lookup(hash [sha256.Size]byte) (APIKey, bool) {
+func (c *cachedKeys) Lookup(ctx context.Context, hash [sha256.Size]byte) (APIKey, bool) {
 	now := c.clk.Now()
 	c.mu.Lock()
 	if e, ok := c.cache[hash]; ok && now.Sub(e.at) < keyCacheTTL {
@@ -159,7 +160,7 @@ func (c *cachedKeys) Lookup(hash [sha256.Size]byte) (APIKey, bool) {
 		return e.key, e.found
 	}
 	c.mu.Unlock()
-	k, ok := c.inner.Lookup(hash)
+	k, ok := c.inner.Lookup(ctx, hash)
 	c.mu.Lock()
 	if len(c.cache) >= maxCachedKeys {
 		clear(c.cache)
@@ -170,6 +171,6 @@ func (c *cachedKeys) Lookup(hash [sha256.Size]byte) (APIKey, bool) {
 }
 
 // Touch passes the use on to the store.
-func (c *cachedKeys) Touch(hash [sha256.Size]byte, ip string, at time.Time) {
-	c.inner.Touch(hash, ip, at)
+func (c *cachedKeys) Touch(ctx context.Context, hash [sha256.Size]byte, ip string, at time.Time) {
+	c.inner.Touch(ctx, hash, ip, at)
 }

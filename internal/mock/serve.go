@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
+	"github.com/pwgith/shadow-mock/internal/blob"
 	"github.com/pwgith/shadow-mock/internal/counter"
 	"github.com/pwgith/shadow-mock/internal/detect"
 	"github.com/pwgith/shadow-mock/internal/engine"
@@ -246,7 +247,14 @@ func (s *Service) fail(w http.ResponseWriter, sv *served, req *match.Request, er
 		sv.entry.Request = req
 	}
 	var ae *apierr.Error
-	if !errors.As(err, &ae) {
+	switch {
+	case errors.As(err, &ae):
+	case errors.Is(err, blob.ErrUnavailable):
+		// A file that is not cached while the object store is down: say why, so that a client can retry (FR-11.14).
+		s.Logger.Error("object store unavailable", "error", err.Error())
+		ae = apierr.New(http.StatusServiceUnavailable, apierr.ObjectStoreUnavailable, "A file this response needs is stored where the engine cannot reach it at the moment.")
+		w.Header().Set(apierr.ReasonHeader, string(apierr.ObjectStoreUnavailable))
+	default:
 		s.Logger.Error("mock request failed", "error", err.Error())
 		ae = apierr.New(http.StatusInternalServerError, "internal_error", "The engine could not serve this request.")
 	}

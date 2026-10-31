@@ -4,6 +4,7 @@
 package audit
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -29,17 +30,29 @@ type Entry struct {
 	Status  int       `json:"status"`
 }
 
-// Trail is the audit trail.
+// Store is where audit entries are kept: Trail in memory, or a database that outlives the instance.
+type Store interface {
+	// Record adds an entry.
+	Record(ctx context.Context, e Entry)
+	// List returns the org's entries, newest first.
+	List(ctx context.Context, org tenant.ID) []Entry
+	// Anonymise replaces a person's identity in the org's entries and returns how many it changed.
+	Anonymise(ctx context.Context, org tenant.ID, person string) int
+}
+
+// Trail is the audit trail in memory.
 type Trail struct {
 	mu      sync.Mutex
 	entries []Entry
 }
 
+var _ Store = (*Trail)(nil)
+
 // New returns an empty trail.
 func New() *Trail { return &Trail{} }
 
 // Record adds an entry.
-func (t *Trail) Record(e Entry) {
+func (t *Trail) Record(_ context.Context, e Entry) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.entries = append(t.entries, e)
@@ -49,7 +62,7 @@ func (t *Trail) Record(e Entry) {
 }
 
 // List returns the org's entries, newest first.
-func (t *Trail) List(org tenant.ID) []Entry {
+func (t *Trail) List(_ context.Context, org tenant.ID) []Entry {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	out := []Entry{}
@@ -62,7 +75,7 @@ func (t *Trail) List(org tenant.ID) []Entry {
 }
 
 // Anonymise replaces a person's identity in the org's entries and returns how many it changed.
-func (t *Trail) Anonymise(org tenant.ID, person string) int {
+func (t *Trail) Anonymise(_ context.Context, org tenant.ID, person string) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	n := 0

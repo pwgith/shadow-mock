@@ -31,7 +31,12 @@ type managed struct {
 func newManaged(t *testing.T, change func(*config.Config)) *managed {
 	t.Helper()
 	clk := clock.NewFake(epoch)
-	issuer := authtest.NewIssuer("management-app", "https://shadowmock.example", "mocks-test", clk)
+	return newManagedWith(t, clk, authtest.NewIssuer("management-app", "https://shadowmock.example", "mocks-test", clk), change)
+}
+
+// newManagedWith starts an engine that trusts the issuer, so that two engines can trust the same one.
+func newManagedWith(t *testing.T, clk *clock.Fake, issuer *authtest.Issuer, change func(*config.Config)) *managed {
+	t.Helper()
 	cfg := config.Default()
 	cfg.Mode, cfg.Root = "managed", t.TempDir()
 	cfg.Storage.Global.Watch = false
@@ -382,7 +387,7 @@ func TestPurgeAnonymiseAndAudit(t *testing.T) {
 		t.Errorf("a key must not purge: %d", code)
 	}
 	var made, refused int
-	for _, e := range m.app.Audit().List("acme") {
+	for _, e := range m.app.Audit().List(t.Context(), "acme") {
 		switch {
 		case e.Subject == "dana" && e.Status == 201:
 			made++
@@ -401,7 +406,7 @@ func TestPurgeAnonymiseAndAudit(t *testing.T) {
 	if code != 200 || !strings.Contains(body, `"sessions":2`) || !strings.Contains(body, `"auditEntries":3`) {
 		t.Errorf("anonymise: %d %s", code, body)
 	}
-	for _, e := range m.app.Audit().List("acme") {
+	for _, e := range m.app.Audit().List(t.Context(), "acme") {
 		if e.Subject == "dana" {
 			t.Errorf("an entry still names dana: %+v", e)
 		}
@@ -498,4 +503,15 @@ func TestManagedModeStartsOnlyWhenSafe(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newApp builds an engine from a configuration and returns the error, for tests of a start that should fail.
+func newApp(t *testing.T, cfg config.Config) (*app.App, error) {
+	t.Helper()
+	a, err := app.New(cfg, app.Options{Logger: slog.New(slog.DiscardHandler), Clock: clock.Real{}, Version: "test"})
+	if err != nil {
+		return nil, err
+	}
+	t.Cleanup(func() { _ = a.Close() })
+	return a, nil
 }

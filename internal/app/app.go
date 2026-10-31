@@ -26,7 +26,6 @@ import (
 	"github.com/pwgith/shadow-mock/internal/browserproxy"
 	"github.com/pwgith/shadow-mock/internal/clock"
 	"github.com/pwgith/shadow-mock/internal/config"
-	"github.com/pwgith/shadow-mock/internal/counter"
 	"github.com/pwgith/shadow-mock/internal/detect"
 	"github.com/pwgith/shadow-mock/internal/egress"
 	"github.com/pwgith/shadow-mock/internal/engine"
@@ -79,6 +78,12 @@ type App struct {
 	globalFS  *fs.Mappings
 	sessions  *fs.SessionStore
 	closers   []func() error
+	log       *slog.Logger
+
+	// Managed mode: the shared stores (Postgres, Redis, object storage) when the configuration names them;
+	// otherwise the state is in memory, on one instance.
+	sh    shared
+	audit audit.Store
 
 	// Managed mode: the directory of orgs, the Tool app keys, the audit trail and the usage meter (FR-11).
 	directory *tenant.Memory
@@ -92,7 +97,10 @@ func New(cfg config.Config, o Options) (*App, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	a := &App{cfg: cfg}
+	a := &App{cfg: cfg, log: o.Logger}
+	if err := a.openShared(cfg, o); err != nil {
+		return nil, errors.Join(err, a.Close())
+	}
 	svc, err := a.service(cfg, o)
 	if err != nil {
 		return nil, errors.Join(err, a.Close())
@@ -152,7 +160,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		Sessions:     registry,
 		Layers:       engine.NewManager(mappings, registry, match.Options{Now: o.Clock.Now, CustomMatchers: custom}, o.Logger),
 		Detector:     detector,
-		Counters:     counter.NewMemory(),
+		Counters:     a.counters(),
 		Journal:      jrnl,
 		Renderer:     renderer,
 		Webhooks:     hooks,
@@ -210,7 +218,7 @@ func (a *App) routers(cfg config.Config, o Options) error {
 	}
 	managed := cfg.Mode == modeManaged
 	adminAPI := admin.New(a.svc, authn, auth.RoleAuthorizer{DenyGlobalWrites: cfg.Admin.GlobalWrites == "deny"},
-		admin.Config{Version: o.Version, PublicBaseURL: cfg.Server.PublicBaseURL, MaxBodyBytes: cfg.Limits.MaxBodyBytes, Shutdown: o.Shutdown, SaaS: managed, Managed: managed, Audit: a.trail}, o.Logger)
+		admin.Config{Version: o.Version, PublicBaseURL: cfg.Server.PublicBaseURL, MaxBodyBytes: cfg.Limits.MaxBodyBytes, Shutdown: o.Shutdown, SaaS: managed, Managed: managed, Audit: a.auditStore()}, o.Logger)
 	route := server.Router{
 		Directory:    a.orgDirectory(allow, cfg),
 		LocalOrg:     string(tenant.Local),
@@ -235,6 +243,7 @@ func (a *App) routers(cfg config.Config, o Options) error {
 		Clock:             o.Clock,
 		ExemptAdminTokens: managed,
 		OrgLimits:         server.NewOrgLimiters(),
+		Checks:            a.readiness,
 	}
 	if cfg.Proxy.Browser.Enabled {
 		bp, bpErr := a.browserProxy(cfg, o)
@@ -278,6 +287,9 @@ func (a *App) browserProxy(cfg config.Config, o Options) (*browserproxy.Proxy, e
 }
 
 func (a *App) globalStores(cfg config.Config, logger *slog.Logger) (store.MappingRepository, store.FileRepository, error) {
+	if cfg.Storage.Global.Driver == "postgres" {
+		return a.sh.pg.Mappings(), a.globalFiles(), nil
+	}
 	if cfg.Storage.Global.Driver == "memory" {
 		return memory.NewMappings(), memory.NewFiles(), nil
 	}
@@ -312,7 +324,15 @@ func (a *App) Start(ctx context.Context) error {
 			changes = ch
 		}
 	}
-	if err := a.svc.Start(ctx, []tenant.ID{tenant.Local}, changes); err != nil {
+	tenants := []tenant.ID{tenant.Local}
+	if a.sh.orgs != nil {
+		ids, relayed, err := a.startShared(ctx)
+		if err != nil {
+			return err
+		}
+		tenants, changes = ids, relayed
+	}
+	if err := a.svc.Start(ctx, tenants, changes); err != nil {
 		return err
 	}
 	if a.sessions != nil {
@@ -562,6 +582,9 @@ func (a *App) startTelemetry(cfg config.Config, o Options) (*telemetry.Telemetry
 // management app fills.
 func (a *App) orgDirectory(allow []netip.Prefix, cfg config.Config) tenant.Directory {
 	if cfg.Mode == modeManaged {
+		if a.sh.orgs != nil {
+			return a.sh.orgs
+		}
 		a.directory = tenant.NewMemory()
 		return a.directory
 	}
@@ -578,8 +601,7 @@ func (a *App) authenticators(cfg config.Config, o Options) (authn, guard auth.Au
 	if err != nil {
 		return nil, nil, err
 	}
-	a.keys = auth.NewMemoryKeys()
-	m := auth.NewManaged(auth.ManagedOptions{Issuers: issuers, Keys: a.keys, Replay: auth.NewMemoryReplay(o.Clock), Clock: o.Clock})
+	m := auth.NewManaged(auth.ManagedOptions{Issuers: issuers, Keys: a.keyStore(o), Replay: a.replayCache(o), Clock: o.Clock})
 	return m, auth.SystemOnly{Inner: m}, nil
 }
 
@@ -625,7 +647,7 @@ func (a *App) Usage() *usage.Meter { return a.meter }
 // managedState makes the usage meter and the audit trail that managed mode keeps (FR-11.12, FR-11.15).
 func (a *App) managedState(cfg config.Config, o Options) {
 	if cfg.Mode == modeManaged {
-		a.meter, a.trail = usage.New(o.Clock), audit.New()
+		a.meter, a.audit = usage.New(o.Clock), a.managedAudit(o)
 	}
 }
 

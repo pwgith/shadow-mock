@@ -145,18 +145,21 @@ func (s *statusWriter) WriteHeader(code int) {
 
 func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
-// audited records a state-changing call in the audit trail once it has been answered.
-func (h *Handler) audited(w http.ResponseWriter, r *http.Request, p auth.Principal, route string) (http.ResponseWriter, func()) {
+// auditing wraps w so that the status can be seen, when the call is one to audit: a state-changing call on a server
+// that keeps an audit trail. It returns nil for any other call.
+func (h *Handler) auditing(w http.ResponseWriter, r *http.Request) *statusWriter {
 	if h.cfg.Audit == nil || r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
-		return w, func() {}
+		return nil
 	}
-	sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
-	return sw, func() {
-		h.cfg.Audit.Record(audit.Entry{
-			At: h.svc.Clock.Now().UTC(), Org: p.OrgID, Issuer: p.Issuer, Subject: p.UserID, Key: p.KeyLabel,
-			TokenID: p.TokenID, Method: r.Method, Route: route, Status: sw.status,
-		})
-	}
+	return &statusWriter{ResponseWriter: w, status: http.StatusOK}
+}
+
+// record writes the audit entry of a call that has been answered.
+func (h *Handler) record(ctx context.Context, r *http.Request, p auth.Principal, route string, sw *statusWriter) {
+	h.cfg.Audit.Record(ctx, audit.Entry{
+		At: h.svc.Clock.Now().UTC(), Org: p.OrgID, Issuer: p.Issuer, Subject: p.UserID, Key: p.KeyLabel,
+		TokenID: p.TokenID, Method: r.Method, Route: route, Status: sw.status,
+	})
 }
 
 // listAudit answers GET /audit.
@@ -164,7 +167,7 @@ func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request, sc store.Sco
 	if h.cfg.Audit == nil {
 		return apierr.New(http.StatusNotFound, apierr.NotSupported, "This server keeps no audit trail.")
 	}
-	entries := h.cfg.Audit.List(sc.Tenant)
+	entries := h.cfg.Audit.List(r.Context(), sc.Tenant)
 	return writeJSON(w, http.StatusOK, map[string]any{"entries": page(r, entries)})
 }
 
@@ -187,7 +190,7 @@ func (h *Handler) anonymisePerson(w http.ResponseWriter, r *http.Request, sc sto
 	sessions := h.svc.AnonymisePerson(r.Context(), sc.Tenant, person)
 	entries := 0
 	if h.cfg.Audit != nil {
-		entries = h.cfg.Audit.Anonymise(sc.Tenant, person)
+		entries = h.cfg.Audit.Anonymise(r.Context(), sc.Tenant, person)
 	}
 	return writeJSON(w, http.StatusOK, map[string]any{keyStatus: "done", "sessions": sessions, "auditEntries": entries})
 }

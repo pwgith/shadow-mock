@@ -35,7 +35,7 @@ func ResolveSecrets(c *Config, lookup func(string) (string, bool)) error {
 		}
 		t.secret = v
 	}
-	return nil
+	return resolveSharedSecrets(c, lookup)
 }
 
 // validateAuth checks the admin tokens and works out their hashes.
@@ -135,8 +135,8 @@ func (t *AdminToken) secretHash(where string) ([sha256.Size]byte, error) {
 func (c *Config) Warnings() []string {
 	var out []string
 	d := Default()
-	if c.Storage.Blobs != d.Storage.Blobs {
-		out = append(out, "storage.blobs has no effect yet: it is reserved for the hosted service")
+	if c.Storage.Blobs != d.Storage.Blobs && c.Storage.Global.Driver != driverPostgres {
+		out = append(out, "storage.blobs has no effect: it holds the files of storage.global.driver: postgres, which is for managed mode")
 	}
 	if c.Auth.Driver == "basic" {
 		out = append(out, "auth.driver: basic sends the password with every admin call; keep the admin API on a network you trust, or behind TLS")

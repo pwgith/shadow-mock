@@ -36,7 +36,7 @@ func (m *Managed) authenticateToken(r *http.Request, cred string) (Principal, er
 	if err != nil {
 		return Principal{}, err
 	}
-	if iss.ReplayCheck && m.replay != nil && t.claims.ID != "" && m.replay.Seen(iss.Name, t.claims.ID, t.claims.Expires.Time) {
+	if iss.ReplayCheck && m.replay != nil && t.claims.ID != "" && m.replay.Seen(r.Context(), iss.Name, t.claims.ID, t.claims.Expires.Time) {
 		return Principal{}, apierr.New(http.StatusUnauthorized, apierr.TokenReplayed, "The token has been used already.")
 	}
 	return p, nil

@@ -3,6 +3,8 @@
 package server
 
 import (
+	"context"
+	"maps"
 	"math"
 	"net"
 	"net/http"
@@ -72,6 +74,8 @@ type Router struct {
 	ExemptAdminTokens bool
 	// OrgLimits holds each org's rate limiter; nil means no per-org limit.
 	OrgLimits *OrgLimiters
+	// Checks reports the shared stores for /__ready, each as "up" or "down". Nil reports none.
+	Checks func(context.Context) map[string]string
 }
 
 // OrgLimiters are the per-org rate limiters, shared by every Router made from the same configuration.
@@ -89,15 +93,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := r.URL.EscapedPath()
-	switch path {
-	case "/__health":
-		rt.health(w, nil)
-		return
-	case "/__ready":
-		rt.health(w, map[string]string{"storage": "up"})
-		return
-	case "/__metrics":
-		rt.serveMetrics(w, r)
+	if rt.serveProbe(w, r, path) {
 		return
 	}
 	org, prefix, rest, ok := rt.org(path)
@@ -118,9 +114,13 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ip := rt.ClientIP.From(r)
-	r, ok = rt.checkAllowlist(w, r, org, ip, isAdmin)
-	if !ok {
+	switch rt.allowlistVerdict(org, ip, isAdmin) {
+	case refuse:
+		rt.rejectIP(w, org, ip)
 		return
+	case admitTokens:
+		r = r.WithContext(admin.WithIPDenied(r.Context(), ip))
+	case admit:
 	}
 	if isAdmin && rt.AdminRequireHTTPS && r.TLS == nil {
 		(&apierr.ValidationError{Status: http.StatusForbidden, Errors: []apierr.WireMockError{{Code: 40, Title: "HTTPS is required for accessing the admin API"}}}).Write(w)
@@ -143,22 +143,65 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if id, inner, isURLBased := urlBased(rest); isURLBased {
 		tr.URLMockID, tr.Path = id, inner
 	}
-	rt.Service.ServeMock(w, r.WithContext(ctx), tr)
+	rt.Service.ServeMock(w, r.WithContext(ctx), tr) //nolint:contextcheck // the request context reaches the database, Redis and object-store drivers through interfaces; the analyser takes their internal contexts for new ones
 }
 
-// checkAllowlist applies the org's allowlist before the body is read, so refused callers cost almost nothing. A caller
-// outside it is refused, except for an admin call when tokens from the trusted issuer are let past: the management
-// app calls from the host's servers, not the customer's networks, so the admin handler decides once it knows the
-// credential.
-func (rt *Router) checkAllowlist(w http.ResponseWriter, r *http.Request, org *tenant.Org, ip netip.Addr, isAdmin bool) (*http.Request, bool) {
-	if (isAdmin && !org.AllowlistAdmin) || org.Allows(ip) {
-		return r, true
+// serveProbe answers the health, readiness and metrics paths, which belong to no org. It reports whether it did.
+func (rt *Router) serveProbe(w http.ResponseWriter, r *http.Request, path string) bool {
+	switch path {
+	case "/__health":
+		rt.health(w, nil)
+	case "/__ready":
+		rt.ready(w, r)
+	case "/__metrics":
+		rt.serveMetrics(w, r)
+	default:
+		return false
 	}
-	if !isAdmin || !rt.ExemptAdminTokens {
-		rt.rejectIP(w, org, ip)
-		return r, false
+	return true
+}
+
+type verdict int
+
+const (
+	// admit lets the request on.
+	admit verdict = iota
+	// refuse turns it away.
+	refuse
+	// admitTokens lets an admin call on far enough for the admin handler to look at its credential: the caller is
+	// outside the allowlist, and only a token from the trusted issuer may pass.
+	admitTokens
+)
+
+// allowlistVerdict applies the org's allowlist before the body is read, so refused callers cost almost nothing. A
+// caller outside it is refused, except for an admin call when tokens from the trusted issuer are let past: the
+// management app calls from the host's servers, not the customer's networks, so the admin handler decides once it
+// knows the credential.
+func (rt *Router) allowlistVerdict(org *tenant.Org, ip netip.Addr, isAdmin bool) verdict {
+	switch {
+	case (isAdmin && !org.AllowlistAdmin) || org.Allows(ip):
+		return admit
+	case isAdmin && rt.ExemptAdminTokens:
+		return admitTokens
+	default:
+		return refuse
 	}
-	return r.WithContext(admin.WithIPDenied(r.Context(), ip)), true
+}
+
+// ready answers /__ready: the engine's own storage, and each shared store when there is one. A store that is down
+// makes the status degraded; the engine keeps serving what it has (FR-11.14).
+func (rt *Router) ready(w http.ResponseWriter, r *http.Request) {
+	checks := map[string]string{"storage": "up"}
+	if rt.Checks != nil {
+		maps.Copy(checks, rt.Checks(r.Context()))
+	}
+	h := rt.Admin.Health(checks)
+	for _, v := range checks {
+		if v != "up" {
+			h.Status = "degraded"
+		}
+	}
+	apierr.WriteJSON(w, http.StatusOK, h)
 }
 
 // viaProxy reports whether a request reached this listener as a proxy request: sent in absolute form,
@@ -371,7 +414,7 @@ func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 func (rt *Router) serveAdmin(w http.ResponseWriter, r *http.Request) {
 	ctx, span := rt.Telemetry.Start(r, "admin "+r.Method)
 	sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
-	rt.Admin.ServeHTTP(sw, r.WithContext(ctx))
+	rt.Admin.ServeHTTP(sw, r.WithContext(ctx)) //nolint:contextcheck // see ServeMock in ServeHTTP
 	span.SetAttributes(attribute.String("http.request.method", r.Method), attribute.Int("http.response.status_code", sw.status), attribute.String("shadowmock.kind", "admin"))
 	if sw.status >= http.StatusInternalServerError {
 		span.SetStatus(codes.Error, http.StatusText(sw.status))
@@ -411,7 +454,7 @@ func (rt *Router) refuseOrgState(w http.ResponseWriter, org *tenant.Org, isAdmin
 }
 
 // ReasonHeader names the header that says why the engine refused a request.
-const ReasonHeader = "X-Shadow-Mock-Reason"
+const ReasonHeader = apierr.ReasonHeader
 
 // LimitHeader names the header that says which limit applied to a rate-limited request.
 const LimitHeader = "X-Shadow-Mock-Limit"

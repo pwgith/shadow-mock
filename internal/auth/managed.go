@@ -72,7 +72,7 @@ func (i Issuer) role(claim string) (Role, bool) {
 // Replay remembers token ids until they expire, so a token is used once.
 type Replay interface {
 	// Seen reports whether the id was used before, and remembers it until `until`.
-	Seen(issuer, id string, until time.Time) bool
+	Seen(ctx context.Context, issuer, id string, until time.Time) bool
 }
 
 // MemoryReplay is a Replay held in memory.
@@ -88,7 +88,7 @@ func NewMemoryReplay(clk clock.Clock) *MemoryReplay {
 }
 
 // Seen implements Replay.
-func (m *MemoryReplay) Seen(issuer, id string, until time.Time) bool {
+func (m *MemoryReplay) Seen(_ context.Context, issuer, id string, until time.Time) bool {
 	now := m.clk.Now()
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -160,12 +160,12 @@ func (m *Managed) authenticateKey(r *http.Request, cred string) (Principal, erro
 		return Principal{}, invalid()
 	}
 	hash := HashKey(cred)
-	k, ok := m.keys.Lookup(hash)
+	k, ok := m.keys.Lookup(r.Context(), hash)
 	now := m.clk.Now()
 	if !ok || (!k.Expires.IsZero() && !k.Expires.After(now)) {
 		return Principal{}, invalid()
 	}
-	m.keys.Touch(hash, clientAddr(r), now)
+	m.keys.Touch(r.Context(), hash, clientAddr(r), now)
 	return Principal{
 		UserID: k.Label, OrgID: k.Org, Roles: []Role{Editor}, Kind: KindKey, KeyLabel: k.Label, KeyScopes: k.Scopes,
 	}, nil
