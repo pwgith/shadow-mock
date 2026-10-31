@@ -56,7 +56,8 @@ func newManagedWith(t *testing.T, clk clock.Clock, issuer *authtest.Issuer, chan
 	}
 	srv := httptest.NewServer(a.Handler())
 	t.Cleanup(srv.Close)
-	fake, _ := clk.(*clock.Fake) //nolint:errcheck // nil for a real clock, which tests do not advance
+	fake, _ := clk.(*clock.Fake)
+	// fake is nil for a real clock, which tests do not advance.
 	return &managed{t: t, app: a, srv: srv, issuer: issuer, clk: fake}
 }
 
