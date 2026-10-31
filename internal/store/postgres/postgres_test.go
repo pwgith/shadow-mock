@@ -107,8 +107,12 @@ func TestOrgsAreReadWithTheirAliasesLimitsAndStatus(t *testing.T) {
 	if byID, ok := orgs.ByID(active); !ok || byID.Handle != handle {
 		t.Errorf("ByID = %+v, %v", byID, ok)
 	}
-	if len(skipped) != 0 {
-		t.Errorf("unexpected skips: %v", skipped)
+	// The database is shared with the other tests, which add orgs of their own, some on purpose with a handle that
+	// is refused. Only this test's orgs matter here.
+	for _, h := range skipped {
+		if slices.Contains([]string{handle, handle + "-old", sHandle, dHandle, dHandle + "-old"}, h) {
+			t.Errorf("one of this test's orgs was left out: %s (all skips: %v)", h, skipped)
+		}
 	}
 }
 
