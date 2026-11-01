@@ -340,6 +340,9 @@ func TestFilesThroughObjectStorage(t *testing.T) {
 func TestChangesAreNotified(t *testing.T) {
 	t.Parallel()
 	db := pgtest.Connect(t)
+	if !db.SupportsNotify() {
+		t.Skip("PGlite does not deliver LISTEN/NOTIFY; CI runs this against Postgres")
+	}
 	org, _ := newOrg(t, db, "active")
 	ch, err := db.Watch(t.Context())
 	if err != nil {

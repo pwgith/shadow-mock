@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -150,7 +151,12 @@ type world struct {
 	parentSpanID   string        // the span id in it
 	adminToken     string        // sent as a bearer token on admin calls and scrapes, when not empty
 	m              *managedWorld // set in managed mode
+	starts         int           // how many times the engine was started
 	sessionNumbers map[string][]int
+	// bodyRead counts the request-body bytes the engine read in managed mode (see front).
+	bodyRead atomic.Int64
+
+	console consoleWorld // the console and command-line steps
 
 	createdSession map[string]any
 	marks          map[string]time.Time
@@ -223,7 +229,8 @@ func (w *world) start() error {
 		cancel()
 		return errors.Join(fmt.Errorf("start engine: %w", err), a.Close())
 	}
-	w.app, w.cancel, w.srv = a, cancel, httptest.NewServer(a.Handler())
+	w.app, w.cancel, w.srv = a, cancel, httptest.NewServer(w.front(a.Handler()))
+	w.starts++
 	if cfg.Listen.Admin != "" {
 		w.adminSrv = httptest.NewServer(a.Handlers()[cfg.Listen.Admin])
 	}

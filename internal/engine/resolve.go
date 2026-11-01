@@ -17,6 +17,8 @@ type NearMiss struct {
 	Stub     *CompiledStub
 	Layer    *Layer
 	Distance float64
+	// Missed names the parts of the stub's pattern that the request did not match, such as "Header [Accept]".
+	Missed []string
 }
 
 // hidden tracks parent stubs hidden by more specific layers: by id (overrides, FR-7.7, and id
@@ -98,7 +100,7 @@ func NearMisses(r *match.Request, stack Stack, limit int) []NearMiss {
 				continue
 			}
 			res := cs.Matcher.Score(r)
-			out = append(out, NearMiss{Stub: cs, Layer: layer, Distance: res.Distance})
+			out = append(out, NearMiss{Stub: cs, Layer: layer, Distance: res.Distance, Missed: cs.Matcher.Mismatches(r)})
 		}
 		h.add(snap, r)
 	}

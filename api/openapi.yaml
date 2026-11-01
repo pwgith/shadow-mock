@@ -2249,6 +2249,10 @@ components:
           type: object
           properties:
             distance: { type: number, minimum: 0, maximum: 1 }
+        missed:
+          type: array
+          description: The parts of the mapping's pattern that the request did not match, such as `Header [Accept]`.
+          items: { type: string }
     NearMissList:
       type: object
       properties:
@@ -2559,6 +2563,7 @@ components:
             keyBased: { type: integer }
             urlBased: { type: integer }
         rateLimited: { type: integer, description: Requests refused for being over the org's rate limit, apart from the ones served. }
+        expiredSessions: { type: integer, description: Shadow mocks that expired in the window. }
         ipRejections:
           type: array
           items:

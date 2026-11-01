@@ -30,6 +30,7 @@ type Tracker struct {
 	events  map[tenant.ID][]Event
 	ipRej   map[tenant.ID]map[string]int
 	rateLim map[tenant.ID]int
+	expired map[tenant.ID][]time.Time
 }
 
 // New returns an empty tracker.
@@ -37,7 +38,7 @@ func New() *Tracker { return NewKeeping(defaultKeep) }
 
 // NewKeeping returns a tracker that holds events for d, which the history endpoint can reach back over.
 func NewKeeping(d time.Duration) *Tracker {
-	return &Tracker{keep: max(d, defaultKeep), events: map[tenant.ID][]Event{}, ipRej: map[tenant.ID]map[string]int{}, rateLim: map[tenant.ID]int{}}
+	return &Tracker{keep: max(d, defaultKeep), events: map[tenant.ID][]Event{}, ipRej: map[tenant.ID]map[string]int{}, rateLim: map[tenant.ID]int{}, expired: map[tenant.ID][]time.Time{}}
 }
 
 // Record adds an event and drops history older than an hour.
@@ -60,6 +61,30 @@ func (t *Tracker) Forget(org tenant.ID) {
 	delete(t.events, org)
 	delete(t.ipRej, org)
 	delete(t.rateLim, org)
+	delete(t.expired, org)
+}
+
+// RecordExpiry notes that a session of the org expired at the time given.
+func (t *Tracker) RecordExpiry(org tenant.ID, at time.Time) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	xs := t.expired[org]
+	cut := 0
+	for cut < len(xs) && at.Sub(xs[cut]) > t.keep {
+		cut++
+	}
+	t.expired[org] = append(xs[cut:], at)
+}
+
+// expiredIn counts the expiries in [from, to).
+func (t *Tracker) expiredIn(org tenant.ID, from, to time.Time) int {
+	n := 0
+	for _, at := range t.expired[org] {
+		if !at.Before(from) && at.Before(to) {
+			n++
+		}
+	}
+	return n
 }
 
 // RecordIPRejection counts a request refused by the IP allowlist.
@@ -123,6 +148,8 @@ type Live struct {
 	IPRejections      []IPCount      `json:"ipRejections"`
 	// RateLimited counts the requests refused for being over the org's rate limit, apart from the ones served.
 	RateLimited int `json:"rateLimited"`
+	// ExpiredSessions counts the shadow mocks that expired in the window.
+	ExpiredSessions int `json:"expiredSessions"`
 }
 
 // Live summarises the org's events in the window ending at now.
@@ -137,6 +164,7 @@ func (t *Tracker) Live(org tenant.ID, window string, d time.Duration, now time.T
 	}
 	out := summarise(evs, window, active, t.ipRej[org])
 	out.RateLimited = t.rateLim[org]
+	out.ExpiredSessions = t.expiredIn(org, now.Add(-d), now.Add(time.Nanosecond))
 	return out
 }
 
@@ -162,7 +190,9 @@ func (t *Tracker) History(org tenant.ID, from, to time.Time, step time.Duration,
 				evs = append(evs, e)
 			}
 		}
-		out = append(out, Point{From: start.UTC(), To: end.UTC(), Live: summarise(evs, step.String(), active, t.ipRej[org])})
+		live := summarise(evs, step.String(), active, t.ipRej[org])
+		live.ExpiredSessions = t.expiredIn(org, start, end)
+		out = append(out, Point{From: start.UTC(), To: end.UTC(), Live: live})
 	}
 	return out
 }

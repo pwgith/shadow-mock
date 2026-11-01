@@ -68,8 +68,22 @@ func (h *Handler) listSessions(w http.ResponseWriter, r *http.Request, sc store.
 	if err != nil {
 		return err
 	}
-	shown := page(r, all)
-	out := sessionList{Sessions: make([]sessionView, 0, len(shown)), Meta: metaView{Total: len(all)}}
+	q := r.URL.Query()
+	if q.Get("cursor") == "" && q.Get("offset") != "" {
+		q.Set("cursor", q.Get("offset")) // the older way to say where the page starts
+	}
+	_, limit, err := journalWindow(q)
+	if err != nil {
+		return err
+	}
+	if limit == 0 {
+		limit = -1 // no limit, as before
+	}
+	shown, next, err := cutPage(q, all, limit)
+	if err != nil {
+		return err
+	}
+	out := sessionList{Sessions: make([]sessionView, 0, len(shown)), Meta: metaView{Total: len(all), NextCursor: next}}
 	for i := range shown {
 		out.Sessions = append(out.Sessions, h.sessionView(r, &shown[i]))
 	}

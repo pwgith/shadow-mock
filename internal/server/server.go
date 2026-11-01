@@ -24,6 +24,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/auth"
 	"github.com/pwgith/shadow-mock/internal/browserproxy"
 	"github.com/pwgith/shadow-mock/internal/clock"
+	"github.com/pwgith/shadow-mock/internal/console"
 	"github.com/pwgith/shadow-mock/internal/mock"
 	"github.com/pwgith/shadow-mock/internal/ratelimit"
 	"github.com/pwgith/shadow-mock/internal/stats"
@@ -74,6 +75,8 @@ type Router struct {
 	ExemptAdminTokens bool
 	// OrgLimits holds each org's rate limiter; nil means no per-org limit.
 	OrgLimits *OrgLimiters
+	// Console serves the embedded console under /__console, or is nil when it is off (FR-11.17).
+	Console http.Handler
 	// Checks reports the shared stores for /__ready, each as "up" or "down". Nil reports none.
 	Checks func(context.Context) map[string]string
 }
@@ -148,6 +151,10 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // serveProbe answers the health, readiness and metrics paths, which belong to no org. It reports whether it did.
 func (rt *Router) serveProbe(w http.ResponseWriter, r *http.Request, path string) bool {
+	if rt.Console != nil && rt.ServeAdmin && (path == console.Prefix || strings.HasPrefix(path, console.Prefix+"/")) {
+		rt.Console.ServeHTTP(w, r)
+		return true
+	}
 	switch path {
 	case "/__health":
 		rt.health(w, nil)
@@ -429,7 +436,7 @@ func (rt *Router) rejectIP(w http.ResponseWriter, org *tenant.Org, ip netip.Addr
 		rt.Usage.IPRejected(org.ID)
 	}
 	e := apierr.New(http.StatusForbidden, apierr.IPNotAllowed, "Requests from %s are not allowed for this org.", ip)
-	e.Details = map[string]any{"ip": ip.String()}
+	e.Fields = map[string]any{"ip": ip.String()}
 	e.Write(w)
 }
 

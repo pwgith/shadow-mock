@@ -58,7 +58,7 @@ func metadataRoutes() []string {
 func contentKeys() []string {
 	return []string{
 		"body", "bodyAsBase64", "jsonBody", "headers", "cookies", "queryParams", "formParams", "stubMapping",
-		"responseDefinition", "mappings", "key", "tokens", "metadata", "absoluteUrl", "loggedRequest",
+		"responseDefinition", "mappings", "key", "tokens", "metadata", "absoluteUrl", "loggedRequest", "report",
 	}
 }
 

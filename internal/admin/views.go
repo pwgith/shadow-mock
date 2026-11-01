@@ -258,6 +258,8 @@ type nearMissView struct {
 	StubMapping    *model.StubMapping    `json:"stubMapping,omitempty"`
 	Layer          string                `json:"layer,omitempty"`
 	MatchResult    matchResult           `json:"matchResult"`
+	// Missed names the parts of the mapping's pattern that the request did not match.
+	Missed []string `json:"missed,omitempty"`
 	// Source is the label the management app stamped on the candidate mapping (FR-11.10).
 	Source string `json:"source,omitempty"`
 }
@@ -273,7 +275,7 @@ func stubNearMisses(req *match.Request, nms []engine.NearMiss, e *journal.Entry)
 		m := nm.Stub.Mapping
 		out = append(out, nearMissView{
 			Request: &lr, StubMapping: &m, Layer: string(nm.Layer.Kind),
-			MatchResult: matchResult{Distance: round(nm.Distance)}, Source: sourceOf(&m),
+			MatchResult: matchResult{Distance: round(nm.Distance)}, Missed: nm.Missed, Source: sourceOf(&m),
 		})
 	}
 	return out

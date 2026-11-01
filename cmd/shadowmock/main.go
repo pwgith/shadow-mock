@@ -22,6 +22,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/pwgith/shadow-mock/internal/app"
+	"github.com/pwgith/shadow-mock/internal/cli"
 	"github.com/pwgith/shadow-mock/internal/clock"
 	"github.com/pwgith/shadow-mock/internal/config"
 	"github.com/pwgith/shadow-mock/internal/server"
@@ -37,12 +38,15 @@ const maxDelay = 5 * time.Minute
 
 func main() {
 	if err := run(os.Args[1:], os.LookupEnv, os.Stdout); err != nil {
-		slog.Error("shadowmock stopped", "error", err.Error())
+		slog.Error("shadowmock failed", "error", err.Error())
 		os.Exit(1)
 	}
 }
 
 func run(args []string, lookup func(string) (string, bool), stdout io.Writer) error {
+	if cli.IsCommand(args) {
+		return cli.Run(context.Background(), args, cli.Env{Lookup: lookup, Stdout: stdout})
+	}
 	cfg, flags, err := config.Resolve(args, lookup)
 	if err != nil {
 		return err

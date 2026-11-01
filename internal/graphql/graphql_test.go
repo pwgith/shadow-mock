@@ -51,6 +51,66 @@ func TestQueriesAreEqualApartFromLayoutAndOrder(t *testing.T) {
 	}
 }
 
+func TestStringEscapesAndBlockStrings(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		a, b string
+	}{
+		{"every simple escape", `{ f(s: "\"\\\/\b\f\n\r\t") }`, "{ f(s: \"\\\"\\\\/\\b\\f\\n\\r\\t\") }"},
+		{"a unicode escape", `{ f(s: "\u0041\u00e9\u00C9") }`, `{ f(s: "A\u00e9\u00c9") }`},
+		{"unicode escape and the letter", `{ f(s: "\u0041") }`, `{ f(s: "A") }`},
+		{"block string indentation", "{ f(s: \"\"\"\n    a\n      b\n  \"\"\") }", `{ f(s: "a\n  b") }`},
+		{"block string line endings", "{ f(s: \"\"\"a\r\nb\"\"\") }", `{ f(s: "a\nb") }`},
+		{"an escaped block delimiter", `{ f(s: """a\"""b""") }`, `{ f(s: "a\"\"\"b") }`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := graphql.Equal(tt.a, tt.b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !got {
+				t.Errorf("%q and %q should be equal", tt.a, tt.b)
+			}
+		})
+	}
+}
+
+func TestBadStringsAndNumbersAreSyntaxErrors(t *testing.T) {
+	t.Parallel()
+	for name, q := range map[string]string{
+		"unknown escape":            `{ f(s: "\q") }`,
+		"short unicode escape":      `{ f(s: "\u12") }`,
+		"non-hex unicode escape":    `{ f(s: "\u12zz") }`,
+		"backslash at the end":      `{ f(s: "\`,
+		"a string over a line":      "{ f(s: \"a\nb\") }",
+		"unterminated block":        `{ f(s: """abc) }`,
+		"a bare minus":              `{ f(x: -) }`,
+		"a point without digits":    `{ f(x: 1.) }`,
+		"an exponent no digits":     `{ f(x: 1e) }`,
+		"an exponent sign no digit": `{ f(x: 1e+) }`,
+		"a number then a point":     `{ f(x: 1.5.2) }`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := graphql.Canonical(q); err == nil {
+				t.Errorf("%q should be a syntax error", q)
+			}
+		})
+	}
+}
+
+func TestNumbersAreReadWhole(t *testing.T) {
+	t.Parallel()
+	for _, q := range []string{`{ f(x: -1.5e+10) }`, `{ f(x: 0) }`, `{ f(x: 2E3) }`} {
+		if _, err := graphql.Canonical(q); err != nil {
+			t.Errorf("%q: %v", q, err)
+		}
+	}
+}
+
 func TestInvalidQueriesAreSyntaxErrors(t *testing.T) {
 	t.Parallel()
 	for name, q := range map[string]string{

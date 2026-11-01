@@ -189,6 +189,10 @@ func (s *Service) forget(ctx context.Context, scopes []store.Scope) error {
 		// A session's journal is discarded with it (FR-7.2).
 		s.Journal.Remove(sc, nil)
 		s.Layers.Drop(sc)
+		// Nothing is left to record into, so a recording running in it ends with it.
+		if s.Recorder != nil {
+			s.Recorder.Forget(sc)
+		}
 	}
 	s.Detector.Invalidate()
 	s.persist(ctx)
@@ -209,6 +213,12 @@ func (s *Service) ReapOnce(ctx context.Context) {
 	scopes := s.Sessions.RemoveExpired(ctx)
 	if len(scopes) == 0 {
 		return
+	}
+	if s.Stats != nil {
+		now := s.Clock.Now()
+		for _, sc := range scopes {
+			s.Stats.RecordExpiry(sc.Tenant, now)
+		}
 	}
 	if err := s.forget(ctx, scopes); err != nil {
 		s.Logger.ErrorContext(ctx, "reap expired sessions", "error", err.Error())

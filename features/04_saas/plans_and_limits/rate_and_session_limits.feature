@@ -1,4 +1,4 @@
-@saas @P5 @NFR-4.2
+@managed @P5 @NFR-4.2
 Feature: Plan limits on request rate and sessions
   Limits come from the org's plan entitlements. Soft caps bill overage and
   never break a running test. Hard caps return 429 with a reason.
@@ -27,17 +27,21 @@ Feature: Plan limits on request rate and sessions
   Scenario: The Free tier hard-caps monthly requests
     Given the org "acme" is on Shadow Mock plan "Free"
     And org "acme" has served 100000 mock requests this month
-    When I send a "GET" request to "/x"
+    When I send a "GET" request to "/acme/x"
     Then the response status is 429
     And the response JSON at "$.error" is "monthly_request_cap"
 
   Scenario: Paid tiers keep serving past the included requests and bill overage
     Given the org "acme" is on Shadow Mock plan "Starter"
     And org "acme" has served 2000000 mock requests this month
-    When I send a "GET" request to "/x"
+    When I send a "GET" request to "/acme/x"
     Then the response status is 200
-    And the org "acme" usage shows overage requests
+    And the org "acme" usage counts 2000001 requests this month
 
+  # The engine has no per-plan session limit: it enforces the request rate and the monthly cap (tenant.Limits), and
+  # the session count is only metered. Enforcing it needs a session limit in the org's record, which the management
+  # app and the engine would share.
+  @saas
   Scenario Outline: Concurrent session limits
     Given the org "acme" is on Shadow Mock plan "<plan>"
     And org "acme" has <active> active sessions
@@ -55,6 +59,8 @@ Feature: Plan limits on request rate and sessions
       | Starter | 29     | 201    |
       | Starter | 30     | 429    |
 
+  # Billing and the usage warning header are not built: the engine meters sessions and the management app bills.
+  @saas
   Scenario: Going over the included sessions is billed but allowed up to the ceiling
     Given the org "acme" is on Shadow Mock plan "Team"
     And org "acme" has 50 active sessions
@@ -62,6 +68,8 @@ Feature: Plan limits on request rate and sessions
     Then the response status is 201
     And the response header "X-Shadow-Mock-Usage-Warning" is "sessions_over_included"
 
+  # The number of Tool app keys is the management app's to limit; the engine only checks the keys it is given.
+  @saas @management-app
   Scenario Outline: Tool app key limits
     Given the org "acme" is on Shadow Mock plan "<plan>"
     And org "acme" has <keys> active Tool app keys

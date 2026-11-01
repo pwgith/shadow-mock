@@ -45,6 +45,21 @@ func TestTargetRules(t *testing.T) {
 	}
 }
 
+func TestAddressRulesApplyToWhatANameResolvesTo(t *testing.T) {
+	t.Parallel()
+	targets, err := egress.ParseTargets(nil, []string{"127.0.0.0/8", "::1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := targets.Check(t.Context(), "localhost"); !errors.Is(err, egress.ErrDenied) {
+		t.Errorf("localhost resolves to a denied address, got %v", err)
+	}
+	// A name that does not resolve has no address to deny.
+	if err := targets.Check(t.Context(), "no-such-host.invalid"); err != nil {
+		t.Errorf("an unresolvable name should not be denied, got %v", err)
+	}
+}
+
 func TestTargetRulesRefuseWhatTheyCannotRead(t *testing.T) {
 	t.Parallel()
 	for _, bad := range []string{"10.0.0.9-10.0.0.1", "10.0.0.0/33"} {

@@ -128,6 +128,9 @@ auth:
   driver: noop                # noop | token. token puts the admin API behind bearer tokens
   tokens: []                  # name, role (viewer, editor, admin) and one of token, tokenEnv, tokenSha256
 
+console:
+  enabled: false              # serve the web console at /__console/ (not in managed mode)
+
 storage:
   global:
     driver: fs                # fs | memory

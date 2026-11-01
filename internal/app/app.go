@@ -26,6 +26,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/browserproxy"
 	"github.com/pwgith/shadow-mock/internal/clock"
 	"github.com/pwgith/shadow-mock/internal/config"
+	"github.com/pwgith/shadow-mock/internal/console"
 	"github.com/pwgith/shadow-mock/internal/detect"
 	"github.com/pwgith/shadow-mock/internal/egress"
 	"github.com/pwgith/shadow-mock/internal/engine"
@@ -244,6 +245,9 @@ func (a *App) routers(cfg config.Config, o Options) error {
 		ExemptAdminTokens: managed,
 		OrgLimits:         server.NewOrgLimiters(),
 		Checks:            a.readiness,
+	}
+	if cfg.Console.Enabled && !managed {
+		route.Console = console.Handler(adminPrefix(cfg))
 	}
 	if cfg.Proxy.Browser.Enabled {
 		bp, bpErr := a.browserProxy(cfg, o)
@@ -674,4 +678,12 @@ func (a *App) sessionMappings(cfg config.Config) (store.MappingRepository, error
 	a.sessions = ss
 	a.closers = append(a.closers, ss.Close)
 	return ss, nil
+}
+
+// adminPrefix is where the admin API is served, which the console is told.
+func adminPrefix(cfg config.Config) string {
+	if cfg.AdminPrefix == "" {
+		return "/__admin"
+	}
+	return cfg.AdminPrefix
 }

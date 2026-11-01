@@ -100,6 +100,10 @@ func TestManagedModeOnPostgresRedisAndObjectStorage(t *testing.T) {
 	m := newManagedWith(t, clk, issuer, func(c *config.Config) {
 		c.Storage.Global.Driver = "postgres"
 		c.Storage.Postgres = config.Postgres{DSNEnv: pgtest.DSNVar, DSN: db.DSN, Migrate: true}
+		if !db.SupportsNotify() {
+			// Without notices the directory poll is what carries an org's change to the engine.
+			c.Storage.Postgres.PollInterval = config.Duration(200 * time.Millisecond)
+		}
 		c.Storage.Counters.Driver = "redis"
 		c.Storage.Redis = config.Redis{Addr: mr.Addr(), Prefix: "sm:"}
 		c.Storage.Blobs.Driver = "s3"
@@ -131,13 +135,16 @@ func TestManagedModeOnPostgresRedisAndObjectStorage(t *testing.T) {
 		t.Errorf("an admin token: %d %s", code, body)
 	}
 
-	// A mapping added to the database is served without a restart.
-	exec("INSERT INTO engine.mappings (org_id, id, body) VALUES ($1, $2, $3)", string(org), "00000000-0000-0000-0000-000000000003",
-		`{"id":"00000000-0000-0000-0000-000000000003","request":{"method":"GET","url":"/fresh"},"response":{"status":200,"body":"fresh"}}`)
-	eventually(t, "a new mapping to be served", func() bool {
-		code, body, _ := m.do("GET", base+"/fresh", "", "")
-		return code == 200 && body == "fresh"
-	})
+	// A mapping added to the database is served without a restart. A mapping travels by change notice only, which
+	// PGlite does not deliver; CI runs this against Postgres.
+	if db.SupportsNotify() {
+		exec("INSERT INTO engine.mappings (org_id, id, body) VALUES ($1, $2, $3)", string(org), "00000000-0000-0000-0000-000000000003",
+			`{"id":"00000000-0000-0000-0000-000000000003","request":{"method":"GET","url":"/fresh"},"response":{"status":200,"body":"fresh"}}`)
+		eventually(t, "a new mapping to be served", func() bool {
+			code, body, _ := m.do("GET", base+"/fresh", "", "")
+			return code == 200 && body == "fresh"
+		})
+	}
 
 	// The object store goes down: a cached file is still served, one that was never read is a 503 that says why.
 	objects.Close()

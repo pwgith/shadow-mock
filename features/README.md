@@ -52,6 +52,13 @@ features/
 | `@FR-x.y`, `@NFR-x.y` | Requirement traceability |
 | `@wip` | Not yet implemented, excluded by default |
 
+A feature tagged `@managed` can hold scenarios tagged `@saas`; each has a comment saying what is missing (a store the harness does not stand up, or something the engine does not build). `@management-app` scenarios are left alone unless the engine's admin API is what they describe, as in `05_management_app/admin_api_for_management_app.feature` and `08_platform_flows`. How the managed harness works:
+
+* One engine instance, stores in memory. The management app is played by the scenario: it writes org rows, mappings and statuses straight to the engine's directory and stores, and calls the admin API with tokens from a fake issuer.
+* The test client stands in for the front proxy and says the client address in `X-Forwarded-For`; `server.clientIp` steps change that.
+* Time is a test clock. `freeze` stops it where it is, so a second, an hour or a month passes only when a step says so (rate limits, usage buckets, expiry, stats history).
+* `w.record` setup steps are replayed when a step restarts the engine with other configuration.
+
 ## Base URLs
 
 Steps never hard-code hosts. The harness resolves them per mode:

@@ -59,6 +59,9 @@ func (c ClientIP) From(r *http.Request) netip.Addr {
 		return peer
 	}
 	if len(c.TrustedProxies) > 0 {
+		if !c.trusted(peer) {
+			return peer // a caller that is not a proxy of ours may write any header it likes
+		}
 		for i := len(hops) - 1; i >= 0; i-- {
 			a, err := netip.ParseAddr(hops[i])
 			if err != nil {

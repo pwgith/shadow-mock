@@ -109,6 +109,48 @@ func TestManagedModeRefusesLinksThatAreNotProtected(t *testing.T) {
 	}
 }
 
+func TestManagedModeReportsEverySettingThatIsWrong(t *testing.T) {
+	t.Parallel()
+	_, err := load(t, "mode: managed\nmanaged: { singleInstance: true }\nconsole: { enabled: true }\n", nil)
+	if err == nil {
+		t.Fatal("managed mode with no issuers, globalWrites, unknownFields or egress guard should not start")
+	}
+	for _, want := range []string{"auth.issuers", "admin.globalWrites", "mappings.unknownFields", "egress.blockPrivate", "console.enabled"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error should name %s, got:\n%v", want, err)
+		}
+	}
+}
+
+func TestManagedIssuersAreChecked(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		edit func(string) string
+		want string
+	}{
+		{"no audience", func(y string) string { return strings.Replace(y, "audience: mocks", "", 1) }, "needs name, issuer and audience"},
+		{"both key sources", func(y string) string {
+			return strings.Replace(y, "audience: mocks", "audience: mocks\n      jwksUrl: https://shadowmock.example/jwks", 1)
+		}, "exactly one of jwksUrl and publicKey"},
+		{"a lifetime that is too long", func(y string) string {
+			return strings.Replace(y, "audience: mocks", "audience: mocks\n      maxLifetime: 8760h", 1)
+		}, "maxLifetime"},
+		{"a bad role", func(y string) string {
+			return strings.Replace(y, "audience: mocks", "audience: mocks\n      roleMap: { staff: root }", 1)
+		}, "is not admin, editor or viewer"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := load(t, tt.edit(managedYAML(t, "managed: { singleInstance: true }")), sharedEnv)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error = %v, want one mentioning %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestASingleInstanceMayUseSomeSharedStoresAndNotOthers(t *testing.T) {
 	t.Parallel()
 	y := managedYAML(t, "managed: { singleInstance: true }")
