@@ -38,12 +38,9 @@ Feature: Plan limits on request rate and sessions
     Then the response status is 200
     And the org "acme" usage counts 2000001 requests this month
 
-  # The engine has no per-plan session limit: it enforces the request rate and the monthly cap (tenant.Limits), and
-  # the session count is only metered. Enforcing it needs a session limit in the org's record, which the management
-  # app and the engine would share.
-  @saas
   Scenario Outline: Concurrent session limits
     Given the org "acme" is on Shadow Mock plan "<plan>"
+    And I present a token for "erin" in org "acme" with app role "member"
     And org "acme" has <active> active sessions
     When I call admin "POST" "/sessions/key-based" with:
       """json
@@ -59,8 +56,6 @@ Feature: Plan limits on request rate and sessions
       | Starter | 29     | 201    |
       | Starter | 30     | 429    |
 
-  # Billing and the usage warning header are not built: the engine meters sessions and the management app bills.
-  @saas
   Scenario: Going over the included sessions is billed but allowed up to the ceiling
     Given the org "acme" is on Shadow Mock plan "Team"
     And org "acme" has 50 active sessions
@@ -68,19 +63,15 @@ Feature: Plan limits on request rate and sessions
     Then the response status is 201
     And the response header "X-Shadow-Mock-Usage-Warning" is "sessions_over_included"
 
-  # The number of Tool app keys is the management app's to limit; the engine only checks the keys it is given.
-  @saas @management-app
-  Scenario Outline: Tool app key limits
-    Given the org "acme" is on Shadow Mock plan "<plan>"
-    And org "acme" has <keys> active Tool app keys
-    When an org admin creates another Tool app key
-    Then the result is "<result>"
-
-    Examples:
-      | plan    | keys | result                 |
-      | Free    | 1    | rejected: limit reached |
-      | Starter | 4    | created                |
-      | Team    | 25   | rejected: limit reached |
+  Scenario: The Free tier caps URL-based TTLs at 7 days
+    Given the org "acme" is on Shadow Mock plan "Free"
+    And I present a token for "erin" in org "acme" with app role "member"
+    When I call admin "POST" "/sessions/url-based" with:
+      """json
+      { "ttlSeconds": 1209600 }
+      """
+    Then the response status is 422
+    And the response JSON at "$.error" is "ttl_exceeds_plan_maximum"
 
   Scenario: Limits change immediately when the plan changes
     Given the org "acme" is on Shadow Mock plan "Free"

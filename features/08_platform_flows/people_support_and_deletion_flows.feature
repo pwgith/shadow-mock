@@ -25,8 +25,6 @@ Feature: The engine's part of enablement, support, leaving and deletion
     When the org's IP allowlist is "198.51.100.0/24"
     Then within 1 s a "GET" request to "/acme/hello" from IP "203.0.113.4" returns status 403
 
-  # Not built: the org's journal capture and response compression settings.
-  @saas
   Scenario Outline: F7 - Org settings are applied within a second
     Given the org "acme" with handle "acme" on plan "Team"
     When the management app changes <setting>

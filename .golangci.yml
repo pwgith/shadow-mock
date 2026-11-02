@@ -379,6 +379,11 @@ linters:
           - dupl
           - gochecknoglobals
           - forbidigo
+      # The database-test helper starts one PGlite per test binary and waits for it in real time.
+      - path: internal/store/postgres/pgtest/
+        linters:
+          - gochecknoglobals
+          - forbidigo
       # Step tables are long flat lists of closures, and assertion messages mix several values,
       # so the complexity and error-wrapping rules do not fit the harness.
       - path: test/acceptance/

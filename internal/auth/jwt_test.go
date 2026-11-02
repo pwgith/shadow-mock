@@ -42,6 +42,7 @@ func compact(t *testing.T, header, claims any, sign func(signed string) []byte) 
 }
 
 func rsaSigner(t *testing.T, key *rsa.PrivateKey) func(string) []byte {
+	t.Helper()
 	return func(signed string) []byte {
 		d := sha256.Sum256([]byte(signed))
 		sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, d[:])
@@ -53,6 +54,7 @@ func rsaSigner(t *testing.T, key *rsa.PrivateKey) func(string) []byte {
 }
 
 func ecSigner(t *testing.T, key *ecdsa.PrivateKey) func(string) []byte {
+	t.Helper()
 	return func(signed string) []byte {
 		d := sha256.Sum256([]byte(signed))
 		r, s, err := ecdsa.Sign(rand.Reader, key, d[:])

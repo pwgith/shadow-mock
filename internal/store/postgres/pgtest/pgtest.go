@@ -147,8 +147,11 @@ func launchPGlite() (string, error) {
 	}()
 	select {
 	case r := <-got:
-		if r.err != nil || r.port == 0 {
-			return "", fmt.Errorf("PGlite did not say where it listens: %v", r.err)
+		if r.err != nil {
+			return "", fmt.Errorf("PGlite did not say where it listens: %w", r.err)
+		}
+		if r.port == 0 {
+			return "", errors.New("PGlite did not say where it listens")
 		}
 		// One session serves every connection, so a named prepared statement made on one is seen by all: the simple
 		// protocol makes none. A small pool keeps within the multiplexer's limit.

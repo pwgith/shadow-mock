@@ -16,6 +16,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -46,6 +47,8 @@ type Command struct {
 }
 
 // Commands lists every sub-command and the admin call behind it.
+//
+//nolint:gochecknoglobals // a read-only table that the console and the acceptance steps check against the admin API
 var Commands = []Command{
 	{"session create", http.MethodPost, "/sessions/{kind}"},
 	{"session list", http.MethodGet, "/sessions"},
@@ -122,52 +125,9 @@ func Run(ctx context.Context, args []string, env Env) error {
 func definition(name string, fs *flag.FlagSet) (func([]string) (call, error), error) {
 	switch name {
 	case "session create":
-		kind := fs.String("kind", "key-based", "key-based or url-based")
-		sname := fs.String("name", "", "a name for the shadow mock")
-		ttl := fs.Duration("ttl", 0, "how long it lasts, such as 10m")
-		var tokens stringList
-		fs.Var(&tokens, "token", "a match token (key-based only; repeat for more)")
-		return func(pos []string) (call, error) {
-			if len(pos) > 0 {
-				return call{}, usage("session create takes no argument, got %q", pos[0])
-			}
-			if *kind != "key-based" && *kind != "url-based" {
-				return call{}, usage("--kind must be key-based or url-based")
-			}
-			if len(tokens) > 0 && *kind != "key-based" {
-				return call{}, usage("--token is for key-based shadow mocks")
-			}
-			if *ttl < 0 {
-				return call{}, usage("--ttl cannot be negative")
-			}
-			body := map[string]any{}
-			if *sname != "" {
-				body["name"] = *sname
-			}
-			if *ttl > 0 {
-				body["ttlSeconds"] = int64(math.Ceil(ttl.Seconds()))
-			}
-			if len(tokens) > 0 {
-				body["tokens"] = []string(tokens)
-			}
-			return jsonCall(http.MethodPost, "/sessions/"+*kind, nil, body)
-		}, nil
+		return sessionCreate(fs), nil
 	case "session list":
-		kind := fs.String("kind", "", "only key-based or url-based")
-		state := fs.String("state", "", "only active or expired")
-		sname := fs.String("name", "", "only names containing this")
-		createdBy := fs.String("created-by", "", "only those made by this person or key")
-		return func(pos []string) (call, error) {
-			if len(pos) > 0 {
-				return call{}, usage("session list takes no argument, got %q", pos[0])
-			}
-			q := url.Values{}
-			set(q, "kind", *kind)
-			set(q, "state", *state)
-			set(q, "name", *sname)
-			set(q, "createdBy", *createdBy)
-			return call{method: http.MethodGet, route: "/sessions", query: q}, nil
-		}, nil
+		return sessionList(fs), nil
 	case "session delete":
 		return func(pos []string) (call, error) {
 			if len(pos) != 1 {
@@ -176,38 +136,97 @@ func definition(name string, fs *flag.FlagSet) (func([]string) (call, error), er
 			return call{method: http.MethodDelete, route: "/sessions/" + url.PathEscape(pos[0])}, nil
 		}, nil
 	case "journal tail":
-		unmatched := fs.Bool("unmatched", false, "only requests that matched no mapping")
-		limit := fs.Int("limit", 20, "how many entries, newest first")
-		return func(pos []string) (call, error) {
-			if len(pos) > 0 {
-				return call{}, usage("journal tail takes no argument, got %q", pos[0])
-			}
-			if *limit < 1 {
-				return call{}, usage("--limit must be at least 1")
-			}
-			q := url.Values{"limit": {fmt.Sprint(*limit)}}
-			if *unmatched {
-				q.Set("unmatched", "true")
-			}
-			return call{method: http.MethodGet, route: "/requests", query: q}, nil
-		}, nil
+		return journalTail(fs), nil
 	case "recording start":
-		target := fs.String("target", "", "base URL of the service to record")
-		return func(pos []string) (call, error) {
-			if len(pos) > 0 {
-				return call{}, usage("recording start takes no argument, got %q", pos[0])
-			}
-			if *target == "" {
-				return call{}, usage("recording start needs --target")
-			}
-			return jsonCall(http.MethodPost, "/recordings/start", nil, map[string]any{"targetBaseUrl": *target})
-		}, nil
+		return recordingStart(fs), nil
 	case "recording stop":
 		return noArguments(name, http.MethodPost, "/recordings/stop"), nil
 	case "recording status":
 		return noArguments(name, http.MethodGet, "/recordings/status"), nil
 	}
 	return nil, usage("%q is not a sub-command", name)
+}
+
+func sessionCreate(fs *flag.FlagSet) func([]string) (call, error) {
+	kind := fs.String("kind", "key-based", "key-based or url-based")
+	sname := fs.String("name", "", "a name for the shadow mock")
+	ttl := fs.Duration("ttl", 0, "how long it lasts, such as 10m")
+	var tokens stringList
+	fs.Var(&tokens, "token", "a match token (key-based only; repeat for more)")
+	return func(pos []string) (call, error) {
+		if len(pos) > 0 {
+			return call{}, usage("session create takes no argument, got %q", pos[0])
+		}
+		if *kind != "key-based" && *kind != "url-based" {
+			return call{}, usage("--kind must be key-based or url-based")
+		}
+		if len(tokens) > 0 && *kind != "key-based" {
+			return call{}, usage("--token is for key-based shadow mocks")
+		}
+		if *ttl < 0 {
+			return call{}, usage("--ttl cannot be negative")
+		}
+		body := map[string]any{}
+		if *sname != "" {
+			body["name"] = *sname
+		}
+		if *ttl > 0 {
+			body["ttlSeconds"] = int64(math.Ceil(ttl.Seconds()))
+		}
+		if len(tokens) > 0 {
+			body["tokens"] = []string(tokens)
+		}
+		return jsonCall(http.MethodPost, "/sessions/"+*kind, nil, body)
+	}
+}
+
+func sessionList(fs *flag.FlagSet) func([]string) (call, error) {
+	kind := fs.String("kind", "", "only key-based or url-based")
+	state := fs.String("state", "", "only active or expired")
+	sname := fs.String("name", "", "only names containing this")
+	createdBy := fs.String("created-by", "", "only those made by this person or key")
+	return func(pos []string) (call, error) {
+		if len(pos) > 0 {
+			return call{}, usage("session list takes no argument, got %q", pos[0])
+		}
+		q := url.Values{}
+		set(q, "kind", *kind)
+		set(q, "state", *state)
+		set(q, "name", *sname)
+		set(q, "createdBy", *createdBy)
+		return call{method: http.MethodGet, route: "/sessions", query: q}, nil
+	}
+}
+
+func journalTail(fs *flag.FlagSet) func([]string) (call, error) {
+	unmatched := fs.Bool("unmatched", false, "only requests that matched no mapping")
+	limit := fs.Int("limit", 20, "how many entries, newest first")
+	return func(pos []string) (call, error) {
+		if len(pos) > 0 {
+			return call{}, usage("journal tail takes no argument, got %q", pos[0])
+		}
+		if *limit < 1 {
+			return call{}, usage("--limit must be at least 1")
+		}
+		q := url.Values{"limit": {strconv.Itoa(*limit)}}
+		if *unmatched {
+			q.Set("unmatched", "true")
+		}
+		return call{method: http.MethodGet, route: "/requests", query: q}, nil
+	}
+}
+
+func recordingStart(fs *flag.FlagSet) func([]string) (call, error) {
+	target := fs.String("target", "", "base URL of the service to record")
+	return func(pos []string) (call, error) {
+		if len(pos) > 0 {
+			return call{}, usage("recording start takes no argument, got %q", pos[0])
+		}
+		if *target == "" {
+			return call{}, usage("recording start needs --target")
+		}
+		return jsonCall(http.MethodPost, "/recordings/start", nil, map[string]any{"targetBaseUrl": *target})
+	}
 }
 
 func jsonCall(method, route string, q url.Values, body any) (call, error) {
@@ -320,6 +339,7 @@ type stringList []string
 
 func (s *stringList) String() string { return strings.Join(*s, ",") }
 
+// Set adds one value, so that the flag can be given more than once.
 func (s *stringList) Set(v string) error {
 	if v == "" {
 		return errors.New("a value is needed")

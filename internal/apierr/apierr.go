@@ -27,6 +27,7 @@ const (
 	ValidationFailed             Code = "validation_failed"
 	TTLMustBePositive            Code = "ttl_must_be_positive"
 	TTLExceedsMaximum            Code = "ttl_exceeds_maximum"
+	TTLExceedsPlanMaximum        Code = "ttl_exceeds_plan_maximum"
 	TokenTooShort                Code = "token_too_short"
 	TokenInUse                   Code = "token_in_use"
 	RecordingInProgress          Code = "recording_in_progress"

@@ -5,6 +5,7 @@ package tenant
 import (
 	"context"
 	"net/netip"
+	"time"
 )
 
 // ID identifies an org.
@@ -37,13 +38,15 @@ type Org struct {
 	// Status and Limits come from the org's plan (managed mode). The zero value serves.
 	Status Status
 	Limits Limits
+	// Settings are the org's own choices within its plan.
+	Settings Settings
 	// Aliases are older handles that still resolve to the org, for good.
 	Aliases []string
 }
 
 // Allows reports whether ip may send traffic to the org.
 func (o *Org) Allows(ip netip.Addr) bool {
-	if len(o.Allowlist) == 0 {
+	if len(o.Allowlist) == 0 || !o.Limits.Includes(FeatureIPAllowlist) {
 		return true
 	}
 	ip = ip.Unmap()
@@ -115,4 +118,72 @@ type Limits struct {
 	// more before traffic is refused. Zero means no cap.
 	MonthlyRequestCap int64
 	Grace             int64
+	// MaxSessions is how many shadow mocks the org may have active at once, and IncludedSessions how many of them
+	// its plan includes: a shadow mock made beyond that is allowed, with a warning in the answer, up to MaxSessions.
+	// Zero means the server's own setting, and no warning.
+	MaxSessions      int
+	IncludedSessions int
+	// MaxMappingsPerSession and MaxMappings limit the mappings in a shadow mock and in the org's global layer.
+	// Zero means the server's own setting.
+	MaxMappingsPerSession int
+	MaxMappings           int
+	// MaxURLTTL is the longest a URL-based shadow mock may live on this plan. Zero means the server's own maximum.
+	MaxURLTTL time.Duration
+	// Without is the set of features the plan does not include. A feature that is off keeps its settings and does not
+	// apply, and applies again when the plan has it again.
+	Without Feature
+}
+
+// Feature is something a plan may include. Features combine into a set.
+type Feature uint8
+
+// Features a plan can lack.
+const (
+	// FeatureIPAllowlist is the org's IP allowlist (FR-9.6b).
+	FeatureIPAllowlist Feature = 1 << iota
+)
+
+// featureOf is the feature a name in the database stands for.
+func featureOf(name string) (Feature, bool) {
+	if name == "ip_allowlist" {
+		return FeatureIPAllowlist, true
+	}
+	return 0, false
+}
+
+// ParseFeatures reads feature names, as the database holds them, into a set. A name it does not know is skipped, and
+// the first of them is returned, so a newer management app cannot make an older engine forget the features it does know.
+func ParseFeatures(names []string) (set Feature, unknown string) {
+	for _, n := range names {
+		f, ok := featureOf(n)
+		if !ok {
+			if unknown == "" {
+				unknown = n
+			}
+			continue
+		}
+		set |= f
+	}
+	return set, unknown
+}
+
+// Includes reports whether the plan has the feature. A plan lacks only what it lists.
+func (l Limits) Includes(f Feature) bool { return l.Without&f == 0 }
+
+// Journal capture settings (FR-11.11d).
+const (
+	CaptureAll               = "all"
+	CaptureSessionsUnmatched = "sessions-and-unmatched"
+	CaptureOff               = "off"
+)
+
+// Settings are the choices an org makes within its plan (FR-11.11d). The zero value is the default: everything is
+// journalled, with bodies, and responses are compressed.
+type Settings struct {
+	// JournalCapture is CaptureAll (or empty), CaptureSessionsUnmatched or CaptureOff.
+	JournalCapture string
+	// NoJournalBodies keeps request and response bodies out of the journal.
+	NoJournalBodies bool
+	// NoCompression turns off gzip of responses, whatever the client accepts.
+	NoCompression bool
 }

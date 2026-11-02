@@ -90,6 +90,8 @@ type Service struct {
 	Stats        *stats.Tracker
 	// Usage counts what each org uses (managed mode); nil counts nothing.
 	Usage *usage.Meter
+	// Orgs finds an org's plan limits and settings (managed mode); nil means the server's own settings apply to all.
+	Orgs OrgSource
 	// Metrics receives one call per served request; nil disables it.
 	Metrics Observer
 	// Telemetry starts a span for each mock request; nil records nothing.
@@ -192,4 +194,26 @@ func (s *Service) RequireSession(sc store.Scope) (session.Session, error) {
 // Observer receives the outcome of every served mock request.
 type Observer interface {
 	Request(org, method string, status int, layer, stage string)
+}
+
+// OrgSource finds an org by id, for the plan limits and settings the engine applies itself.
+type OrgSource interface {
+	ByID(id tenant.ID) (*tenant.Org, bool)
+}
+
+// org returns the org with the id, or nil when the engine has no directory of orgs.
+func (s *Service) org(t tenant.ID) *tenant.Org {
+	if s.Orgs == nil {
+		return nil
+	}
+	o, _ := s.Orgs.ByID(t)
+	return o
+}
+
+// orgSettings returns the org's own settings, which are the defaults when the org is not known.
+func (s *Service) orgSettings(t tenant.ID) tenant.Settings {
+	if o := s.org(t); o != nil {
+		return o.Settings
+	}
+	return tenant.Settings{}
 }

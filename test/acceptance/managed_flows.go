@@ -165,7 +165,7 @@ func (w *world) initManagedFlows(sc *godog.ScenarioContext) {
 		if m.snapshot, err = w.orgSnapshot(); err != nil {
 			return err
 		}
-		o, _ := w.app.Directory().ByID(tenant.ID(m.defaultOrg)) //nolint:errcheck // the snapshot found it
+		o, _ := w.app.Directory().ByID(tenant.ID(m.defaultOrg))
 		return w.directoryWrite(w.app.Directory().Put(*o))
 	})
 	sc.Step(`^the org, its mappings and its keys are unchanged$`, func() error {
@@ -221,10 +221,12 @@ func (w *world) initManagedFlows(sc *godog.ScenarioContext) {
 			return err
 		}
 		label := "key-" + own
-		if err = w.addKey(label, own, []string{"sessions", "read"}); err != nil {
+		err = w.addKey(label, own, []string{"sessions", "read"})
+		if err != nil {
 			return err
 		}
-		if err = w.ensureOrg(other); err != nil {
+		err = w.ensureOrg(other)
+		if err != nil {
 			return err
 		}
 		rep, err := w.managedAdminCall("GET", "/sessions", "", other, m.keyCred(label), nil)
@@ -244,7 +246,8 @@ func (w *world) initManagedFlows(sc *godog.ScenarioContext) {
 			return err
 		}
 		org := m.defaultOrg
-		if err = w.putGlobalMapping(org, "secret", "GET", "/secret", secretMappingBody); err != nil {
+		err = w.putGlobalMapping(org, "secret", "GET", "/secret", secretMappingBody)
+		if err != nil {
 			return err
 		}
 		for range sessions {
@@ -415,7 +418,7 @@ func (w *world) initManagedFlows(sc *godog.ScenarioContext) {
 		}
 		return w.createWithKey(name, label, 0)
 	})
-	mapOf := func(name, method, p, body string) string {
+	mapOf := func(method, p, body string) string {
 		return fmt.Sprintf(`{"request":{"method":%q,"url":%q},"response":{"status":200,"body":%q}}`, method, p, body)
 	}
 	sc.Step(`^adds a mapping to "([^"]*)" for "([A-Z]+) ([^"]*)" returning "([^"]*)"$`, func(name, method, p, body string) error {
@@ -423,7 +426,7 @@ func (w *world) initManagedFlows(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		rep, err := w.managedAdminCall("POST", "/sessions/"+w.vars[name+".id"]+"/mappings", mapOf(name, method, p, body), "", m.keyCred(w.vars["pipeline.key"]), nil)
+		rep, err := w.managedAdminCall("POST", "/sessions/"+w.vars[name+".id"]+"/mappings", mapOf(method, p, body), "", m.keyCred(w.vars["pipeline.key"]), nil)
 		if err != nil {
 			return err
 		}
@@ -546,7 +549,7 @@ func (w *world) initManagedFlows(sc *godog.ScenarioContext) {
 			return fmt.Errorf("the journal search gave %s, want the one unmatched request", truncate(w.last.body))
 		}
 		e := doc.Requests[0]
-		if e.Request.Method != "GET" || !strings.HasSuffix(e.Request.URL, "/claims/2") || e.Response.Status != http.StatusNotFound {
+		if e.Request.Method != http.MethodGet || !strings.HasSuffix(e.Request.URL, "/claims/2") || e.Response.Status != http.StatusNotFound {
 			return fmt.Errorf("the entry is %+v, want GET /claims/2 answered 404", e)
 		}
 		return nil
@@ -778,7 +781,7 @@ func (w *world) initManagedFlows(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		if err = w.mappingStored(m.defaultOrg, "GET /hello"); err != nil {
+		if err := w.mappingStored(m.defaultOrg, "GET /hello"); err != nil {
 			return err
 		}
 		if o, ok := w.app.Directory().ByID(tenant.ID(m.defaultOrg)); !ok || o.Limits != planLimit("team") {

@@ -196,3 +196,34 @@ func mustCreate(t *testing.T, r *Registry, req CreateRequest) Session {
 	}
 	return s
 }
+
+func TestPlanMaximumTTL(t *testing.T) {
+	t.Parallel()
+	r, clk := newRegistry()
+	start := clk.Now()
+	ctx := t.Context()
+	week := 7 * 24 * time.Hour
+	tests := []struct {
+		name string
+		req  CreateRequest
+		want apierr.Code
+	}{
+		{"within the plan", CreateRequest{Kind: URLBased, TTLSeconds: ttl(3600), PlanMaxTTL: week}, ""},
+		{"exactly the plan maximum", CreateRequest{Kind: URLBased, TTLSeconds: ttl(int64(week / time.Second)), PlanMaxTTL: week}, ""},
+		{"over the plan but under the server maximum", CreateRequest{Kind: URLBased, TTLSeconds: ttl(1209600), PlanMaxTTL: week}, apierr.TTLExceedsPlanMaximum},
+		{"over the server maximum says so first", CreateRequest{Kind: URLBased, TTLSeconds: ttl(2592001), PlanMaxTTL: week}, apierr.TTLExceedsMaximum},
+		{"no plan maximum", CreateRequest{Kind: URLBased, TTLSeconds: ttl(1209600)}, ""},
+	}
+	for _, tt := range tests {
+		if _, err := r.Create(ctx, tenant.Local, tt.req); code(err) != tt.want {
+			t.Errorf("%s: error %v, want %q", tt.name, err, tt.want)
+		}
+	}
+	short, err := r.Create(ctx, tenant.Local, CreateRequest{Kind: URLBased, PlanMaxTTL: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !short.ExpiresAt.Equal(start.Add(time.Hour)) {
+		t.Errorf("the default TTL of a plan that allows less must be cut to it: expires %s", short.ExpiresAt)
+	}
+}

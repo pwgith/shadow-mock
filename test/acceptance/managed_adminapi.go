@@ -28,7 +28,7 @@ var storyStart = time.Date(2026, 10, 30, 8, 0, 0, 0, time.UTC)
 
 // tableRows turns a table into one map per row, keyed by the header cells.
 func tableRows(t *godog.Table) []map[string]string {
-	var out []map[string]string
+	out := make([]map[string]string, 0, len(t.Rows)-1)
 	for _, row := range t.Rows[1:] {
 		r := map[string]string{}
 		for i, c := range row.Cells {
@@ -94,7 +94,7 @@ func (w *world) initManagedAdminAPI(sc *godog.ScenarioContext) {
 		ttl := int64(60)
 		for _, r := range rows {
 			if r["state"] == "expired" {
-				if err = create(r, &ttl); err != nil {
+				if err := create(r, &ttl); err != nil {
 					return err
 				}
 			}
@@ -102,7 +102,7 @@ func (w *world) initManagedAdminAPI(sc *godog.ScenarioContext) {
 		w.clk.advance(2 * time.Minute)
 		for _, r := range rows {
 			if r["state"] != "expired" {
-				if err = create(r, nil); err != nil {
+				if err := create(r, nil); err != nil {
 					return err
 				}
 			}
@@ -325,7 +325,7 @@ func (w *world) initManagedAdminAPI(sc *godog.ScenarioContext) {
 		if _, err = w.app.Service().Sessions.Create(ctxBackground(), tenant.ID(m.defaultOrg), session.CreateRequest{Kind: session.KeyBased, Name: "short", TTLSeconds: &ttl}); err != nil {
 			return err
 		}
-		if err = w.putGlobalMapping(m.defaultOrg, "hello", "GET", "/hello", "hello"); err != nil {
+		if err := w.putGlobalMapping(m.defaultOrg, "hello", "GET", "/hello", "hello"); err != nil {
 			return err
 		}
 		for h := range hours {
@@ -334,13 +334,13 @@ func (w *world) initManagedAdminAPI(sc *godog.ScenarioContext) {
 				w.app.Service().ReapOnce(ctxBackground())
 			}
 			for _, p := range []string{"/hello", "/hello", "/unknown"} {
-				if err = w.sendOne(newRequest("GET", "/"+m.orgs[m.defaultOrg].handle+p)); err != nil {
+				if err := w.sendOne(newRequest("GET", "/"+m.orgs[m.defaultOrg].handle+p)); err != nil {
 					return err
 				}
 			}
 		}
 		w.clk.set(storyStart.Add(time.Duration(hours-1)*time.Hour + 30*time.Minute))
-		if err = w.sendOne(newRequest("GET", "/"+m.orgs[m.defaultOrg].handle+"/hello")); err != nil {
+		if err := w.sendOne(newRequest("GET", "/"+m.orgs[m.defaultOrg].handle+"/hello")); err != nil {
 			return err
 		}
 		w.vars["from"], w.vars["to"] = storyStart.Format(time.RFC3339), storyStart.Add(time.Duration(hours)*time.Hour).Format(time.RFC3339)
@@ -580,7 +580,8 @@ func (w *world) initManagedAdminAPI(sc *godog.ScenarioContext) {
 		var stored struct {
 			ID string `json:"id"`
 		}
-		if err = json.Unmarshal(rep.body, &stored); err != nil {
+		err = json.Unmarshal(rep.body, &stored)
+		if err != nil {
 			return err
 		}
 		rep, err = w.mustAdmin("GET", "/sessions/${U1.id}/mappings/"+stored.ID, "", 200)
@@ -588,7 +589,7 @@ func (w *world) initManagedAdminAPI(sc *godog.ScenarioContext) {
 			return err
 		}
 		var got map[string]any
-		if err = json.Unmarshal(rep.body, &got); err != nil {
+		if err := json.Unmarshal(rep.body, &got); err != nil {
 			return err
 		}
 		if team, _ := got["x-owner"].(map[string]any)["team"].(string); team != "claims" { //nolint:errcheck // a missing field reads as empty

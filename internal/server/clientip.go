@@ -49,11 +49,7 @@ func (c ClientIP) From(r *http.Request) netip.Addr {
 	}
 	var hops []string
 	for _, v := range r.Header.Values(c.Header) {
-		for _, part := range strings.Split(v, ",") {
-			if p := strings.TrimSpace(part); p != "" {
-				hops = append(hops, p)
-			}
-		}
+		hops = append(hops, splitHops(v)...)
 	}
 	if len(hops) == 0 {
 		return peer
@@ -82,6 +78,17 @@ func (c ClientIP) From(r *http.Request) netip.Addr {
 		return peer
 	}
 	return a.Unmap()
+}
+
+// splitHops reads the addresses of one header value, which a proxy writes as a comma-separated list.
+func splitHops(v string) []string {
+	var hops []string
+	for _, part := range strings.Split(v, ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			hops = append(hops, p)
+		}
+	}
+	return hops
 }
 
 func (c ClientIP) trusted(a netip.Addr) bool {

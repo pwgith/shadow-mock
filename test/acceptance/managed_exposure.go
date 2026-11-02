@@ -1,6 +1,7 @@
 package acceptance
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -59,7 +60,7 @@ func (w *world) initManagedExposure(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		if err = w.get("/__metrics", http.Header{"Authorization": {"Bearer " + w.systemToken()}}); err != nil {
+		if err := w.get("/__metrics", http.Header{"Authorization": {"Bearer " + w.systemToken()}}); err != nil {
 			return err
 		}
 		if w.last == nil || w.last.status != http.StatusOK {
@@ -70,7 +71,7 @@ func (w *world) initManagedExposure(sc *godog.ScenarioContext) {
 			return fmt.Errorf("the metrics do not name the org by its id:\n%s", truncate(w.last.body))
 		}
 		for _, o := range m.orgs {
-			if o.handle != string(o.id) && strings.Contains(scrape, o.handle) {
+			if o.handle != o.id && strings.Contains(scrape, o.handle) {
 				return fmt.Errorf("the metrics carry the handle %q:\n%s", o.handle, truncate(w.last.body))
 			}
 		}
@@ -161,11 +162,11 @@ func (w *world) initManagedExposure(sc *godog.ScenarioContext) {
 		const forwarded = "6.6.6.6, 203.0.113.4, 10.2.2.2"
 		want := map[string]string{"staging": "10.2.2.2", "production": "203.0.113.4"}
 		for env, client := range want {
-			var cfg config.Config = config.Default()
+			cfg := config.Default()
 			if err := config.Merge(&cfg, []byte("server: { clientIp: { header: X-Forwarded-For, trustedHops: "+w.vars["env."+env]+" } }")); err != nil {
 				return err
 			}
-			req, err := http.NewRequest("GET", "/", nil) //nolint:noctx // a value for the lookup, never sent
+			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", http.NoBody)
 			if err != nil {
 				return err
 			}

@@ -2,7 +2,7 @@
 
 Generated from the `@FR-*` and `@NFR-*` tags in the feature files. Regenerate it when tags change. Every requirement in [REQUIREMENTS.md](../docs/REQUIREMENTS.md) has at least one feature.
 
-Managed-mode features tagged `@managed` run in the acceptance suite against the engine on one instance with the stores in memory (`test/acceptance/managed*.go`): the trusted issuer, Tool app keys, org match, roles, global writes, the metadata scope, org state, handles and aliases, handle routing, tenant isolation, the global layer, the org rate limit, the start-up checks of managed mode (`managed_mode_guards.feature`), the admin endpoints closed in managed mode (`admin_endpoints_in_managed_mode.feature`) and the egress policy for literal addresses (`egress_policy.feature`), the network features (`client_ip`, `ip_allowlist`, `metrics_and_health_exposure`), usage metering and the rate limits (`usage_metering`, `rate_and_session_limits`), audit, purge and anonymise, the admin API the management app relies on (`05_management_app/admin_api_for_management_app.feature`) and the engine's part of the platform flows (`08_platform_flows`). Features still tagged `@saas` are not run yet; a comment above each says what is missing: the shared stack (change listener, propagation, database contract, hot and warm journal, object storage, file storage and degraded operation, health and shutdown, shared runtime state), the org's journal and compression settings, shadow mock and mapping limits per plan, plan feature switches, the stub-mapping schema file, and the management app's own screens. The in-process parts of FR-9.3 to FR-9.6b and FR-11.x are tested in Go instead, in `internal/app/managed_test.go` and the `internal/auth`, `internal/tenant`, `internal/usage` and `internal/audit` packages. The Postgres, Redis and S3 drivers are built and tested in Go: the object-store drivers share one contract suite (`internal/blob/blobtest`) and are tested against an S3 fake and, for failures, against Shadow Mock itself as a failing store; the counters share a suite with the in-memory ones (`internal/countertest`); the Postgres tests and the full managed-mode test on Postgres, Redis and object storage run in CI against a Postgres service container. Without `SHADOWMOCK_TEST_POSTGRES_DSN` they run locally on PGlite, an in-memory Postgres under Node (`npm ci` in `test/pglite`; `internal/store/postgres/pgtest`). PGlite has no LISTEN/NOTIFY, so the notification test and the live-update step of the managed test are skipped there and only CI covers them. Not built yet: Redis for shadow-mock sessions and the hot journal, the warm journal, and persisting usage.
+Managed-mode features tagged `@managed` run in the acceptance suite against the engine on one instance with the stores in memory (`test/acceptance/managed*.go`): the trusted issuer, Tool app keys, org match, roles, global writes, the metadata scope, org state, handles and aliases, handle routing, tenant isolation, the global layer, the org rate limit, the start-up checks of managed mode (`managed_mode_guards.feature`), the admin endpoints closed in managed mode (`admin_endpoints_in_managed_mode.feature`) and the egress policy for literal addresses (`egress_policy.feature`), the network features (`client_ip`, `ip_allowlist`, `metrics_and_health_exposure`), usage metering and the rate limits (`usage_metering`, `rate_and_session_limits`), audit, purge and anonymise, the admin API the management app relies on (`05_management_app/admin_api_for_management_app.feature`) and the engine's part of the platform flows (`08_platform_flows`). Features still tagged `@saas` are not run yet; a comment above each says what is missing: the shared stack (change listener, propagation, database contract, hot and warm journal, object storage, file storage and degraded operation, health and shutdown, shared runtime state), and the `@saas` scenarios of other features that need a second instance or the shared stack. The org's journal and compression settings, the shadow mock, mapping and URL-TTL limits of a plan, the plan feature switch (IP allowlist), the usage warning header and the stub-mapping schema file (`schema/stub-mapping.schema.json`, generated from `api/openapi.yaml` and tested in `api/schema_test.go`) are built and run (`04_saas/plans_and_limits/org_settings.feature`, `rate_and_session_limits`, `08_platform_flows/plans_and_limits_flows`). What the management app does itself is specified in the platform repository, not here. The in-process parts of FR-9.3 to FR-9.6b and FR-11.x are tested in Go instead, in `internal/app/managed_test.go` and the `internal/auth`, `internal/tenant`, `internal/usage` and `internal/audit` packages. The Postgres, Redis and S3 drivers are built and tested in Go: the object-store drivers share one contract suite (`internal/blob/blobtest`) and are tested against an S3 fake and, for failures, against Shadow Mock itself as a failing store; the counters share a suite with the in-memory ones (`internal/countertest`); the Postgres tests and the full managed-mode test on Postgres, Redis and object storage run in CI against a Postgres service container. Without `SHADOWMOCK_TEST_POSTGRES_DSN` they run locally on PGlite, an in-memory Postgres under Node (`npm ci` in `test/pglite`; `internal/store/postgres/pgtest`). PGlite has no LISTEN/NOTIFY, so the notification test and the live-update step of the managed test are skipped there and only CI covers them. Not built yet: Redis for shadow-mock sessions and the hot journal, the warm journal, and persisting usage.
 
 | Requirement | Feature files |
 |---|---|
@@ -27,18 +27,18 @@ Managed-mode features tagged `@managed` run in the acceptance suite against the 
 | FR-3.6 | `01_wiremock_parity/responses/unmatched_requests.feature` |
 | FR-4.1 | `07_stateful_responses/call_count_responses.feature` |
 | FR-4.2 | `02_shadow_mocks/key_based/call_count_isolation.feature`, `07_stateful_responses/call_count_responses.feature` |
-| FR-4.3 | `05_management_app/sessions_and_runtime.feature`, `07_stateful_responses/call_count_responses.feature` |
-| FR-4.4 | `05_management_app/sessions_and_runtime.feature`, `07_stateful_responses/scenarios_not_supported.feature` |
+| FR-4.3 | `07_stateful_responses/call_count_responses.feature` |
+| FR-4.4 | `07_stateful_responses/scenarios_not_supported.feature` |
 | FR-5.1 | `01_wiremock_parity/journal/request_journal.feature` |
 | FR-5.2 | `01_wiremock_parity/journal/verification.feature` |
-| FR-5.3 | `01_wiremock_parity/journal/near_misses.feature`, `05_management_app/journal_browsing.feature` |
+| FR-5.3 | `01_wiremock_parity/journal/near_misses.feature` |
 | FR-5.4 | `01_wiremock_parity/journal/request_journal.feature` |
 | FR-5.5 | `01_wiremock_parity/journal/verification.feature`, `04_saas/journal/hot_journal.feature` |
-| FR-5.6 | `04_saas/journal/warm_journal.feature`, `05_management_app/journal_browsing.feature`, `05_management_app/org_settings.feature` |
+| FR-5.6 | `04_saas/journal/warm_journal.feature` |
 | FR-6.1 | `01_wiremock_parity/record_playback/recording.feature`, `01_wiremock_parity/record_playback/snapshot.feature`, `02_shadow_mocks/common/recording_into_sessions.feature` |
 | FR-6.2 | `01_wiremock_parity/webhooks/webhooks.feature` |
 | FR-6.3 | `01_wiremock_parity/admin/admin_misc.feature`, `01_wiremock_parity/mappings/mapping_admin_api.feature` |
-| FR-6.4 | `01_wiremock_parity/mappings/mapping_admin_api.feature`, `01_wiremock_parity/admin/admin_diagnostics.feature`, `05_management_app/sessions_and_runtime.feature` |
+| FR-6.4 | `01_wiremock_parity/mappings/mapping_admin_api.feature`, `01_wiremock_parity/admin/admin_diagnostics.feature` |
 | FR-6.5 | `01_wiremock_parity/admin/admin_misc.feature`, `03_standalone/server_settings.feature`, `04_saas/auth/global_writes_restriction.feature` |
 | FR-7.1 | `02_shadow_mocks/key_based/lifecycle.feature` |
 | FR-7.2 | `02_shadow_mocks/key_based/lifecycle.feature`, `02_shadow_mocks/url_based/lifecycle.feature` |
@@ -66,12 +66,12 @@ Managed-mode features tagged `@managed` run in the acceptance suite against the 
 | FR-9.3b | `04_saas/auth/tool_app_keys.feature` |
 | FR-9.4 | `04_saas/auth/roles_and_permissions.feature`, `04_saas/tenancy/tenant_isolation.feature` |
 | FR-9.5 | `04_saas/auth/roles_and_permissions.feature` |
-| FR-9.5a | `04_saas/auth/global_writes_restriction.feature`, `05_management_app/global_mappings.feature` |
-| FR-9.6 | `04_saas/tenancy/handle_aliases.feature`, `04_saas/tenancy/org_handle_routing.feature`, `05_management_app/org_settings.feature` |
+| FR-9.5a | `04_saas/auth/global_writes_restriction.feature` |
+| FR-9.6 | `04_saas/tenancy/handle_aliases.feature`, `04_saas/tenancy/org_handle_routing.feature` |
 | FR-9.6a | `04_saas/auth/org_match.feature` |
-| FR-9.6b | `03_standalone/listeners_and_allowlist.feature`, `04_saas/network/client_ip.feature`, `04_saas/network/ip_allowlist.feature`, `05_management_app/org_settings.feature` |
+| FR-9.6b | `03_standalone/listeners_and_allowlist.feature`, `04_saas/network/client_ip.feature`, `04_saas/network/ip_allowlist.feature` |
 | FR-9.7 | `04_saas/tenancy/org_handle_routing.feature`, `04_saas/tenancy/tenant_isolation.feature`, `04_saas/tenancy/org_state.feature` |
-| FR-9.8 | `04_saas/data_sync/change_propagation.feature`, `04_saas/data_sync/change_listener.feature`, `05_management_app/global_mappings.feature` |
+| FR-9.8 | `04_saas/data_sync/change_propagation.feature`, `04_saas/data_sync/change_listener.feature` |
 | FR-10.1 | `01_wiremock_parity/request_matching/jsonpath_dialect.feature` (filters, functions and how their results print) |
 | FR-10.2 | `01_wiremock_parity/request_matching/jsonpath_dialect.feature` |
 | FR-10.3 | `01_wiremock_parity/responses/template_blocks.feature` |
@@ -115,7 +115,7 @@ Managed-mode features tagged `@managed` run in the acceptance suite against the 
 | NFR-3.3 | `03_standalone/storage_backends.feature`, `04_saas/data_sync/change_propagation.feature` |
 | NFR-4.1 | `04_saas/data_sync/change_propagation.feature`, `04_saas/operations/shared_runtime_state.feature` |
 | NFR-4.2 | `04_saas/plans_and_limits/rate_and_session_limits.feature`, `04_saas/plans_and_limits/org_rate_limit.feature` |
-| NFR-4.3 | `04_saas/plans_and_limits/usage_metering.feature`, `05_management_app/billing_and_plans.feature` |
+| NFR-4.3 | `04_saas/plans_and_limits/usage_metering.feature` |
 | NFR-4.4 | `04_saas/journal/hot_journal.feature` |
 | NFR-5.1 | `02_shadow_mocks/key_based/lifecycle.feature`, `02_shadow_mocks/url_based/lifecycle.feature`, `06_non_functional/security.feature` |
 | NFR-5.2 | `03_standalone/listeners_and_allowlist.feature` |

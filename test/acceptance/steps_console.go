@@ -89,7 +89,7 @@ auth:
 			return fmt.Errorf("Content-Type = %q, want HTML", ct)
 		}
 		m := adminBaseMeta.FindStringSubmatch(page)
-		if m == nil || m[1] != admin {
+		if len(m) < 2 || m[1] != admin {
 			return fmt.Errorf("the page names the admin API as %v, want %q", m, admin)
 		}
 		for _, ref := range pageRefs.FindAllStringSubmatch(page, -1) {
@@ -149,8 +149,8 @@ func (w *world) consoleCallFor(name, id, stub string, body any) (*reply, error) 
 }
 
 // consoleObject makes a call the console expects to succeed and reads the JSON object it answers.
-func (w *world) consoleObject(name, id string, body any) (map[string]any, error) {
-	rep, err := w.consoleCall(name, id, body)
+func (w *world) consoleObject(name string, body any) (map[string]any, error) {
+	rep, err := w.consoleCall(name, "", body)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +164,18 @@ func (w *world) consoleObject(name, id string, body any) (map[string]any, error)
 	return doc, nil
 }
 
+// as returns v as a T, or T's zero value when v holds anything else.
+func as[T any](v any) T {
+	t, ok := v.(T)
+	if !ok {
+		var zero T
+		return zero
+	}
+	return t
+}
+
 func objects(v any) []map[string]any {
-	list, _ := v.([]any)
+	list := as[[]any](v)
 	out := make([]map[string]any, 0, len(list))
 	for _, e := range list {
 		if m, ok := e.(map[string]any); ok {
@@ -196,7 +206,7 @@ func (w *world) initConsoleJournal(sc *godog.ScenarioContext) {
 		if err := w.openConsole(); err != nil {
 			return err
 		}
-		doc, err := w.consoleObject("unmatched", "", nil)
+		doc, err := w.consoleObject("unmatched", nil)
 		if err != nil {
 			return err
 		}
@@ -206,9 +216,9 @@ func (w *world) initConsoleJournal(sc *godog.ScenarioContext) {
 		}
 		w.console.entry = entries[0]
 		// As app.js does: the entry's request, with each header joined to one string, goes to the near-miss call.
-		req, _ := w.console.entry["request"].(map[string]any)
+		req := as[map[string]any](w.console.entry["request"])
 		headers := map[string]string{}
-		hdr, _ := req["headers"].(map[string]any)
+		hdr := as[map[string]any](req["headers"])
 		for k, v := range hdr {
 			if list, ok := v.([]any); ok {
 				parts := make([]string, 0, len(list))
@@ -221,10 +231,10 @@ func (w *world) initConsoleJournal(sc *godog.ScenarioContext) {
 			}
 		}
 		sample := map[string]any{"method": req["method"], "url": req["url"], "headers": headers}
-		if body, _ := req["body"].(string); body != "" {
+		if body := as[string](req["body"]); body != "" {
 			sample["body"] = body
 		}
-		near, err := w.consoleObject("nearMisses", "", sample)
+		near, err := w.consoleObject("nearMisses", sample)
 		if err != nil {
 			return err
 		}
@@ -233,24 +243,24 @@ func (w *world) initConsoleJournal(sc *godog.ScenarioContext) {
 	})
 	sc.Step(`^it shows the request, the response and the closest mappings with why each missed$`, func() error {
 		e := w.console.entry
-		req, _ := e["request"].(map[string]any)
-		resp, _ := e["response"].(map[string]any)
+		req := as[map[string]any](e["request"])
+		resp := as[map[string]any](e["response"])
 		if req["method"] != "GET" || req["url"] != "/claims/1" {
 			return fmt.Errorf("the entry's request is %v, want GET /claims/1", req)
 		}
 		if _, ok := resp["status"].(float64); !ok {
 			return fmt.Errorf("the entry has no response status: %v", resp)
 		}
-		if matched, _ := e["wasMatched"].(bool); matched {
+		if as[bool](e["wasMatched"]) {
 			return errors.New("the entry says it was matched")
 		}
 		if len(w.console.nearMisses) == 0 {
 			return errors.New("the console shows no closest mapping")
 		}
 		for _, nm := range w.console.nearMisses {
-			stub, _ := nm["stubMapping"].(map[string]any)
-			result, _ := nm["matchResult"].(map[string]any)
-			missed, _ := nm["missed"].([]any)
+			stub := as[map[string]any](nm["stubMapping"])
+			result := as[map[string]any](nm["matchResult"])
+			missed := as[[]any](nm["missed"])
 			if stub["request"] == nil {
 				return fmt.Errorf("a closest mapping has no request pattern to show: %v", nm)
 			}
@@ -261,7 +271,7 @@ func (w *world) initConsoleJournal(sc *godog.ScenarioContext) {
 				return fmt.Errorf("a closest mapping does not say why it missed: %v", nm)
 			}
 		}
-		if missed, _ := w.console.nearMisses[0]["missed"].([]any); !slices.Contains(missed, any("Header [Accept]")) {
+		if missed := as[[]any](w.console.nearMisses[0]["missed"]); !slices.Contains(missed, any("Header [Accept]")) {
 			return fmt.Errorf("the closest mapping missed on %v, want it to name Header [Accept]", missed)
 		}
 		return nil
@@ -274,23 +284,23 @@ func (w *world) initConsoleDryRun(sc *godog.ScenarioContext) {
 		if err := w.ensure(); err != nil {
 			return err
 		}
-		doc, err := w.consoleObject("dryRun", "", map[string]any{"request": map[string]any{"method": method, "url": target}})
+		doc, err := w.consoleObject("dryRun", map[string]any{"request": map[string]any{"method": method, "url": target}})
 		w.console.dryRun = doc
 		return err
 	})
 	sc.Step(`^it shows which layer and mapping would serve it and the rendered response$`, func() error {
 		d := w.console.dryRun
-		if matched, _ := d["matched"].(bool); !matched {
+		if !as[bool](d["matched"]) {
 			return fmt.Errorf("the dry run matched nothing: %v", d)
 		}
-		if layer, _ := d["layer"].(string); layer != "global" {
+		if layer := as[string](d["layer"]); layer != "global" {
 			return fmt.Errorf("the dry run names layer %q, want global", d["layer"])
 		}
-		if stub, _ := d["stubMapping"].(map[string]any); stub == nil {
+		if as[map[string]any](d["stubMapping"]) == nil {
 			return fmt.Errorf("the dry run names no mapping: %v", d)
 		}
-		resp, _ := d["response"].(map[string]any)
-		if status, _ := resp["status"].(float64); status != 200 || resp["body"] != "claim one" {
+		resp := as[map[string]any](d["response"])
+		if status := as[float64](resp["status"]); status != 200 || resp["body"] != "claim one" {
 			return fmt.Errorf("the dry run's response is %v, want 200 with the body \"claim one\"", resp)
 		}
 		return nil
@@ -314,14 +324,13 @@ func (w *world) initConsoleDryRun(sc *godog.ScenarioContext) {
 }
 
 func (w *world) shownSessions() ([]string, error) {
-	doc, err := w.consoleObject("sessions", "", nil)
+	doc, err := w.consoleObject("sessions", nil)
 	if err != nil {
 		return nil, err
 	}
 	var ids []string
 	for _, s := range objects(doc["sessions"]) {
-		id, _ := s["id"].(string)
-		ids = append(ids, id)
+		ids = append(ids, as[string](s["id"]))
 	}
 	sort.Strings(ids)
 	return ids, nil
@@ -476,7 +485,7 @@ func (w *world) initConsoleAccess(sc *godog.ScenarioContext) {
 		// The refusal is the token's doing: the same call with a token is served.
 		w.adminToken = "admin-token-0123456789"
 		defer func() { w.adminToken = "" }()
-		_, err := w.consoleObject("journal", "", nil)
+		_, err := w.consoleObject("journal", nil)
 		return err
 	})
 }
@@ -485,6 +494,7 @@ func (w *world) initConsoleAccess(sc *godog.ScenarioContext) {
 // server, which this harness cannot reach, is answered with a canned success.
 type cliRecorder struct{ w *world }
 
+// RoundTrip answers a call to the engine through the in-process handler and records every call it sees.
 func (t cliRecorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	var body []byte
 	if req.Body != nil {
@@ -580,7 +590,7 @@ func (w *world) initCLI(sc *godog.ScenarioContext) {
 			return fmt.Errorf("the command made %d calls, want 1", len(w.console.cliCalls))
 		}
 		if got, want := w.console.cliCalls[0].auth, "Bearer "+w.console.cliKey; got != want {
-			return fmt.Errorf("Authorization = %q, want %q", got, want)
+			return fmt.Errorf("the Authorization header is %q, want %q", got, want)
 		}
 		return nil
 	})

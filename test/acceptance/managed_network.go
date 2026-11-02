@@ -277,10 +277,10 @@ func (w *world) initManagedNetwork(sc *godog.ScenarioContext) {
 	})
 
 	// The platform proxy and a client that goes round it.
-	sc.Step(`^the proxy simulator forwards a request from real IP "([^"]*)" carrying client header "([^:"]*): ([^"]*)"$`, func(real, name, value string) error {
+	sc.Step(`^the proxy simulator forwards a request from real IP "([^"]*)" carrying client header "([^:"]*): ([^"]*)"$`, func(realIP, name, value string) error {
 		r := newRequest("GET", w.mockPath("/x"))
 		// What the proxy does: it adds the address it saw to the end of whatever the client sent.
-		r.header.Set(name, value+", "+real)
+		r.header.Set(name, value+", "+realIP)
 		r.header.Set(harnessPeerHeader, proxyAddr)
 		return w.sendOne(r)
 	})

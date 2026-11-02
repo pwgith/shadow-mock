@@ -158,6 +158,16 @@ type serveEvent struct {
 	ShadowMock         shadowView                `json:"shadowMock"`
 	// Source is the label the management app stamped on the mapping that served the request (FR-11.10).
 	Source string `json:"source,omitempty"`
+	// Bodies says why the entry has no bodies, or that they were cut (FR-11.11b).
+	Bodies *bodiesView `json:"bodies,omitempty"`
+}
+
+// bodiesView explains a journal entry whose bodies are not whole: the org's journal settings keep them out, or the
+// size cap cut them.
+type bodiesView struct {
+	Stored      bool   `json:"stored"`
+	Reason      string `json:"reason,omitempty"`
+	TruncatedAt int    `json:"truncatedAt,omitempty"`
 }
 
 // layerOf returns the layer that served an entry, or for an unmatched entry the most
@@ -195,6 +205,12 @@ func eventView(e *journal.Entry) serveEvent {
 	}
 	v.Response.Body = bodyText(e.Response.Body)
 	v.Response.BodyAsBase64 = base64.StdEncoding.EncodeToString(e.Response.Body)
+	switch {
+	case e.BodiesOmitted != "":
+		v.Bodies = &bodiesView{Reason: e.BodiesOmitted}
+	case e.BodyTruncatedAt > 0:
+		v.Bodies = &bodiesView{Stored: true, Reason: "size_cap", TruncatedAt: e.BodyTruncatedAt}
+	}
 	if e.SessionID != "" {
 		id := e.SessionID
 		v.ShadowMock.SessionID = &id

@@ -176,6 +176,6 @@ func (h *Handler) snapshot(w http.ResponseWriter, r *http.Request, sc store.Scop
 
 // The versions a release reports, so the management app can check them against the ones it was built for.
 const (
-	SchemaVersion        = 1
+	SchemaVersion        = 2
 	MappingSchemaVersion = 1
 )

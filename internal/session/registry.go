@@ -63,12 +63,15 @@ type CreateRequest struct {
 	CreatedBy  string
 	// CreatedByKey is the label of the Tool app key that made the session.
 	CreatedByKey string
+	// PlanMaxTTL is the longest lifetime the org's plan allows for this kind of shadow mock, if shorter than the
+	// registry's own maximum. Zero means no plan limit.
+	PlanMaxTTL time.Duration
 }
 
 // Create validates and registers a new session.
 func (r *Registry) Create(_ context.Context, t tenant.ID, req CreateRequest) (Session, error) {
 	now := r.clock.Now().UTC()
-	ttl, err := r.checkTTL(req.Kind, req.TTLSeconds)
+	ttl, err := r.checkTTL(req.Kind, req.TTLSeconds, req.PlanMaxTTL)
 	if err != nil {
 		return Session{}, err
 	}
@@ -109,9 +112,12 @@ func (r *Registry) Create(_ context.Context, t tenant.ID, req CreateRequest) (Se
 	return s, nil
 }
 
-func (r *Registry) checkTTL(k Kind, seconds *int64) (time.Duration, error) {
+func (r *Registry) checkTTL(k Kind, seconds *int64, planMax time.Duration) (time.Duration, error) {
 	def, maxTTL := r.limits.ttl(k)
 	if seconds == nil {
+		if planMax > 0 && def > planMax {
+			def = planMax
+		}
 		return def, nil
 	}
 	if *seconds <= 0 {
@@ -121,6 +127,10 @@ func (r *Registry) checkTTL(k Kind, seconds *int64) (time.Duration, error) {
 	if ttl > maxTTL {
 		return 0, apierr.New(http.StatusUnprocessableEntity, apierr.TTLExceedsMaximum,
 			"ttlSeconds %d exceeds the maximum of %d for %s shadow mocks.", *seconds, int64(maxTTL/time.Second), k)
+	}
+	if planMax > 0 && ttl > planMax {
+		return 0, apierr.New(http.StatusUnprocessableEntity, apierr.TTLExceedsPlanMaximum,
+			"ttlSeconds %d exceeds the %d that the org's plan allows for %s shadow mocks.", *seconds, int64(planMax/time.Second), k)
 	}
 	return ttl, nil
 }

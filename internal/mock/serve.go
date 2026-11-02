@@ -199,6 +199,7 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return
 	}
 	markMatched(out.Header, stub)
+	out.GzipDisabled = out.GzipDisabled || s.orgSettings(sv.entry.Tenant).NoCompression
 	if s.Config.MatchedHeader {
 		out.Header.Set("X-Shadow-Mock-Matched", layerLabel(res.Layer.Scope)+";layer="+string(res.Layer.Kind))
 	}
@@ -265,6 +266,28 @@ func (s *Service) fail(w http.ResponseWriter, sv *served, req *match.Request, er
 	ae.Write(w)
 }
 
+// forJournal applies the org's journal settings to an entry about to be kept (FR-11.11d). It returns nil for an entry
+// the settings keep out, and else the entry, or a copy of it with the bodies left out.
+func (s *Service) forJournal(e *journal.Entry) *journal.Entry {
+	set := s.orgSettings(e.Tenant)
+	switch set.JournalCapture {
+	case tenant.CaptureOff:
+		return nil
+	case tenant.CaptureSessionsUnmatched:
+		if len(e.Sessions) == 0 && e.Matched() {
+			return nil
+		}
+	}
+	if !set.NoJournalBodies {
+		return e
+	}
+	cp := *e
+	cp.Request = e.Request.WithBody(nil)
+	cp.Response.Body = nil
+	cp.BodiesOmitted = journal.BodiesOffByOrg
+	return &cp
+}
+
 func (s *Service) finish(sv *served) {
 	if sv.done {
 		return
@@ -273,7 +296,9 @@ func (s *Service) finish(sv *served) {
 	e := sv.entry
 	e.ProcessTime = s.Clock.Now().Sub(sv.start).Milliseconds()
 	if e.Request != nil {
-		s.Journal.Append(e)
+		if kept := s.forJournal(e); kept != nil {
+			s.Journal.Append(kept)
+		}
 	}
 	path := ""
 	if e.Request != nil {

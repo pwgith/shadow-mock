@@ -53,7 +53,7 @@ func (s *Service) CreateSession(ctx context.Context, t tenant.ID, kind session.K
 	if err != nil {
 		return session.Session{}, err
 	}
-	if limit := s.Config.Limits.MaxMappingsPerSession; limit > 0 && len(mappings) > limit {
+	if limit := s.mappingsPerSessionLimit(t); limit > 0 && len(mappings) > limit {
 		return session.Session{}, apierr.New(http.StatusTooManyRequests, apierr.MappingLimitReached,
 			"A shadow mock may hold at most %d mappings, and this one starts with %d.", limit, len(mappings))
 	}
@@ -63,6 +63,7 @@ func (s *Service) CreateSession(ctx context.Context, t tenant.ID, kind session.K
 	sess, err := s.Sessions.Create(ctx, t, session.CreateRequest{
 		Kind: kind, Name: req.Name, TTLSeconds: req.TTLSeconds, Tokens: req.Tokens, ParentID: req.ParentID,
 		Masks: req.Masks, Metadata: req.Metadata, CreatedBy: createdBy, CreatedByKey: req.CreatedByKey,
+		PlanMaxTTL: s.planMaxTTL(t, kind),
 	})
 	if err != nil {
 		return session.Session{}, err
@@ -146,6 +147,9 @@ func (s *Service) validateMasks(masks []model.Mask) error {
 func (s *Service) UpdateSession(ctx context.Context, t tenant.ID, id string, p session.Patch) (session.Session, error) {
 	if err := s.validateMasks(p.AddMasks); err != nil {
 		return session.Session{}, err
+	}
+	if cur, ok := s.Sessions.Get(t, id); ok {
+		p.PlanMaxTTL = s.planMaxTTL(t, cur.Kind)
 	}
 	sess, err := s.Sessions.Update(ctx, t, id, p)
 	if err != nil {

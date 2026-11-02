@@ -180,17 +180,19 @@ func (m *managedWorld) serveJWKS(rw http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(rw).Encode(set) //nolint:errcheck // the client may have gone
 }
 
-// planLimit is what a plan allows that the engine enforces itself (FR-11.5, FR-11.6).
+// planLimit is what a plan allows that the engine enforces itself (FR-11.5, FR-11.6, FR-11.12): the request rate,
+// the monthly cap, and the shadow mocks (SAAS.md Â§12: a ceiling of 3 times the included number, and for Free no
+// more than are included).
 func planLimit(plan string) tenant.Limits {
 	switch strings.ToLower(plan) {
 	case "free":
-		return tenant.Limits{RequestsPerSecond: 10, Burst: 10, MonthlyRequestCap: 100_000}
+		return tenant.Limits{RequestsPerSecond: 10, Burst: 10, MonthlyRequestCap: 100_000, IncludedSessions: 2, MaxSessions: 2, MaxURLTTL: 7 * 24 * time.Hour}
 	case "starter":
-		return tenant.Limits{RequestsPerSecond: 100, Burst: 100}
+		return tenant.Limits{RequestsPerSecond: 100, Burst: 100, IncludedSessions: 10, MaxSessions: 30}
 	case "team":
-		return tenant.Limits{RequestsPerSecond: 200, Burst: 200}
+		return tenant.Limits{RequestsPerSecond: 200, Burst: 200, IncludedSessions: 50, MaxSessions: 150}
 	default: // Business and anything else
-		return tenant.Limits{RequestsPerSecond: 2000, Burst: 2000}
+		return tenant.Limits{RequestsPerSecond: 2000, Burst: 2000, IncludedSessions: 250, MaxSessions: 750}
 	}
 }
 
@@ -403,6 +405,7 @@ func (w *world) initManaged(sc *godog.ScenarioContext) {
 	w.initManagedPurge(sc)
 	w.initManagedAdminAPI(sc)
 	w.initManagedFlows(sc)
+	w.initManagedPlan(sc)
 }
 
 // eventually runs check until it passes or the time is up, waiting in real time between tries. It returns the last

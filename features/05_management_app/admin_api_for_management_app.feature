@@ -1,4 +1,4 @@
-@managed @management-app @P5 @FR-11.11 @FR-11.10 @NFR-2.4 @TA-3 @TA-6
+@managed @P5 @FR-11.11 @FR-11.10 @NFR-2.4 @TA-3 @TA-6
 Feature: What the management app needs from the admin API
   The management app's shadow mock, journal and stats pages are clients of the engine's admin API, called from its
   server with a token it signs for the user. These are the parts of the API it relies on beyond WireMock's.
@@ -68,14 +68,14 @@ Feature: What the management app needs from the admin API
     When I search by status and time with a limit of 100
     Then the answer arrives within 1 second at the 95th percentile
 
-  # Not built: per-org journal settings and the reason an entry has no body.
-  @saas
   Scenario: An entry says why it has no body
     Given the org stores no journal bodies
-    When I open a journal entry
+    And the SUT has sent a request with a body
+    When I open the journal entry
     Then the response says bodies are not stored because of the org's journal settings
-    Given the org stores bodies and a body was 300 KiB
-    When I open that entry
+    Given the org stores journal bodies
+    And the SUT has sent a request with a 300 KiB body
+    When I open the journal entry
     Then the response says the body was truncated at 256 KiB
 
   Scenario: A journal entry and near-miss analysis name the owning set
@@ -100,17 +100,17 @@ Feature: What the management app needs from the admin API
     When I call admin "GET" "/stats/live"
     Then it shows the present minute
 
-  # Not built: per-org journal capture settings.
-  @saas
   Scenario: Journal settings are the org's own
     When the management app sets the org's journal capture to "sessions-and-unmatched" and body storage off
     Then within 1 second a matched global request is not journalled
     And an unmatched request is journalled without a body
     And a request to a shadow mock is journalled without a body
 
-  # Not built: per-org response compression.
-  @saas
   Scenario: Response compression can be turned off for an org
+    Given the global mapping:
+      """json
+      { "request": { "urlPath": "/hello" }, "response": { "status": 200, "body": "${text:4096}" } }
+      """
     When the management app turns response compression off for the org
     Then a response to a client that accepts gzip is not compressed
 
@@ -135,8 +135,6 @@ Feature: What the management app needs from the admin API
     When I call admin "GET" "/version"
     Then the response has "version", "schemaVersion" and "mappingSchema"
 
-  # Not built: schema/stub-mapping.schema.json is not shipped yet.
-  @saas
   Scenario: The contract files agree with the version
     When I call admin "GET" "/version"
     Then the OpenAPI description and "schema/stub-mapping.schema.json" of that release agree with it

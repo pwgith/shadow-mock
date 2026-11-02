@@ -83,14 +83,6 @@ Feature: Per-org IP allowlist for mock traffic
     When the org admin adds "198.51.100.0/24" in the management app
     Then within 1 s a "GET" request to "/x" from IP "198.51.100.77" returns status 200
 
-  # The plan decides whether an org may set an allowlist, and the management app enforces it; the engine
-  # stores what the app writes.
-  @saas @management-app
-  Scenario: The allowlist is a plan entitlement
-    Given the org "acme" is on Shadow Mock plan "Starter"
-    When the org admin tries to add an IP allowlist entry
-    Then the change is rejected with "upgrade to Team"
-
   Scenario: Tokens from the management app are exempt from the admin allowlist, keys are not
     Given the org's IP allowlist is "198.51.100.0/24" and applies to the admin API
     When the management app calls admin "GET" "/sessions" with a token it signed, from the host's servers at "203.0.113.4"

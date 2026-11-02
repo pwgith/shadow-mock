@@ -43,6 +43,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, sc store.Scope,
 	}
 	v := h.sessionView(r, &s)
 	v.Key = s.Key // returned only here (FR-7.1)
+	if warn := h.svc.UsageWarning(sc.Tenant); warn != "" {
+		w.Header().Set("X-Shadow-Mock-Usage-Warning", warn)
+	}
 	return writeJSON(w, http.StatusCreated, v)
 }
 

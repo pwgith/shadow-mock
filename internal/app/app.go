@@ -152,7 +152,7 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 	hooks := webhook.New(client, renderer.Templates, o.Clock, o.Logger)
 	a.closers = append(a.closers, func() error { hooks.Close(); return nil })
 	jrnl := journal.NewMemory(cfg.Storage.Journal.Hot.MaxEntries)
-	jrnl.LimitBodies(cfg.Storage.Journal.Hot.MaxBodyBytes)
+	jrnl.LimitBodies(journalBodyCap(cfg))
 	jrnl.LimitSize(cfg.Storage.Journal.Hot.MaxBytes)
 	a.managedState(cfg, o)
 	svc := &mock.Service{
@@ -189,6 +189,18 @@ func (a *App) service(cfg config.Config, o Options) (*mock.Service, error) {
 		svc.SessionStore = a.sessions
 	}
 	return svc, nil
+}
+
+// managedJournalBodyCap is how much of a body the journal keeps of a managed server's traffic when the
+// configuration does not say (SAAS.md §12): the journal is shared, so a body cannot be left unbounded.
+const managedJournalBodyCap = 256 << 10
+
+// journalBodyCap is the most of a body the hot journal keeps.
+func journalBodyCap(cfg config.Config) int {
+	if n := cfg.Storage.Journal.Hot.MaxBodyBytes; n > 0 || cfg.Mode != modeManaged {
+		return n
+	}
+	return managedJournalBodyCap
 }
 
 // newDetector builds the session-key detector from the sessions.detect settings.
@@ -587,9 +599,11 @@ func (a *App) startTelemetry(cfg config.Config, o Options) (*telemetry.Telemetry
 func (a *App) orgDirectory(allow []netip.Prefix, cfg config.Config) tenant.Directory {
 	if cfg.Mode == modeManaged {
 		if a.sh.orgs != nil {
+			a.svc.Orgs = a.sh.orgs
 			return a.sh.orgs
 		}
 		a.directory = tenant.NewMemory()
+		a.svc.Orgs = a.directory
 		return a.directory
 	}
 	return tenant.NewStatic(&tenant.Org{ID: tenant.Local, Handle: string(tenant.Local), Allowlist: allow, AllowlistAdmin: cfg.Tenancy.Local.AllowlistAdmin})

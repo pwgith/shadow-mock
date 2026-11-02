@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"testing"
@@ -22,7 +23,7 @@ func TestClientAddrPrefersTheResolvedAddress(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := httptest.NewRequest("GET", "/", nil)
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", http.NoBody)
 			r.RemoteAddr = tt.remote
 			if tt.ctxIP != "" {
 				r = r.WithContext(WithClientIP(r.Context(), netip.MustParseAddr(tt.ctxIP)))

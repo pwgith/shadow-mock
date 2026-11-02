@@ -55,11 +55,3 @@ Feature: Gzip response compression
       | method | path | header:Accept-Encoding |
       | GET    | /br  | gzip                   |
     Then the response header "Content-Encoding" is "br"
-
-  @saas
-  Scenario: An org can turn compression off
-    Given the org "acme" has setting "gzip" set to "off"
-    When I send a request:
-      | method | path | header:Accept-Encoding |
-      | GET    | /big | gzip                   |
-    Then the response header "Content-Encoding" is absent

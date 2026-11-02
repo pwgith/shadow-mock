@@ -1,0 +1,732 @@
+{
+  "$defs": {
+    "CallResponse": {
+      "description": "One rule. Set exactly one selector, `calls` or `every`.\n`calls`: `\"3\"` (the 3rd call), `\"1-2\"` (calls 1 to 2) or `\"100+\"` (call 100 onwards).\n`every`: every nth call (n, 2n, 3n, …). Call numbers start at 1.\n",
+      "oneOf": [
+        {
+          "required": [
+            "calls"
+          ]
+        },
+        {
+          "required": [
+            "every"
+          ]
+        }
+      ],
+      "properties": {
+        "calls": {
+          "examples": [
+            "3",
+            "1-2",
+            "100+"
+          ],
+          "pattern": "^([1-9][0-9]*)(-[1-9][0-9]*|\\+)?$",
+          "type": "string"
+        },
+        "every": {
+          "minimum": 2,
+          "type": "integer"
+        },
+        "response": {
+          "$ref": "#/$defs/ResponseDefinition"
+        }
+      },
+      "required": [
+        "response"
+      ],
+      "type": "object"
+    },
+    "ContentPattern": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/StringValuePattern"
+        },
+        {
+          "properties": {
+            "binaryEqualTo": {
+              "contentEncoding": "base64",
+              "type": "string"
+            },
+            "enablePlaceholders": {
+              "type": "boolean"
+            },
+            "equalToJson": {
+              "description": "A JSON value, or a JSON string. Supports `${json-unit.*}` placeholders."
+            },
+            "equalToXml": {
+              "type": "string"
+            },
+            "exemptedComparisons": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "ignoreArrayOrder": {
+              "type": "boolean"
+            },
+            "ignoreExtraElements": {
+              "type": "boolean"
+            },
+            "matchesJsonPath": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": true,
+                  "properties": {
+                    "expression": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "expression"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "matchesJsonSchema": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object"
+                }
+              ]
+            },
+            "matchesXPath": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": true,
+                  "properties": {
+                    "expression": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "expression"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "placeholderClosingDelimiterRegex": {
+              "type": "string"
+            },
+            "placeholderOpeningDelimiterRegex": {
+              "type": "string"
+            },
+            "schemaVersion": {
+              "examples": [
+                "V202012"
+              ],
+              "type": "string"
+            },
+            "xPathNamespaces": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      ],
+      "description": "A body or metadata pattern. It is a StringValuePattern, or one of the structured body operators."
+    },
+    "DelayDistribution": {
+      "oneOf": [
+        {
+          "properties": {
+            "lower": {
+              "type": "integer"
+            },
+            "type": {
+              "const": "uniform"
+            },
+            "upper": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "lower",
+            "upper"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "maxValue": {
+              "type": "integer"
+            },
+            "median": {
+              "type": "integer"
+            },
+            "sigma": {
+              "type": "number"
+            },
+            "type": {
+              "const": "lognormal"
+            }
+          },
+          "required": [
+            "type",
+            "median",
+            "sigma"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "milliseconds": {
+              "type": "integer"
+            },
+            "type": {
+              "const": "fixed"
+            }
+          },
+          "required": [
+            "type",
+            "milliseconds"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MultiValuePattern": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/StringValuePattern"
+        },
+        {
+          "properties": {
+            "hasExactly": {
+              "items": {
+                "$ref": "#/$defs/StringValuePattern"
+              },
+              "type": "array"
+            },
+            "includes": {
+              "items": {
+                "$ref": "#/$defs/StringValuePattern"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      ],
+      "description": "A StringValuePattern, or a multi-value operator."
+    },
+    "MultipartPattern": {
+      "properties": {
+        "bodyPatterns": {
+          "items": {
+            "$ref": "#/$defs/ContentPattern"
+          },
+          "type": "array"
+        },
+        "headers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/MultiValuePattern"
+          },
+          "type": "object"
+        },
+        "matchingType": {
+          "default": "ANY",
+          "enum": [
+            "ANY",
+            "ALL"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RequestPattern": {
+      "additionalProperties": true,
+      "description": "At most one of url, urlPath, urlPattern, urlPathPattern and urlPathTemplate may be set.",
+      "properties": {
+        "basicAuthCredentials": {
+          "properties": {
+            "password": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "bodyPatterns": {
+          "items": {
+            "$ref": "#/$defs/ContentPattern"
+          },
+          "type": "array"
+        },
+        "cookies": {
+          "additionalProperties": {
+            "$ref": "#/$defs/StringValuePattern"
+          },
+          "type": "object"
+        },
+        "customMatcher": {
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "parameters": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "formParameters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/MultiValuePattern"
+          },
+          "type": "object"
+        },
+        "headers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/MultiValuePattern"
+          },
+          "type": "object"
+        },
+        "host": {
+          "$ref": "#/$defs/StringValuePattern"
+        },
+        "method": {
+          "examples": [
+            "GET",
+            "POST",
+            "ANY"
+          ],
+          "type": "string"
+        },
+        "multipartPatterns": {
+          "items": {
+            "$ref": "#/$defs/MultipartPattern"
+          },
+          "type": "array"
+        },
+        "pathParameters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/StringValuePattern"
+          },
+          "type": "object"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "queryParameters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/MultiValuePattern"
+          },
+          "type": "object"
+        },
+        "scheme": {
+          "enum": [
+            "http",
+            "https"
+          ],
+          "type": "string"
+        },
+        "url": {
+          "description": "Exact path and query.",
+          "type": "string"
+        },
+        "urlPath": {
+          "description": "Exact path, any query.",
+          "type": "string"
+        },
+        "urlPathPattern": {
+          "description": "Regex over the path.",
+          "type": "string"
+        },
+        "urlPathTemplate": {
+          "examples": [
+            "/claims/{claimId}"
+          ],
+          "type": "string"
+        },
+        "urlPattern": {
+          "description": "Regex over path and query.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResponseDefinition": {
+      "additionalProperties": true,
+      "properties": {
+        "additionalProxyRequestHeaders": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "base64Body": {
+          "contentEncoding": "base64",
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "bodyFileName": {
+          "description": "Resolved in the session's files first, then global `__files`. It can be templated.",
+          "type": "string"
+        },
+        "chunkedDribbleDelay": {
+          "properties": {
+            "numberOfChunks": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "totalDuration": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "numberOfChunks",
+            "totalDuration"
+          ],
+          "type": "object"
+        },
+        "delayDistribution": {
+          "$ref": "#/$defs/DelayDistribution"
+        },
+        "fault": {
+          "description": "In SaaS behind the platform proxy, faults reach clients as 502.",
+          "enum": [
+            "CONNECTION_RESET_BY_PEER",
+            "EMPTY_RESPONSE",
+            "MALFORMED_RESPONSE_CHUNK",
+            "RANDOM_DATA_THEN_CLOSE"
+          ],
+          "type": "string"
+        },
+        "fixedDelayMilliseconds": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "gzipDisabled": {
+          "description": "Shadow Mock extension: never gzip this response, even if the client accepts gzip (FR-3.5a).",
+          "type": "boolean"
+        },
+        "headers": {
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "type": "object"
+        },
+        "jsonBody": {
+          "description": "Any JSON value, serialised as the body."
+        },
+        "proxyBaseUrl": {
+          "format": "uri",
+          "type": "string"
+        },
+        "proxyUrlPrefixToRemove": {
+          "type": "string"
+        },
+        "removeProxyRequestHeaders": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "status": {
+          "default": 200,
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        },
+        "statusMessage": {
+          "type": "string"
+        },
+        "transformerParameters": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "transformers": {
+          "items": {
+            "examples": [
+              "response-template"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ServeEventListener": {
+      "properties": {
+        "name": {
+          "examples": [
+            "webhook"
+          ],
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "properties": {
+            "base64Body": {
+              "contentEncoding": "base64",
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "delay": {
+              "$ref": "#/$defs/DelayDistribution"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "method": {
+              "type": "string"
+            },
+            "url": {
+              "format": "uri",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "requestPhases": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "StringValuePattern": {
+      "description": "Exactly one operator, plus its modifiers.",
+      "minProperties": 1,
+      "properties": {
+        "absent": {
+          "type": "boolean"
+        },
+        "actualFormat": {
+          "examples": [
+            "dd/MM/yyyy"
+          ],
+          "type": "string"
+        },
+        "after": {
+          "type": "string"
+        },
+        "and": {
+          "items": {
+            "$ref": "#/$defs/StringValuePattern"
+          },
+          "type": "array"
+        },
+        "before": {
+          "description": "ISO date-time, or relative such as \"now -1 days\".",
+          "type": "string"
+        },
+        "caseInsensitive": {
+          "type": "boolean"
+        },
+        "contains": {
+          "type": "string"
+        },
+        "doesNotContain": {
+          "type": "string"
+        },
+        "doesNotMatch": {
+          "type": "string"
+        },
+        "equalTo": {
+          "type": "string"
+        },
+        "equalToDateTime": {
+          "type": "string"
+        },
+        "equalToNumber": {
+          "description": "Numeric equality, so \"5\", \"5.0\" and \"5.00\" all match 5.",
+          "type": "number"
+        },
+        "greaterThanEqualNumber": {
+          "type": "number"
+        },
+        "greaterThanNumber": {
+          "type": "number"
+        },
+        "lessThanEqualNumber": {
+          "type": "number"
+        },
+        "lessThanNumber": {
+          "type": "number"
+        },
+        "matches": {
+          "description": "Regex.",
+          "type": "string"
+        },
+        "not": {
+          "$ref": "#/$defs/StringValuePattern"
+        },
+        "or": {
+          "items": {
+            "$ref": "#/$defs/StringValuePattern"
+          },
+          "type": "array"
+        },
+        "truncateActual": {
+          "type": "string"
+        },
+        "truncateExpected": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "StubMapping": {
+      "additionalProperties": true,
+      "description": "WireMock StubMapping, plus the Shadow Mock extension `callResponses`. Unknown fields are\npreserved and returned unchanged (FR-1.4). The WireMock scenario fields `scenarioName`,\n`requiredScenarioState` and `newScenarioState` are **rejected** with\n`422 scenarios_not_supported` (FR-4.4).\n",
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "scenarioName"
+            ]
+          },
+          {
+            "required": [
+              "requiredScenarioState"
+            ]
+          },
+          {
+            "required": [
+              "newScenarioState"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "callResponses": {
+          "description": "Rules that pick a response by call number. The first match wins (FR-4.1).",
+          "examples": [
+            [
+              {
+                "calls": "1-2",
+                "response": {
+                  "status": 503
+                }
+              },
+              {
+                "every": 3,
+                "response": {
+                  "status": 500
+                }
+              },
+              {
+                "calls": "100+",
+                "response": {
+                  "headers": {
+                    "Retry-After": "1"
+                  },
+                  "status": 429
+                }
+              }
+            ]
+          ],
+          "items": {
+            "$ref": "#/$defs/CallResponse"
+          },
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "persistent": {
+          "type": "boolean"
+        },
+        "postServeActions": {
+          "items": {
+            "$ref": "#/$defs/ServeEventListener"
+          },
+          "type": "array"
+        },
+        "priority": {
+          "description": "Lower wins within a layer. The default is 5.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "request": {
+          "$ref": "#/$defs/RequestPattern"
+        },
+        "response": {
+          "$ref": "#/$defs/ResponseDefinition",
+          "description": "The default response, used when no `callResponses` rule matches the call number."
+        },
+        "serveEventListeners": {
+          "items": {
+            "$ref": "#/$defs/ServeEventListener"
+          },
+          "type": "array"
+        },
+        "uuid": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "response"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/StubMapping",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shadow Mock stub mapping",
+  "x-generatedFrom": "api/openapi.yaml: do not edit; run UPDATE_SCHEMA=1 go test ./api",
+  "x-schemaVersion": 1,
+  "x-wireMockFields": "Unknown fields are kept and returned unchanged (FR-1.4)."
+}

@@ -466,10 +466,11 @@ const ReasonHeader = apierr.ReasonHeader
 // LimitHeader names the header that says which limit applied to a rate-limited request.
 const LimitHeader = "X-Shadow-Mock-Limit"
 
-// orgLimiter is an org's rate limiter and the limits it was made with, so a plan change makes a new one.
+// orgLimiter is an org's rate limiter and the rate it was made with, so a plan change makes a new one.
 type orgLimiter struct {
-	limits tenant.Limits
-	l      *ratelimit.Limiter
+	rate  float64
+	burst int
+	l     *ratelimit.Limiter
 }
 
 // admitMock lets a mock request in, or answers it: the client's own rate, the org's rate, and the org's
@@ -499,8 +500,8 @@ func (rt *Router) withinOrgRate(w http.ResponseWriter, org *tenant.Org) bool {
 	}
 	cur, _ := rt.OrgLimits.m.Load(org.ID)
 	ol, found := cur.(*orgLimiter)
-	if !found || ol.limits != lim {
-		ol = &orgLimiter{limits: lim, l: ratelimit.New(rt.Clock, lim.RequestsPerSecond, lim.Burst)}
+	if !found || ol.rate != lim.RequestsPerSecond || ol.burst != lim.Burst {
+		ol = &orgLimiter{rate: lim.RequestsPerSecond, burst: lim.Burst, l: ratelimit.New(rt.Clock, lim.RequestsPerSecond, lim.Burst)}
 		rt.OrgLimits.m.Store(org.ID, ol)
 	}
 	ok, wait := ol.l.Allow(string(org.ID))

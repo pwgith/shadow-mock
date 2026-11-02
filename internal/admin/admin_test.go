@@ -597,23 +597,23 @@ func TestTheSessionListIsPagedWithACursor(t *testing.T) {
 		a.want(201, "POST", "/sessions/key-based", `{}`)
 	}
 	first := a.want(200, "GET", "/sessions?limit=2", "")
-	if got, _ := first["sessions"].([]any); len(got) != 2 { //nolint:errcheck // a wrong type reads as no sessions
+	if got, _ := first["sessions"].([]any); len(got) != 2 {
 		t.Fatalf("the first page has %d sessions, want 2", len(got))
 	}
-	meta, _ := first["meta"].(map[string]any) //nolint:errcheck // a missing meta reads as no cursor
-	cursor, _ := meta["nextCursor"].(string)  //nolint:errcheck // see above
+	meta, _ := first["meta"].(map[string]any)
+	cursor, _ := meta["nextCursor"].(string)
 	if cursor != "2" {
 		t.Fatalf("the first page's cursor is %q, want 2", cursor)
 	}
 	next := a.want(200, "GET", "/sessions?limit=2&cursor="+cursor, "")
-	if got, _ := next["sessions"].([]any); len(got) != 1 { //nolint:errcheck // a wrong type reads as no sessions
+	if got, _ := next["sessions"].([]any); len(got) != 1 {
 		t.Errorf("the second page has %d sessions, want 1", len(got))
 	}
-	if meta, _ = next["meta"].(map[string]any); meta["nextCursor"] != nil { //nolint:errcheck // see above
+	if meta, _ = next["meta"].(map[string]any); meta["nextCursor"] != nil {
 		t.Errorf("the last page has a cursor: %v", meta["nextCursor"])
 	}
 	// The older offset still says where a page starts.
-	if got, _ := a.want(200, "GET", "/sessions?offset=1", "")["sessions"].([]any); len(got) != 2 { //nolint:errcheck // see above
+	if got, _ := a.want(200, "GET", "/sessions?offset=1", "")["sessions"].([]any); len(got) != 2 {
 		t.Errorf("offset=1 lists %d sessions, want 2", len(got))
 	}
 }

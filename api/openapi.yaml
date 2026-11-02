@@ -2,6 +2,9 @@ openapi: 3.1.0
 info:
   title: Shadow Mock Engine API
   version: 0.1.0
+  # The version of the stub-mapping JSON Schema this description and schema/stub-mapping.schema.json carry. It
+  # equals "mappingSchema" in GET /__admin/version (FR-11.11e).
+  x-mapping-schema-version: 1
   summary: WireMock-compatible admin API plus Shadow Mock sessions, runtime and platform endpoints.
   description: |
     The admin and runtime API of the Shadow Mock engine (the Go service).

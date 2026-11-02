@@ -22,6 +22,8 @@ type Patch struct {
 	AddMasks     []model.Mask   `json:"addMasks"`
 	RemoveMasks  []model.Mask   `json:"removeMasks"`
 	Metadata     map[string]any `json:"metadata"`
+	// PlanMaxTTL is the longest lifetime the org's plan allows; zero means no plan limit. A client cannot set it.
+	PlanMaxTTL time.Duration `json:"-"`
 }
 
 func notFound(id string) error {
@@ -39,7 +41,7 @@ func (r *Registry) Update(_ context.Context, t tenant.ID, id string, p Patch) (S
 	}
 	next := s.clone()
 	if p.TTLSeconds != nil {
-		ttl, err := r.checkTTL(s.Kind, p.TTLSeconds)
+		ttl, err := r.checkTTL(s.Kind, p.TTLSeconds, p.PlanMaxTTL)
 		if err != nil {
 			return Session{}, err
 		}

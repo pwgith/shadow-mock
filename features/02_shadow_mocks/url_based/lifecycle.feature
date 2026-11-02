@@ -31,16 +31,6 @@ Feature: URL-based shadow mock lifecycle
       | 2592000 | 201    |
       | 2592001 | 422    |
 
-  @saas
-  Scenario: The Free tier caps URL-based TTLs at 7 days
-    Given the org "acme" is on Shadow Mock plan "Free"
-    When I call admin "POST" "/sessions/url-based" with:
-      """json
-      { "ttlSeconds": 1209600 }
-      """
-    Then the response status is 422
-    And the response JSON at "$.error" is "ttl_exceeds_plan_maximum"
-
   Scenario: URL-based IDs are unguessable and unique
     When I create 1000 URL-based shadow mocks
     Then all 1000 ids are distinct

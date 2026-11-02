@@ -14,15 +14,14 @@ Feature: The engine's part of the plan, payment and limit flows
     When the management app raises the limit for org "acme" to 100 requests per second
     Then within 1 second 50 requests in one second are all served
 
-  # Not built: the number of concurrent shadow mocks a plan allows.
-  @saas
   Scenario: F9 - A plan change raises the shadow mock limit within a second
     Given the plan allows 5 concurrent shadow mocks and 10 requests per second
+    And 5 shadow mocks are active
+    And creating another shadow mock is refused
     When the management app writes a plan allowing 50 shadow mocks and 100 requests per second
-    Then within 1 second the 6th shadow mock can be created
+    Then within 1 second another shadow mock can be created
 
-  # F15: reaching a limit, and moving to a smaller plan. Not built: shadow mock and mapping limits, and plan features.
-  @saas
+  # F15: reaching a limit, and moving to a smaller plan.
   Scenario: F15 - A limit refuses the action and names the limit
     Given the plan allows 2 concurrent shadow mocks and 2 are active
     When I create another shadow mock
@@ -30,14 +29,12 @@ Feature: The engine's part of the plan, payment and limit flows
     And the response JSON at "$.error" is "session_limit_reached"
     And the existing shadow mocks are unaffected
 
-  @saas
   Scenario: F15 - A smaller plan deletes nothing
     Given org "acme" has 5 shadow mocks, 40 mappings and 3 files
     When the management app writes a plan allowing 2 shadow mocks and 10 mappings per shadow mock
     Then the 5 shadow mocks, 40 mappings and 3 files are all still there and still served
     But creating another shadow mock is refused
 
-  @saas
   Scenario: F15 - A feature the smaller plan lacks is switched off and its settings kept
     Given the org's IP allowlist is "198.51.100.0/24"
     When the management app writes a plan without the IP allowlist

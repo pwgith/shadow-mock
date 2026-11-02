@@ -2,7 +2,6 @@ package console_test
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -13,29 +12,19 @@ import (
 	"github.com/pwgith/shadow-mock/test/contract"
 )
 
-func get(t *testing.T, h http.Handler, method, target string) *http.Response {
+func get(t *testing.T, h http.Handler, method, target string) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(method, target, http.NoBody))
-	return rec.Result()
-}
-
-func body(t *testing.T, r *http.Response) string {
-	t.Helper()
-	defer r.Body.Close()
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(b)
+	h.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), method, target, http.NoBody))
+	return rec
 }
 
 func TestThePageIsToldWhereTheAdminAPIIs(t *testing.T) {
 	for _, base := range []string{"/__admin", "/api/v2", "/acme/__admin"} {
 		r := get(t, console.Handler(base), http.MethodGet, console.Prefix+"/")
-		page := body(t, r)
-		if r.StatusCode != http.StatusOK {
-			t.Fatalf("%s: status = %d", base, r.StatusCode)
+		page := r.Body.String()
+		if r.Code != http.StatusOK {
+			t.Fatalf("%s: status = %d", base, r.Code)
 		}
 		if !strings.Contains(page, `<meta name="admin-base" content="`+base+`">`) {
 			t.Errorf("%s: the page does not carry the admin base:\n%s", base, page)
@@ -43,7 +32,7 @@ func TestThePageIsToldWhereTheAdminAPIIs(t *testing.T) {
 		if strings.Contains(page, "__ADMIN_BASE__") {
 			t.Errorf("%s: the placeholder was left in the page", base)
 		}
-		if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		if ct := r.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
 			t.Errorf("Content-Type = %q, want HTML", ct)
 		}
 	}
@@ -51,7 +40,7 @@ func TestThePageIsToldWhereTheAdminAPIIs(t *testing.T) {
 
 func TestIndexHTMLIsTheSamePage(t *testing.T) {
 	h := console.Handler("/__admin")
-	if a, b := body(t, get(t, h, http.MethodGet, console.Prefix+"/")), body(t, get(t, h, http.MethodGet, console.Prefix+"/index.html")); a != b {
+	if a, b := get(t, h, http.MethodGet, console.Prefix+"/").Body.String(), get(t, h, http.MethodGet, console.Prefix+"/index.html").Body.String(); a != b {
 		t.Error("/__console/index.html differs from /__console/")
 	}
 }
@@ -66,14 +55,14 @@ func TestEveryAnswerCarriesTheSecurityHeaders(t *testing.T) {
 	for _, target := range []string{"/", "/app.js", "/style.css", "/calls.json", "/missing.js"} {
 		r := get(t, h, http.MethodGet, console.Prefix+target)
 		for k, v := range want {
-			if k == "Cache-Control" && r.StatusCode == http.StatusNotFound {
+			if k == "Cache-Control" && r.Code == http.StatusNotFound {
 				continue // net/http drops it from its own error answers
 			}
-			if got := r.Header.Get(k); got != v {
+			if got := r.Header().Get(k); got != v {
 				t.Errorf("%s: %s = %q, want %q", target, k, got, v)
 			}
 		}
-		csp := r.Header.Get("Content-Security-Policy")
+		csp := r.Header().Get("Content-Security-Policy")
 		for _, part := range []string{"default-src 'none'", "script-src 'self'", "connect-src 'self'", "frame-ancestors 'none'", "base-uri 'none'"} {
 			if !strings.Contains(csp, part) {
 				t.Errorf("%s: Content-Security-Policy %q lacks %q", target, csp, part)
@@ -91,17 +80,16 @@ func TestTheAssetsAreServed(t *testing.T) {
 		"/app.js": "javascript", "/style.css": "text/css", "/calls.json": "application/json",
 	} {
 		r := get(t, h, http.MethodGet, console.Prefix+target)
-		if r.StatusCode != http.StatusOK || !strings.Contains(r.Header.Get("Content-Type"), wantType) {
-			t.Errorf("%s: status %d, Content-Type %q, want 200 and %q", target, r.StatusCode, r.Header.Get("Content-Type"), wantType)
+		if r.Code != http.StatusOK || !strings.Contains(r.Header().Get("Content-Type"), wantType) {
+			t.Errorf("%s: status %d, Content-Type %q, want 200 and %q", target, r.Code, r.Header().Get("Content-Type"), wantType)
 		}
-		body(t, r)
 	}
 }
 
 func TestOnlyTheConsolesOwnFilesAreServed(t *testing.T) {
 	h := console.Handler("/__admin")
 	for _, target := range []string{"/missing.js", "/assets/", "/assets/app.js", "/%2e%2e/console.go", "/../console.go", "/must.go"} {
-		if r := get(t, h, http.MethodGet, console.Prefix+target); r.StatusCode == http.StatusOK {
+		if r := get(t, h, http.MethodGet, console.Prefix+target); r.Code == http.StatusOK {
 			t.Errorf("%s answered 200", target)
 		}
 	}
@@ -109,8 +97,8 @@ func TestOnlyTheConsolesOwnFilesAreServed(t *testing.T) {
 
 func TestThePrefixWithoutASlashRedirects(t *testing.T) {
 	r := get(t, console.Handler("/__admin"), http.MethodGet, console.Prefix)
-	if r.StatusCode != http.StatusMovedPermanently || r.Header.Get("Location") != console.Prefix+"/" {
-		t.Errorf("status %d, Location %q, want a redirect to %s/", r.StatusCode, r.Header.Get("Location"), console.Prefix)
+	if r.Code != http.StatusMovedPermanently || r.Header().Get("Location") != console.Prefix+"/" {
+		t.Errorf("status %d, Location %q, want a redirect to %s/", r.Code, r.Header().Get("Location"), console.Prefix)
 	}
 }
 
@@ -118,12 +106,12 @@ func TestTheConsoleIsReadOnly(t *testing.T) {
 	h := console.Handler("/__admin")
 	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
 		r := get(t, h, m, console.Prefix+"/")
-		if r.StatusCode != http.StatusMethodNotAllowed || r.Header.Get("Allow") != "GET, HEAD" {
-			t.Errorf("%s: status %d, Allow %q, want 405 and \"GET, HEAD\"", m, r.StatusCode, r.Header.Get("Allow"))
+		if r.Code != http.StatusMethodNotAllowed || r.Header().Get("Allow") != "GET, HEAD" {
+			t.Errorf("%s: status %d, Allow %q, want 405 and \"GET, HEAD\"", m, r.Code, r.Header().Get("Allow"))
 		}
 	}
-	if r := get(t, h, http.MethodHead, console.Prefix+"/"); r.StatusCode != http.StatusOK || body(t, r) != "" {
-		t.Errorf("HEAD: status %d, want 200 with no body", r.StatusCode)
+	if r := get(t, h, http.MethodHead, console.Prefix+"/"); r.Code != http.StatusOK || r.Body.String() != "" {
+		t.Errorf("HEAD: status %d, want 200 with no body", r.Code)
 	}
 }
 

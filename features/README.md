@@ -1,6 +1,6 @@
 # Shadow Mock: Executable Specifications
 
-Specification by example, written in Gherkin, for running with Cucumber. The Go engine uses [godog](https://github.com/cucumber/godog). The management-app features can also run with Cucumber.js against the Next.js app.
+Specification by example, written in Gherkin, for running with Cucumber. The Go engine uses [godog](https://github.com/cucumber/godog).
 
 Every requirement in [REQUIREMENTS.md](../docs/REQUIREMENTS.md) is covered by at least one scenario. Features are tagged with the requirement IDs they cover. See the coverage matrix in [COVERAGE.md](COVERAGE.md).
 
@@ -43,7 +43,6 @@ features/
 | `@saas` | Managed (hosted) mode, **not run yet**: the harness cannot run it, or the engine does not build what it describes. A comment above says which |
 | `@managed` | Managed mode, **run**: the engine is started with `mode: managed` on one instance, with the stores in memory, and the management app is played by the scenario (`test/acceptance/managed*.go`) |
 | `@central-server` | Standalone binary deployed as a shared server |
-| `@management-app` | Exercised through the management app (UI or its API), not the engine directly |
 | `@wiremock` | WireMock parity behaviour |
 | `@key-based`, `@url-based` | Shadow mock type under test |
 | `@multi-instance` | Needs two or more engine instances |
@@ -52,7 +51,7 @@ features/
 | `@FR-x.y`, `@NFR-x.y` | Requirement traceability |
 | `@wip` | Not yet implemented, excluded by default |
 
-A feature tagged `@managed` can hold scenarios tagged `@saas`; each has a comment saying what is missing (a store the harness does not stand up, or something the engine does not build). `@management-app` scenarios are left alone unless the engine's admin API is what they describe, as in `05_management_app/admin_api_for_management_app.feature` and `08_platform_flows`. How the managed harness works:
+A feature tagged `@managed` can hold scenarios tagged `@saas`; each has a comment saying what is missing (a store the harness does not stand up, or something the engine does not build). Only what the engine does is specified here. What the management app does itself (screens, teams and grants, billing, plan changes) is specified in the platform repository, and the harness plays the app where the engine needs it. How the managed harness works:
 
 * One engine instance, stores in memory. The management app is played by the scenario: it writes org rows, mappings and statuses straight to the engine's directory and stores, and calls the admin API with tokens from a fake issuer.
 * The test client stands in for the front proxy and says the client address in `X-Forwarded-For`; `server.clientIp` steps change that.
@@ -173,10 +172,7 @@ Writing the examples surfaced these concrete API details. All of them are now de
 godog run --tags='~@wip && ~@perf && (@P0 || @P1)' features/
 
 # SaaS only
-godog run --tags='@saas && ~@management-app' features/
-
-# Management app
-npx cucumber-js features/05_management_app --tags '@management-app'
+godog run --tags='@saas' features/
 ```
 
 ## Running the suite

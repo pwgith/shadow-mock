@@ -136,14 +136,14 @@ func (w *world) initManagedPurge(sc *godog.ScenarioContext) {
 			return fmt.Errorf("starting a recording gave %d: %s", rep.status, truncate(rep.body))
 		}
 		global := store.Global(tenant.ID(org))
-		if err = w.app.Service().Counters.Set(ctxBackground(), counter.Key{RequestScope: global, StubScope: global, StubID: "stub-1"}, 4); err != nil {
+		if err := w.app.Service().Counters.Set(ctxBackground(), counter.Key{RequestScope: global, StubScope: global, StubID: "stub-1"}, 4); err != nil {
 			return err
 		}
-		if err = w.putGlobalMapping(org, "hello", "GET", "/hello", "hello"); err != nil {
+		if err := w.putGlobalMapping(org, "hello", "GET", "/hello", "hello"); err != nil {
 			return err
 		}
 		for range entries {
-			if err = w.sendOne(newRequest("GET", "/"+m.orgs[org].handle+"/hello")); err != nil {
+			if err := w.sendOne(newRequest("GET", "/"+m.orgs[org].handle+"/hello")); err != nil {
 				return err
 			}
 		}
@@ -162,7 +162,7 @@ func (w *world) initManagedPurge(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		if err = w.record(func() error { return w.app.Directory().MarkDeleted(tenant.ID(m.defaultOrg)) }); err != nil {
+		if err := w.record(func() error { return w.app.Directory().MarkDeleted(tenant.ID(m.defaultOrg)) }); err != nil {
 			return err
 		}
 		return w.keepLast(func() error { return w.asManagementApp("POST", "/org/purge") })
@@ -224,7 +224,8 @@ func (w *world) initManagedPurge(sc *godog.ScenarioContext) {
 		if err != nil {
 			return err
 		}
-		if err = w.ensureOrg(target); err != nil {
+		err = w.ensureOrg(target)
+		if err != nil {
 			return err
 		}
 		sp := w.tokenOf("management-app", own, "admin")
@@ -245,7 +246,7 @@ func (w *world) initManagedPurge(sc *godog.ScenarioContext) {
 			}
 		}
 		for range calls - n {
-			if err = w.adminAs("DELETE", "/sessions/"+unknownSession, person, m.defaultOrg, "member"); err != nil {
+			if err := w.adminAs("DELETE", "/sessions/"+unknownSession, person, m.defaultOrg, "member"); err != nil {
 				return err
 			}
 		}
