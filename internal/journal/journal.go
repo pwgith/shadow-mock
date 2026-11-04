@@ -39,6 +39,9 @@ type Entry struct {
 	// Sessions lists every session in the request's stack, most specific first. A session's
 	// journal holds the requests whose stack includes it (FR-7.11).
 	Sessions []string
+	// GlobalSkipped is true when a session in the stack was created with inheritGlobal=false, so the request could not
+	// fall through to the global layer (FR-7.13).
+	GlobalSkipped bool
 	// Layer is the kind of layer that served the request: key-based, url-based or global;
 	// "" when nothing matched.
 	Layer       string

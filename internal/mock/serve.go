@@ -167,7 +167,8 @@ func (s *Service) trafficStack(_ context.Context, tr Traffic, req *match.Request
 	if len(sessions) > 0 {
 		sv.entry.SessionID = sessions[0]
 	}
-	return s.Layers.Stack(tr.Tenant, sessions...), nil
+	sv.entry.GlobalSkipped = s.skipsGlobal(tr.Tenant, sessions)
+	return s.stackOf(tr.Tenant, sessions), nil
 }
 
 func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Request, req *match.Request, stack engine.Stack, res engine.Result, sv *served) {
@@ -215,7 +216,7 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 
 // unmatched sends WireMock's 404 diagnostic with the closest stubs (FR-3.6).
 func (s *Service) unmatched(w http.ResponseWriter, req *match.Request, stack engine.Stack, sv *served) {
-	near := engine.NearMisses(req, stack, 3)
+	near := s.nearMisses(req, stack, 3)
 	var b strings.Builder
 	b.WriteString("Request was not matched\n=======================\n\n")
 	fmt.Fprintf(&b, "Request: %s %s\n", req.Method, req.URL())
@@ -228,7 +229,11 @@ func (s *Service) unmatched(w http.ResponseWriter, req *match.Request, stack eng
 			if name == "" {
 				name = nm.Stub.ID()
 			}
-			fmt.Fprintf(&b, "  %s (%s layer, distance %.2f)\n", name, nm.Layer.Kind, nm.Distance)
+			skipped := ""
+			if nm.Skipped {
+				skipped = ", not inherited by this shadow mock"
+			}
+			fmt.Fprintf(&b, "  %s (%s layer%s, distance %.2f)\n", name, nm.Layer.Kind, skipped, nm.Distance)
 			for _, why := range nm.Stub.Matcher.Mismatches(req) {
 				fmt.Fprintf(&b, "    %s does not match\n", why)
 			}

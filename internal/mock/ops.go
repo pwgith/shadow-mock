@@ -58,7 +58,7 @@ func (s *Service) UnmatchedRequests(sc store.Scope) []*journal.Entry {
 
 // NearMissesFor ranks the stubs in the scope's stack against a request.
 func (s *Service) NearMissesFor(sc store.Scope, req *match.Request) []engine.NearMiss {
-	return engine.NearMisses(req, s.Stack(sc), nearMissLimit)
+	return s.nearMisses(req, s.Stack(sc), nearMissLimit)
 }
 
 // PatternNearMiss is a journal entry that nearly matches a pattern.
@@ -210,7 +210,7 @@ func (s *Service) DryRun(ctx context.Context, sc store.Scope, req DryRunRequest)
 	r := match.FromSample(&req.Request)
 	res := engine.Resolve(r, stack)
 	if res.Stub == nil {
-		return DryRunResult{NearMisses: engine.NearMisses(r, stack, nearMissLimit)}, nil
+		return DryRunResult{NearMisses: s.nearMisses(r, stack, nearMissLimit)}, nil
 	}
 	n, err := s.Counters.Peek(ctx, counter.Key{RequestScope: stack.RequestScope(), StubScope: res.Stub.Scope, StubID: res.Stub.ID()})
 	if err != nil {

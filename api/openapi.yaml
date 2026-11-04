@@ -2256,6 +2256,9 @@ components:
           type: array
           description: The parts of the mapping's pattern that the request did not match, such as `Header [Accept]`.
           items: { type: string }
+        skipped:
+          type: boolean
+          description: A global mapping that the shadow mock does not inherit (`inheritGlobal` false). A hint only; it never serves a response.
     NearMissList:
       type: object
       properties:
@@ -2428,6 +2431,7 @@ components:
           description: Create inside a URL-based shadow mock (FR-8.5). Its expiry is capped at the parent's.
         seedFrom: { $ref: '#/components/schemas/SeedFrom' }
         metadata: { type: object, additionalProperties: true }
+        inheritGlobal: { $ref: '#/components/schemas/InheritGlobal' }
     CreateURLBasedSessionRequest:
       type: object
       properties:
@@ -2441,6 +2445,13 @@ components:
           items: { $ref: '#/components/schemas/Mask' }
         seedFrom: { $ref: '#/components/schemas/SeedFrom' }
         metadata: { type: object, additionalProperties: true }
+        inheritGlobal: { $ref: '#/components/schemas/InheritGlobal' }
+    InheritGlobal:
+      type: boolean
+      default: true
+      description: >-
+        When false, a request that the shadow mock's own mappings do not cover gets the unmatched response and never falls
+        through to the global layer (FR-7.13). Fixed at creation. Session reads always report the effective value.
     Session:
       type: object
       required: [id, kind, createdBy, createdAt, expiresAt]
@@ -2463,6 +2474,7 @@ components:
         mappingCount: { type: integer }
         requestCount: { type: integer }
         metadata: { type: object, additionalProperties: true }
+        inheritGlobal: { $ref: '#/components/schemas/InheritGlobal' }
     CreatedKeyBasedSession:
       allOf:
         - $ref: '#/components/schemas/Session'

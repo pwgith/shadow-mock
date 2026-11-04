@@ -199,6 +199,10 @@ The Kaizentis platform hosts the engine as the **Tool app**. Another application
 * **FR-7.10 Ambiguity.** If an Aho-Corasick scan (metadata or body) finds keys or tokens for more than one session, the policy is configurable: `first` (earliest offset, the default), `reject` (respond 409 with a diagnostic), or `global` (ignore all of them). The journal records the ambiguity either way.
 * **FR-7.11 Journal isolation.** A session's journal holds only requests attributed to it. The global journal holds everything, tagged with the session that served it.
 * **FR-7.12 Propagation hint.** The response can optionally echo `X-Shadow-Mock-Matched: <id>;layer=<key-based|url-based|global>` (off by default, for debugging).
+* **FR-7.13 Optional global fallback.** Creating a key-based or URL-based shadow mock takes `inheritGlobal` (boolean, default `true`). When it is `false`, a request that the shadow mock's own mappings (and its URL-based parent's, if nested) do not cover gets the normal unmatched response and never falls through to the global layer. This is for tests that want a missing mapping to fail loudly rather than be served by a global one. It covers everything the global layer holds: mappings, body files and call counters. It does not change authentication, limits or recording.
+  * It is fixed at creation (`PATCH` does not change it); to change it, create another shadow mock. Reads of a shadow mock report the effective value.
+  * A key-based shadow mock nested in a URL-based one skips the global layer if either was created with `inheritGlobal: false`.
+  * The unmatched response and the near-miss endpoints still rank global mappings, each marked as not inherited (`skipped: true`), as a hint; they never serve a response. The journal entry records that the global layer was skipped.
 
 ## 5. Functional requirements: URL-based shadow mocks
 

@@ -35,6 +35,9 @@ type CreateSessionRequest struct {
 	ParentID   string            `json:"parentId"`
 	SeedFrom   *SeedFrom         `json:"seedFrom"`
 	Metadata   map[string]any    `json:"metadata"`
+	// InheritGlobal says whether requests that the session's own mappings do not cover fall through to the global layer.
+	// Left out, it is true (FR-7.13).
+	InheritGlobal *bool `json:"inheritGlobal"`
 	// CreatedByKey is the label of the Tool app key making the request. The admin handler sets it; a client cannot.
 	CreatedByKey string `json:"-"`
 }
@@ -62,7 +65,7 @@ func (s *Service) CreateSession(ctx context.Context, t tenant.ID, kind session.K
 	}
 	sess, err := s.Sessions.Create(ctx, t, session.CreateRequest{
 		Kind: kind, Name: req.Name, TTLSeconds: req.TTLSeconds, Tokens: req.Tokens, ParentID: req.ParentID,
-		Masks: req.Masks, Metadata: req.Metadata, CreatedBy: createdBy, CreatedByKey: req.CreatedByKey,
+		Masks: req.Masks, Metadata: req.Metadata, NoGlobal: req.InheritGlobal != nil && !*req.InheritGlobal, CreatedBy: createdBy, CreatedByKey: req.CreatedByKey,
 		PlanMaxTTL: s.planMaxTTL(t, kind),
 	})
 	if err != nil {
@@ -145,6 +148,9 @@ func (s *Service) validateMasks(masks []model.Mask) error {
 
 // UpdateSession applies a patch, then refreshes the layer (masks) and detector (tokens).
 func (s *Service) UpdateSession(ctx context.Context, t tenant.ID, id string, p session.Patch) (session.Session, error) {
+	if p.InheritGlobal != nil {
+		return session.Session{}, apierr.Invalid("/inheritGlobal", "inheritGlobal is set when the shadow mock is created and cannot be changed")
+	}
 	if err := s.validateMasks(p.AddMasks); err != nil {
 		return session.Session{}, err
 	}

@@ -18,6 +18,7 @@ func (h *Handler) sessionView(r *http.Request, s *session.Session) sessionView {
 		ID: s.ID, Kind: string(s.Kind), Name: s.Name, Tenant: string(s.Tenant), CreatedBy: s.CreatedBy, CreatedByKey: s.CreatedByKey,
 		CreatedAt: s.CreatedAt, ExpiresAt: s.ExpiresAt, TTLSeconds: int64(s.TTL.Seconds()),
 		Masks: s.Masks, MappingCount: len(mappings), RequestCount: h.svc.Journal.Count(sc, nil), Metadata: s.Metadata,
+		InheritGlobal: !s.NoGlobal,
 	}
 	if s.ParentID != "" {
 		p := s.ParentID

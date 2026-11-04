@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/detect"
 	"github.com/pwgith/shadow-mock/internal/engine"
 	"github.com/pwgith/shadow-mock/internal/journal"
+	"github.com/pwgith/shadow-mock/internal/match"
 	"github.com/pwgith/shadow-mock/internal/proxy"
 	"github.com/pwgith/shadow-mock/internal/record"
 	"github.com/pwgith/shadow-mock/internal/respond"
@@ -170,7 +172,40 @@ func (s *Service) Stack(sc store.Scope) engine.Stack {
 	if sess, ok := s.Sessions.Get(sc.Tenant, sc.SessionID); ok && sess.ParentID != "" {
 		ids = append(ids, sess.ParentID)
 	}
-	return s.Layers.Stack(sc.Tenant, ids...)
+	return s.stackOf(sc.Tenant, ids)
+}
+
+// stackOf builds the stack for the sessions (most specific first). The global layer ends it, unless one of the
+// sessions was created with inheritGlobal=false (FR-7.13).
+func (s *Service) stackOf(t tenant.ID, sessionIDs []string) engine.Stack {
+	st := s.Layers.Stack(t, sessionIDs...)
+	if s.skipsGlobal(t, sessionIDs) {
+		return st[:len(st)-1]
+	}
+	return st
+}
+
+// skipsGlobal reports whether any of the sessions keeps requests from reaching the global layer.
+func (s *Service) skipsGlobal(t tenant.ID, sessionIDs []string) bool {
+	return slices.ContainsFunc(sessionIDs, func(id string) bool {
+		sess, ok := s.Sessions.Get(t, id)
+		return ok && sess.NoGlobal
+	})
+}
+
+// nearMisses ranks the closest mappings for a request that stack did not serve. When the stack leaves the global layer
+// out, the global layer's mappings are still ranked, marked as skipped, so a miss can be traced to a mapping the
+// session chose not to inherit. They are only a hint; they never serve a response.
+func (s *Service) nearMisses(req *match.Request, stack engine.Stack, limit int) []engine.NearMiss {
+	if len(stack) == 0 || stack[len(stack)-1].Kind == session.Global {
+		return engine.NearMisses(req, stack, limit)
+	}
+	global, _ := s.Layers.Layer(store.Global(stack[0].Scope.Tenant))
+	nms := engine.NearMisses(req, append(slices.Clone(stack), global), limit)
+	for i := range nms {
+		nms[i].Skipped = nms[i].Layer == global
+	}
+	return nms
 }
 
 // fileScopes lists the scopes a stack looks up body files in, most specific first.

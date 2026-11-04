@@ -52,6 +52,7 @@ Managed-mode features tagged `@managed` run in the acceptance suite against the 
 | FR-7.10 | `02_shadow_mocks/key_based/ambiguity.feature` |
 | FR-7.11 | `02_shadow_mocks/key_based/journal_isolation.feature` |
 | FR-7.12 | `02_shadow_mocks/key_based/layered_resolution.feature` |
+| FR-7.13 | `02_shadow_mocks/common/inherit_global.feature` |
 | FR-8.1 | `02_shadow_mocks/url_based/lifecycle.feature` |
 | FR-8.2 | `02_shadow_mocks/url_based/routing.feature`, `03_standalone/standalone_mode.feature` |
 | FR-8.3 | `02_shadow_mocks/url_based/resolution.feature` |

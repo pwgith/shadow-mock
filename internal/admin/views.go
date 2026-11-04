@@ -276,6 +276,8 @@ type nearMissView struct {
 	MatchResult    matchResult           `json:"matchResult"`
 	// Missed names the parts of the mapping's pattern that the request did not match.
 	Missed []string `json:"missed,omitempty"`
+	// Skipped marks a global mapping that the session does not inherit (inheritGlobal=false); it is a hint only.
+	Skipped bool `json:"skipped,omitempty"`
 	// Source is the label the management app stamped on the candidate mapping (FR-11.10).
 	Source string `json:"source,omitempty"`
 }
@@ -291,7 +293,7 @@ func stubNearMisses(req *match.Request, nms []engine.NearMiss, e *journal.Entry)
 		m := nm.Stub.Mapping
 		out = append(out, nearMissView{
 			Request: &lr, StubMapping: &m, Layer: string(nm.Layer.Kind),
-			MatchResult: matchResult{Distance: round(nm.Distance)}, Missed: nm.Missed, Source: sourceOf(&m),
+			MatchResult: matchResult{Distance: round(nm.Distance)}, Missed: nm.Missed, Skipped: nm.Skipped, Source: sourceOf(&m),
 		})
 	}
 	return out
@@ -338,6 +340,8 @@ type sessionView struct {
 	MappingCount int            `json:"mappingCount"`
 	RequestCount int            `json:"requestCount"`
 	Metadata     map[string]any `json:"metadata,omitempty"`
+	// InheritGlobal is false when requests the session does not cover never fall through to the global layer (FR-7.13).
+	InheritGlobal bool `json:"inheritGlobal"`
 	// Key is set only in the response to creation.
 	Key string `json:"key,omitempty"`
 }

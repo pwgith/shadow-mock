@@ -60,7 +60,9 @@ type CreateRequest struct {
 	ParentID   string
 	Masks      []model.Mask
 	Metadata   map[string]any
-	CreatedBy  string
+	// NoGlobal keeps requests from falling through to the global layer.
+	NoGlobal  bool
+	CreatedBy string
 	// CreatedByKey is the label of the Tool app key that made the session.
 	CreatedByKey string
 	// PlanMaxTTL is the longest lifetime the org's plan allows for this kind of shadow mock, if shorter than the
@@ -78,7 +80,7 @@ func (r *Registry) Create(_ context.Context, t tenant.ID, req CreateRequest) (Se
 	s := Session{
 		Kind: req.Kind, Tenant: t, Name: req.Name, ParentID: req.ParentID,
 		CreatedBy: req.CreatedBy, CreatedByKey: req.CreatedByKey, CreatedAt: now, ExpiresAt: now.Add(ttl), TTL: ttl,
-		Masks: slices.Clone(req.Masks), Metadata: req.Metadata,
+		Masks: slices.Clone(req.Masks), Metadata: req.Metadata, NoGlobal: req.NoGlobal,
 	}
 	if req.Kind == KeyBased {
 		s.ID = ids.NewSessionID()

@@ -22,6 +22,8 @@ type Patch struct {
 	AddMasks     []model.Mask   `json:"addMasks"`
 	RemoveMasks  []model.Mask   `json:"removeMasks"`
 	Metadata     map[string]any `json:"metadata"`
+	// InheritGlobal is read only to refuse it: the setting is fixed at creation (FR-7.13).
+	InheritGlobal *bool `json:"inheritGlobal"`
 	// PlanMaxTTL is the longest lifetime the org's plan allows; zero means no plan limit. A client cannot set it.
 	PlanMaxTTL time.Duration `json:"-"`
 }

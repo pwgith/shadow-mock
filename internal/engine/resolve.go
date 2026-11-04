@@ -19,6 +19,8 @@ type NearMiss struct {
 	Distance float64
 	// Missed names the parts of the stub's pattern that the request did not match, such as "Header [Accept]".
 	Missed []string
+	// Skipped marks a mapping of the global layer that the session does not inherit (FR-7.13). It is a hint only.
+	Skipped bool
 }
 
 // hidden tracks parent stubs hidden by more specific layers: by id (overrides, FR-7.7, and id
