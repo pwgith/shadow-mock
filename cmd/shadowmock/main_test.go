@@ -27,6 +27,28 @@ func TestRun(t *testing.T) {
 	}
 }
 
+// A sub-command is a client of a running server and does not start one.
+func TestRunSubCommandCallsTheAdminAPI(t *testing.T) {
+	t.Parallel()
+	var got string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Method + " " + r.URL.RequestURI() + " " + r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{"sessions":[]}`))
+	}))
+	defer srv.Close()
+	env := func(k string) (string, bool) { return "smt_KEY", k == "SHADOWMOCK_KEY" }
+	var out bytes.Buffer
+	if err := run([]string{"session", "list", "--state", "active", "--url", srv.URL}, env, &out); err != nil {
+		t.Fatal(err)
+	}
+	if want := "GET /__admin/sessions?state=active Bearer smt_KEY"; got != want {
+		t.Errorf("call = %q, want %q", got, want)
+	}
+	if out.String() != "{\"sessions\":[]}\n" {
+		t.Errorf("output = %q, want the API's answer", out.String())
+	}
+}
+
 // dial opens a client connection to ln and closes it when the test ends.
 func dial(t *testing.T, ln net.Listener) {
 	t.Helper()

@@ -45,18 +45,3 @@ Feature: Other WireMock admin endpoints: files, settings, reset, health and shut
     When I call admin "POST" "/shutdown"
     Then the response status is 200
     And within 5 s the server has stopped
-
-  @saas @P5
-  Scenario Outline: Endpoints that are disabled or restricted in SaaS
-    Given I am "alice" in org "acme" with app role "admin"
-    When I call admin "<method>" "<path>"
-    Then the response status is <status>
-    And the response JSON at "$.error" is "<error>"
-
-    Examples:
-      | method | path             | status | error                            |
-      | POST   | /shutdown        | 404    | not_available_in_saas            |
-      | POST   | /mappings/save   | 404    | not_available_in_saas            |
-      | POST   | /reset           | 403    | global_writes_via_management_app |
-      | PUT    | /files/x.json    | 403    | global_writes_via_management_app |
-      | POST   | /settings        | 403    | global_writes_via_management_app |

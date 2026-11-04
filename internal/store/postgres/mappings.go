@@ -85,7 +85,7 @@ func (m *Mappings) Put(ctx context.Context, s store.Scope, sm model.StubMapping)
 		return fmt.Errorf("postgres mappings: %w", err)
 	}
 	_, err = m.db.pool.Exec(ctx, `INSERT INTO engine.mappings (org_id, id, body) VALUES ($1, $2, $3)
-		ON CONFLICT (org_id, id) DO UPDATE SET body = EXCLUDED.body`, string(s.Tenant), sm.ID, body)
+		ON CONFLICT (org_id, id) DO UPDATE SET body = EXCLUDED.body`, string(s.Tenant), sm.ID, string(body))
 	if err != nil {
 		return fmt.Errorf("postgres mappings: %w", err)
 	}

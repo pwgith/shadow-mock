@@ -110,3 +110,18 @@ func TestTopUnmatchedPathsAreCappedAndTied(t *testing.T) {
 		t.Errorf("TopUnmatchedPaths = %v, want 10 entries ordered by path when counts tie", got)
 	}
 }
+
+func TestExpiriesAreCountedPerWindow(t *testing.T) {
+	t.Parallel()
+	tr := stats.New()
+	tr.RecordExpiry("acme", now.Add(-10*time.Minute))
+	tr.RecordExpiry("acme", now.Add(-90*time.Minute))
+	tr.RecordExpiry("globex", now)
+	if got := tr.Live("acme", "15m", 15*time.Minute, now, stats.ActiveSessions{}).ExpiredSessions; got != 1 {
+		t.Errorf("Live() ExpiredSessions = %d, want 1", got)
+	}
+	points := tr.History("acme", now.Add(-2*time.Hour), now, time.Hour, stats.ActiveSessions{})
+	if len(points) != 2 || points[0].ExpiredSessions != 1 || points[1].ExpiredSessions != 1 {
+		t.Errorf("History() points = %+v, want one expiry in each hour", points)
+	}
+}

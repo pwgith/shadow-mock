@@ -2,6 +2,9 @@ openapi: 3.1.0
 info:
   title: Shadow Mock Engine API
   version: 0.1.0
+  # The version of the stub-mapping JSON Schema this description and schema/stub-mapping.schema.json carry. It
+  # equals "mappingSchema" in GET /__admin/version (FR-11.11e).
+  x-mapping-schema-version: 1
   summary: WireMock-compatible admin API plus Shadow Mock sessions, runtime and platform endpoints.
   description: |
     The admin and runtime API of the Shadow Mock engine (the Go service).
@@ -2249,6 +2252,13 @@ components:
           type: object
           properties:
             distance: { type: number, minimum: 0, maximum: 1 }
+        missed:
+          type: array
+          description: The parts of the mapping's pattern that the request did not match, such as `Header [Accept]`.
+          items: { type: string }
+        skipped:
+          type: boolean
+          description: A global mapping that the shadow mock does not inherit (`inheritGlobal` false). A hint only; it never serves a response.
     NearMissList:
       type: object
       properties:
@@ -2421,6 +2431,7 @@ components:
           description: Create inside a URL-based shadow mock (FR-8.5). Its expiry is capped at the parent's.
         seedFrom: { $ref: '#/components/schemas/SeedFrom' }
         metadata: { type: object, additionalProperties: true }
+        inheritGlobal: { $ref: '#/components/schemas/InheritGlobal' }
     CreateURLBasedSessionRequest:
       type: object
       properties:
@@ -2434,6 +2445,13 @@ components:
           items: { $ref: '#/components/schemas/Mask' }
         seedFrom: { $ref: '#/components/schemas/SeedFrom' }
         metadata: { type: object, additionalProperties: true }
+        inheritGlobal: { $ref: '#/components/schemas/InheritGlobal' }
+    InheritGlobal:
+      type: boolean
+      default: true
+      description: >-
+        When false, a request that the shadow mock's own mappings do not cover gets the unmatched response and never falls
+        through to the global layer (FR-7.13). Fixed at creation. Session reads always report the effective value.
     Session:
       type: object
       required: [id, kind, createdBy, createdAt, expiresAt]
@@ -2456,6 +2474,7 @@ components:
         mappingCount: { type: integer }
         requestCount: { type: integer }
         metadata: { type: object, additionalProperties: true }
+        inheritGlobal: { $ref: '#/components/schemas/InheritGlobal' }
     CreatedKeyBasedSession:
       allOf:
         - $ref: '#/components/schemas/Session'
@@ -2559,6 +2578,7 @@ components:
             keyBased: { type: integer }
             urlBased: { type: integer }
         rateLimited: { type: integer, description: Requests refused for being over the org's rate limit, apart from the ones served. }
+        expiredSessions: { type: integer, description: Shadow mocks that expired in the window. }
         ipRejections:
           type: array
           items:

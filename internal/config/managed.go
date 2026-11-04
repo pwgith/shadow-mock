@@ -37,7 +37,8 @@ type Managed struct {
 	SingleInstance bool `yaml:"singleInstance"`
 }
 
-// Console is the embedded web console (FR-11.17). It is not built yet; managed mode refuses it.
+// Console is the embedded web console (FR-11.17), served under /__console by standalone and central-server
+// use. Managed mode serves no pages, so it refuses it (FR-11.16).
 type Console struct {
 	Enabled bool `yaml:"enabled"`
 }
@@ -65,18 +66,23 @@ func (c *Config) validateManaged() error {
 	for i, is := range c.Auth.Issuers {
 		errs = append(errs, is.validate(fmt.Sprintf("auth.issuers[%d]", i), names))
 	}
-	switch {
-	case c.Admin.GlobalWrites != "deny":
+	// Every setting is checked, so that one start-up reports all that is wrong and not the first.
+	if c.Admin.GlobalWrites != "deny" {
 		add("mode: managed needs admin.globalWrites: deny, because the management app writes the global layer")
-	case c.Mappings.UnknownFields != "keep":
+	}
+	if c.Mappings.UnknownFields != "keep" {
 		add("mode: managed needs mappings.unknownFields: keep, because the management app stores fields the engine does not know")
-	case !c.Egress.BlockPrivate:
+	}
+	if !c.Egress.BlockPrivate {
 		add("mode: managed needs egress.blockPrivate: true, and nothing may turn it off")
-	case c.Proxy.Browser.Enabled:
+	}
+	if c.Proxy.Browser.Enabled {
 		add("mode: managed refuses proxy.browser: a shared host must not be an open proxy")
-	case c.TLS.Enabled():
+	}
+	if c.TLS.Enabled() {
 		add("mode: managed refuses tls.port: a shared host ends TLS at its edge")
-	case c.Console.Enabled:
+	}
+	if c.Console.Enabled {
 		add("mode: managed serves no pages: console.enabled must be false")
 	}
 	if strings.Contains(strings.Join(c.Templating.Extensions, ","), ExtensionJWT) && (c.Templating.JWT.HS256Secret == "" || c.Templating.JWT.RS256PrivateKey == "") {

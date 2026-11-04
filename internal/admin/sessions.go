@@ -18,6 +18,7 @@ func (h *Handler) sessionView(r *http.Request, s *session.Session) sessionView {
 		ID: s.ID, Kind: string(s.Kind), Name: s.Name, Tenant: string(s.Tenant), CreatedBy: s.CreatedBy, CreatedByKey: s.CreatedByKey,
 		CreatedAt: s.CreatedAt, ExpiresAt: s.ExpiresAt, TTLSeconds: int64(s.TTL.Seconds()),
 		Masks: s.Masks, MappingCount: len(mappings), RequestCount: h.svc.Journal.Count(sc, nil), Metadata: s.Metadata,
+		InheritGlobal: !s.NoGlobal,
 	}
 	if s.ParentID != "" {
 		p := s.ParentID
@@ -43,6 +44,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request, sc store.Scope,
 	}
 	v := h.sessionView(r, &s)
 	v.Key = s.Key // returned only here (FR-7.1)
+	if warn := h.svc.UsageWarning(sc.Tenant); warn != "" {
+		w.Header().Set("X-Shadow-Mock-Usage-Warning", warn)
+	}
 	return writeJSON(w, http.StatusCreated, v)
 }
 
@@ -68,8 +72,22 @@ func (h *Handler) listSessions(w http.ResponseWriter, r *http.Request, sc store.
 	if err != nil {
 		return err
 	}
-	shown := page(r, all)
-	out := sessionList{Sessions: make([]sessionView, 0, len(shown)), Meta: metaView{Total: len(all)}}
+	q := r.URL.Query()
+	if q.Get("cursor") == "" && q.Get("offset") != "" {
+		q.Set("cursor", q.Get("offset")) // the older way to say where the page starts
+	}
+	_, limit, err := journalWindow(q)
+	if err != nil {
+		return err
+	}
+	if limit == 0 {
+		limit = -1 // no limit, as before
+	}
+	shown, next, err := cutPage(q, all, limit)
+	if err != nil {
+		return err
+	}
+	out := sessionList{Sessions: make([]sessionView, 0, len(shown)), Meta: metaView{Total: len(all), NextCursor: next}}
 	for i := range shown {
 		out.Sessions = append(out.Sessions, h.sessionView(r, &shown[i]))
 	}

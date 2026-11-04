@@ -95,6 +95,27 @@ func TestFilesRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDeleteAllRemovesOnlyThatOrgsFiles(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	r, _ := newRepo(-1)
+	_ = r.Put(ctx, acme, "a.txt", []byte("a"))
+	_ = r.Put(ctx, acme, "b.txt", []byte("b"))
+	_ = r.Put(ctx, globex, "a.txt", []byte("g"))
+	if err := r.DeleteAll(ctx, acme); err != nil {
+		t.Fatal(err)
+	}
+	if names, _ := r.List(ctx, acme); len(names) != 0 {
+		t.Errorf("acme still has %v", names)
+	}
+	if got, err := r.Read(ctx, globex, "a.txt"); err != nil || string(got) != "g" {
+		t.Errorf("globex's file = %q, %v", got, err)
+	}
+	if err := r.DeleteAll(ctx, store.Scope{Tenant: "acme", SessionID: "s"}); err == nil {
+		t.Error("only the global layer's files are stored here")
+	}
+}
+
 func TestOrgsDoNotSeeEachOthersFiles(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

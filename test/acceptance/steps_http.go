@@ -101,7 +101,7 @@ func (w *world) initHTTP(sc *godog.ScenarioContext) {
 	sc.Step(`^I send a request:$`, w.sendTable)
 
 	sc.Step(`^I send a "([^"]*)" request to "([^"]*)" from IP "([^"]*)"$`, func(m, p, ip string) error {
-		r := newRequest(m, p)
+		r := newRequest(m, w.mockPath(p))
 		r.header.Set("X-Forwarded-For", ip)
 		return w.sendOne(r)
 	})
@@ -149,6 +149,9 @@ func docType(doc *godog.DocString) string {
 }
 
 func (w *world) urlBasedPath(name, path string) string {
+	if w.m != nil {
+		return w.mockPath("/d/" + w.vars[name+".id"] + path)
+	}
 	return "/d/" + w.vars[name+".id"] + path
 }
 

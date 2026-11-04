@@ -8,27 +8,69 @@ import (
 
 	"github.com/pwgith/shadow-mock/internal/apierr"
 	"github.com/pwgith/shadow-mock/internal/model"
+	"github.com/pwgith/shadow-mock/internal/session"
 	"github.com/pwgith/shadow-mock/internal/store"
 	"github.com/pwgith/shadow-mock/internal/tenant"
 )
 
-// checkSessionRoom refuses a new shadow mock when limits.maxSessions are already active.
+// checkSessionRoom refuses a new shadow mock when the org's plan, or else limits.maxSessions, allows no more active
+// ones. A smaller plan deletes nothing: it only refuses the next one.
 func (s *Service) checkSessionRoom(t tenant.ID) error {
-	limit := s.Config.Limits.MaxSessions
+	limit, who := s.Config.Limits.MaxSessions, "The server"
+	if o := s.org(t); o != nil && o.Limits.MaxSessions > 0 {
+		limit, who = o.Limits.MaxSessions, "The org's plan"
+	}
 	if limit <= 0 {
 		return nil
 	}
+	if active := s.activeSessions(t); active >= limit {
+		return apierr.New(http.StatusTooManyRequests, apierr.SessionLimitReached,
+			"%s allows %d active shadow mocks and %d are active. Delete one that is no longer needed, or wait for one to expire.", who, limit, active)
+	}
+	return nil
+}
+
+func (s *Service) activeSessions(t tenant.ID) int {
 	active := 0
 	for _, x := range s.Sessions.All() {
 		if x.Tenant == t {
 			active++
 		}
 	}
-	if active >= limit {
-		return apierr.New(http.StatusTooManyRequests, apierr.SessionLimitReached,
-			"The server already has %d active shadow mocks, which is its limit. Delete one that is no longer needed, or wait for one to expire.", active)
+	return active
+}
+
+// UsageWarning returns the reason to warn the caller of a shadow mock that has just been made, or "". An org beyond
+// the sessions its plan includes is allowed on, up to the plan's ceiling, and is told so (NFR-4.2).
+func (s *Service) UsageWarning(t tenant.ID) string {
+	if o := s.org(t); o != nil && o.Limits.IncludedSessions > 0 && s.activeSessions(t) > o.Limits.IncludedSessions {
+		return "sessions_over_included"
 	}
-	return nil
+	return ""
+}
+
+// planMaxTTL is the longest a shadow mock of this kind may live on the org's plan, or zero when the plan sets none.
+func (s *Service) planMaxTTL(t tenant.ID, kind session.Kind) time.Duration {
+	if o := s.org(t); o != nil && kind == session.URLBased {
+		return o.Limits.MaxURLTTL
+	}
+	return 0
+}
+
+// mappingsPerSessionLimit is how many mappings a shadow mock of the org may hold: its plan's limit, else the server's.
+func (s *Service) mappingsPerSessionLimit(t tenant.ID) int {
+	if o := s.org(t); o != nil && o.Limits.MaxMappingsPerSession > 0 {
+		return o.Limits.MaxMappingsPerSession
+	}
+	return s.Config.Limits.MaxMappingsPerSession
+}
+
+// globalMappingsLimit is how many mappings the org's global layer may hold.
+func (s *Service) globalMappingsLimit(t tenant.ID) int {
+	if o := s.org(t); o != nil && o.Limits.MaxMappings > 0 {
+		return o.Limits.MaxMappings
+	}
+	return s.Config.Limits.MaxMappings
 }
 
 // checkMappingRoom refuses a change that would leave a scope with more mappings than the limits
@@ -36,9 +78,9 @@ func (s *Service) checkSessionRoom(t tenant.ID) error {
 // that replaces an existing one does not count. With replaceAll the incoming mappings take the
 // place of everything in the scope.
 func (s *Service) checkMappingRoom(ctx context.Context, sc store.Scope, incoming []string, replaceAll bool) error {
-	limit, what := s.Config.Limits.MaxMappingsPerSession, "A shadow mock"
+	limit, what := s.mappingsPerSessionLimit(sc.Tenant), "A shadow mock"
 	if sc.IsGlobal() {
-		limit, what = s.Config.Limits.MaxMappings, "The global session"
+		limit, what = s.globalMappingsLimit(sc.Tenant), "The global session"
 	}
 	if limit <= 0 {
 		return nil

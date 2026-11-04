@@ -34,6 +34,13 @@ type managedWorld struct {
 	audience string
 	replay   bool
 	pinned   bool
+	// clientHeader and clientHops say where the engine reads the client address (server.clientIp). The default
+	// is the harness's own: the test client plays the proxy and says the address in X-Forwarded-For.
+	clientHeader  string
+	clientHops    int
+	clientProxies []string
+	// extra is more configuration a scenario asked for, applied on every start.
+	extra string
 
 	// The issuer signs with signer. Every key in published is served at the key set URL.
 	signer    *authtest.Issuer
@@ -53,6 +60,18 @@ type managedWorld struct {
 	writeErr error
 	// lastMetadata is the metadata the management app last wrote, for a step that reads it back.
 	lastMetadata map[string]any
+
+	// limitedEachSecond is how many requests were refused with 429 in each second of a rate test.
+	limitedEachSecond []int
+	// requestsBefore is the requests counted before an event, when requestsNoted.
+	requestsBefore int64
+	requestsNoted  bool
+	// usageHour is the hour of a bucket read earlier.
+	usageHour time.Time
+	// recordedSession is the shadow mock a scenario started a recording in.
+	recordedSession string
+	// snapshot is what the org held before a write that should change nothing.
+	snapshot string
 }
 
 type orgRecord struct {
@@ -104,7 +123,16 @@ auth:
       audience: %s
       replayCheck: %v
       %s
-`, m.name, managedIssuerURL, m.audience, m.replay, strings.ReplaceAll(strings.TrimRight(keys, "\n"), "\n", "\n      "))
+%s`, m.name, managedIssuerURL, m.audience, m.replay, strings.ReplaceAll(strings.TrimRight(keys, "\n"), "\n", "\n      "), m.clientIPYAML()+m.extra)
+}
+
+// clientIPYAML is the server.clientIp setting, when the scenario names a header; the harness's own setting stays
+// otherwise.
+func (m *managedWorld) clientIPYAML() string {
+	if m.clientHeader == "" {
+		return ""
+	}
+	return fmt.Sprintf("server:\n  clientIp: { header: %s, trustedHops: %d, trustedProxies: [%s] }\n", m.clientHeader, m.clientHops, strings.Join(m.clientProxies, ", "))
 }
 
 func indent(s, prefix string) string {
@@ -152,17 +180,19 @@ func (m *managedWorld) serveJWKS(rw http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(rw).Encode(set) //nolint:errcheck // the client may have gone
 }
 
-// planLimit is what a plan allows that the engine enforces itself (FR-11.5, FR-11.6).
+// planLimit is what a plan allows that the engine enforces itself (FR-11.5, FR-11.6, FR-11.12): the request rate,
+// the monthly cap, and the shadow mocks (SAAS.md Â§12: a ceiling of 3 times the included number, and for Free no
+// more than are included).
 func planLimit(plan string) tenant.Limits {
 	switch strings.ToLower(plan) {
 	case "free":
-		return tenant.Limits{RequestsPerSecond: 10, Burst: 10, MonthlyRequestCap: 100_000}
+		return tenant.Limits{RequestsPerSecond: 10, Burst: 10, MonthlyRequestCap: 100_000, IncludedSessions: 2, MaxSessions: 2, MaxURLTTL: 7 * 24 * time.Hour}
 	case "starter":
-		return tenant.Limits{RequestsPerSecond: 100, Burst: 100}
+		return tenant.Limits{RequestsPerSecond: 100, Burst: 100, IncludedSessions: 10, MaxSessions: 30}
 	case "team":
-		return tenant.Limits{RequestsPerSecond: 200, Burst: 200}
+		return tenant.Limits{RequestsPerSecond: 200, Burst: 200, IncludedSessions: 50, MaxSessions: 150}
 	default: // Business and anything else
-		return tenant.Limits{RequestsPerSecond: 2000, Burst: 2000}
+		return tenant.Limits{RequestsPerSecond: 2000, Burst: 2000, IncludedSessions: 250, MaxSessions: 750}
 	}
 }
 
@@ -369,6 +399,13 @@ func (w *world) initManaged(sc *godog.ScenarioContext) {
 	w.initManagedLayers(sc)
 	w.initManagedLimits(sc)
 	w.initManagedLimits2(sc)
+	w.initManagedNetwork(sc)
+	w.initManagedExposure(sc)
+	w.initManagedUsage(sc)
+	w.initManagedPurge(sc)
+	w.initManagedAdminAPI(sc)
+	w.initManagedFlows(sc)
+	w.initManagedPlan(sc)
 }
 
 // eventually runs check until it passes or the time is up, waiting in real time between tries. It returns the last

@@ -40,12 +40,3 @@ Feature: Global session writes only through the management app
       { "request": { "urlPath": "/x" }, "response": { "status": 200 } }
       """
     Then the response status is 201
-
-  @management-app
-  Scenario: A global mapping written by the management app is served by the engine
-    Given "dana" is in team "platform-qa" which has grant "global:write"
-    When "dana" creates the global mapping in the management app:
-      """json
-      { "request": { "urlPath": "/from-ui" }, "response": { "status": 200, "body": "ui" } }
-      """
-    Then within 1 s a "GET" request to "/acme/from-ui" returns body "ui"

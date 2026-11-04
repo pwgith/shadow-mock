@@ -125,10 +125,12 @@ func (m *Meter) Month(org tenant.ID, t time.Time) int64 {
 	return n
 }
 
-// Buckets returns the org's hourly buckets that start in [from, to), oldest first. A zero `to` means now.
+// Buckets returns the org's hourly buckets that start in [from, to), oldest first. A zero `to` means now. When both
+// ends are given, every hour of the range has a bucket, and an hour with nothing counted is an empty one.
 func (m *Meter) Buckets(org tenant.ID, from, to time.Time) []Bucket {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	fill := !from.IsZero() && !to.IsZero()
 	if to.IsZero() {
 		to = m.clk.Now().Add(time.Hour)
 	}
@@ -144,6 +146,17 @@ func (m *Meter) Buckets(org tenant.ID, from, to time.Time) []Bucket {
 		}
 		b.read, b.dirty = true, false
 		out = append(out, b.Bucket)
+	}
+	if fill {
+		have := make(map[time.Time]bool, len(out))
+		for _, b := range out {
+			have[b.PeriodStart] = true
+		}
+		for h := hourOf(from); h.Before(to); h = h.Add(time.Hour) {
+			if !have[h] {
+				out = append(out, Bucket{PeriodStart: h, PeriodEnd: h.Add(time.Hour)})
+			}
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].PeriodStart.Before(out[j].PeriodStart) })
 	return out

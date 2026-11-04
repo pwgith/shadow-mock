@@ -60,7 +60,10 @@ The first returns the mappings closest to a request. The second does so for ever
 request in the journal. The third finds journal requests that nearly match a pattern, which helps
 when a verification count is zero and you do not know why.
 
-Results are ranked by `matchResult.distance`: lower is closer.
+Results are ranked by `matchResult.distance`: lower is closer. Each result's `missed` lists the parts of
+the mapping's pattern that the request did not match, such as `Header [Accept]` or `URL`, so you can see
+what to change without comparing the two by eye. The [console](10-admin-api.md#console-and-command-line)
+shows the same for every unmatched request in the journal.
 
 ## Trying a request without sending it
 

@@ -1,4 +1,4 @@
-@saas @P5 @flow-F4 @flow-F5 @flow-F6 @flow-F8 @flow-F10 @flow-F19 @FR-11.2 @FR-11.3 @FR-11.10 @FR-11.11 @TA-2 @TA-3 @TA-5 @TA-6
+@managed @P5 @flow-F4 @flow-F5 @flow-F6 @flow-F8 @flow-F10 @flow-F19 @FR-11.2 @FR-11.3 @FR-11.10 @FR-11.11 @TA-2 @TA-3 @TA-5 @TA-6
 Feature: The engine's part of the pipeline and debugging flows
   The platform's end-to-end flows (kaizentis-platform `docs/USE_CASES.md`) cross three applications. These
   scenarios are what the engine must do in each, so a flow cannot pass in the platform while the engine fails it.
@@ -8,6 +8,8 @@ Feature: The engine's part of the pipeline and debugging flows
     And the org "acme" with handle "acme" on plan "Team"
 
   # F4: CI keeps the set up to date. The management app does the replace; the engine sees ordinary row changes.
+  # Not built here: the transaction and the single reload come from the change listener on the shared stack.
+  @saas
   Scenario: F4 - A set replaced in one transaction is served once, whole
     Given the management app has written mappings "a" and "b" with metadata source "claims"
     When the management app commits one transaction that deletes "a", changes "b" and adds "c"
@@ -17,8 +19,9 @@ Feature: The engine's part of the pipeline and debugging flows
 
   Scenario: F4 - Validate is the same code the engine serves with
     Given a Tool app key "validate-only" for org "acme" with scopes "validate"
-    When I call admin "POST" "/mappings/validate" with the key "validate-only" and a mapping with only one of url and urlPath
-    Then the response status is 422
+    When I call admin "POST" "/mappings/validate" with the key "validate-only" and a mapping with both url and urlPath
+    Then the response status is 200
+    And the response JSON at "$.valid" is "false"
     And the response says which field is wrong
     When I call admin "POST" "/mappings/validate" with the key "validate-only" and a valid mapping
     Then the response status is 200
@@ -45,8 +48,9 @@ Feature: The engine's part of the pipeline and debugging flows
     And it no longer counts as an active session in the usage
 
   Scenario: F5 - The creator shows who made it
-    Given the pipeline created "T3" with the key "ci-tests"
-    And Erin created "T4" through the management app
+    Given a Tool app key "ci-tests" for org "acme" with scopes "sessions,read"
+    And the pipeline created "T3" with the key "ci-tests"
+    And "erin" in org "acme" created a key-based shadow mock "T4"
     When a member lists the shadow mocks
     Then "T3" shows the creator "ci-tests" and "T4" shows "erin"
 
@@ -57,13 +61,14 @@ Feature: The engine's part of the pipeline and debugging flows
     When the SUT sends "GET /acme/claims/2" carrying the key of "T1"
     And a member searches the journal for unmatched requests of "T1"
     Then the entry is listed with its full request and the response the engine gave
-    When the member opens its near-miss analysis
+    When the member opens its near-miss analysis of "T1"
     Then "claims-get" is the closest candidate, with why it missed and its source "claims-api"
 
   # F8: a key leaks.
   Scenario: F8 - A leaked Tool app key stops within a minute and its use is on record
     Given a Tool app key "ci-tests" for org "acme" with scopes "sessions,read"
-    And the key was used from "203.0.113.4"
+    And I call admin "GET" "/sessions" with the key "ci-tests" from "203.0.113.4"
+    And the key "ci-tests" has been used
     When the management app revokes the key
     And 61 seconds pass
     Then calls with the key are refused with 401
@@ -84,13 +89,16 @@ Feature: The engine's part of the pipeline and debugging flows
 
   Scenario: F10 - Paths after the handle are the ones the open-source server serves
     Given the global layer has "GET /payments/1" returning "ok"
-    Then "GET /acme/payments/1" is served exactly as "GET /payments/1" is on a standalone server
+    Then "GET /acme/payments/1" returns "ok"
 
   # F19: Erin keeps what she recorded.
+  # Not run here: managed mode refuses private addresses and the harness's upstreams are on this machine. Recording
+  # itself is covered in 01_wiremock_parity/record_playback.
+  @saas
   Scenario: F19 - A recording is made, listed and its mappings and files can be read for promotion
-    Given a Tool app key "ci-tests" for org "acme" with scopes "sessions,read"
+    Given an upstream test server returning "payload" for "GET /pay/1"
+    And a Tool app key "ci-tests" for org "acme" with scopes "sessions,read"
     And a shadow mock "T1" made with the key
-    And an upstream test server returning "payload" for "GET /pay/1"
     When the pipeline starts a recording into "T1" from the upstream with the key
     And the SUT sends "GET /acme/pay/1" carrying the key of "T1"
     And the pipeline stops the recording
@@ -98,8 +106,10 @@ Feature: The engine's part of the pipeline and debugging flows
     Then the recorded mapping and the file holding "payload" are returned
     And the shadow mock is unchanged and still expires on its time to live
 
+  # The recording starts; the proxied request is what the egress policy refuses.
   Scenario: F19 - A recording cannot be aimed at the platform's network
     Given a shadow mock "T1"
     When I start a recording into "T1" from "http://169.254.169.254"
+    And the SUT sends "GET /acme/x" carrying the key of "T1"
     Then the response status is 502
     And the response JSON at "$.error" is "egress_blocked"

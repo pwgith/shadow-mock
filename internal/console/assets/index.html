@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="admin-base" content="__ADMIN_BASE__">
+  <title>Shadow Mock console</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Shadow Mock</h1>
+    <label class="token">Admin token
+      <input id="token" type="password" autocomplete="off" placeholder="only if the server asks for one">
+    </label>
+    <span id="status" role="status"></span>
+  </header>
+  <nav aria-label="Console sections">
+    <button type="button" data-tab="journal" aria-pressed="true">Journal</button>
+    <button type="button" data-tab="sessions" aria-pressed="false">Shadow mocks</button>
+    <button type="button" data-tab="counters" aria-pressed="false">Counters</button>
+    <button type="button" data-tab="recordings" aria-pressed="false">Recordings</button>
+    <button type="button" data-tab="dryrun" aria-pressed="false">Dry run</button>
+  </nav>
+  <main>
+    <section id="tab-journal">
+      <div class="bar">
+        <label><input id="unmatched-only" type="checkbox"> Unmatched only</label>
+        <button type="button" id="refresh-journal">Refresh</button>
+      </div>
+      <div class="split">
+        <ul id="journal-list" class="list" aria-label="Journal entries"></ul>
+        <div id="journal-detail" class="detail" aria-live="polite"><p class="hint">Select an entry.</p></div>
+      </div>
+    </section>
+    <section id="tab-sessions" hidden>
+      <div class="bar">
+        <button type="button" id="refresh-sessions">Refresh</button>
+      </div>
+      <table>
+        <thead><tr><th>Name</th><th>Kind</th><th>Created by</th><th>Expires</th><th>Requests</th><th></th></tr></thead>
+        <tbody id="sessions-body"></tbody>
+      </table>
+      <p id="sessions-empty" class="hint" hidden>No shadow mocks.</p>
+      <div id="session-edit" class="detail" aria-live="polite" hidden></div>
+    </section>
+    <section id="tab-counters" hidden>
+      <div class="bar">
+        <label>Scope <select id="counters-scope"></select></label>
+        <button type="button" id="refresh-counters">Refresh</button>
+        <button type="button" id="reset-counters">Reset all</button>
+      </div>
+      <table>
+        <thead><tr><th>Mapping</th><th>Layer</th><th>Calls so far</th><th>Last called</th><th>Set to</th><th></th></tr></thead>
+        <tbody id="counters-body"></tbody>
+      </table>
+      <p id="counters-empty" class="hint" hidden>No call counters. A mapping has one after its first call, if it uses callResponses or request.callNumber.</p>
+    </section>
+    <section id="tab-recordings" hidden>
+      <div class="bar">
+        <label>Scope <select id="recordings-scope"></select></label>
+        <button type="button" id="refresh-recordings">Refresh</button>
+      </div>
+      <p>Status: <strong id="recording-status">unknown</strong></p>
+      <form id="recording-form">
+        <label>Record through <input id="rec-target" type="url" size="40" placeholder="https://api.example.com" required></label>
+        <button type="submit">Start recording</button>
+        <button type="button" id="stop-recording">Stop recording</button>
+      </form>
+      <div id="recording-result" class="detail" aria-live="polite" hidden></div>
+    </section>
+    <section id="tab-dryrun" hidden>
+      <form id="dryrun-form">
+        <label>Method <input id="dr-method" value="GET" size="8"></label>
+        <label>URL <input id="dr-url" value="/" size="40"></label>
+        <label>Session ID (optional) <input id="dr-session" size="30"></label>
+        <button type="submit">Dry run</button>
+      </form>
+      <div id="dryrun-result" class="detail" aria-live="polite"></div>
+      <p class="hint">A dry run changes nothing and is not journalled.</p>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

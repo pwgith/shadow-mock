@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.6b @FR-9.6 @NFR-5.2 @TA-15
+@managed @P5 @FR-9.6b @FR-9.6 @NFR-5.2 @TA-15
 Feature: What is public on a shared host, and the real client address
   The admin API is reachable from the internet, so a credential is its only gate. Health and readiness are public;
   metrics can reveal org handles and per-org volumes, so they are not. The allowlist and the rate limit use the
@@ -49,7 +49,7 @@ Feature: What is public on a shared host, and the real client address
       | 1    |                               | 10.1.1.1 | 10.1.1.1     |
 
   Scenario: A client-supplied header is never trusted on its own
-    Given the number of trusted hops is 1
+    Given the trusted proxies are "10.0.0.0/8"
     When a request arrives straight from "198.51.100.9" with "X-Forwarded-For: 203.0.113.4"
     Then the client address the engine uses is "198.51.100.9"
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -170,6 +171,9 @@ func TestNearMisses(t *testing.T) {
 	}
 	if nm[0].Distance >= nm[1].Distance {
 		t.Errorf("distances %v, %v not ascending", nm[0].Distance, nm[1].Distance)
+	}
+	if !slices.Equal(nm[0].Missed, []string{"URL"}) || !slices.Equal(nm[1].Missed, []string{"Method", "URL"}) {
+		t.Errorf("Missed = %v and %v, want [URL] and [Method URL]", nm[0].Missed, nm[1].Missed)
 	}
 	if got := NearMisses(get(t, "/payments/2"), Stack{s, g}, 1); len(got) != 1 {
 		t.Errorf("limit 1 returned %d", len(got))

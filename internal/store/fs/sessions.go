@@ -44,6 +44,7 @@ type storedSession struct {
 	TTL       int64          `json:"ttlSeconds"`
 	Masks     []model.Mask   `json:"masks,omitempty"`
 	Metadata  map[string]any `json:"metadata,omitempty"`
+	NoGlobal  bool           `json:"noGlobal,omitempty"`
 }
 
 // NewSessionStore opens (creating if needed) the sessions directory.
@@ -74,7 +75,7 @@ func (s *SessionStore) SaveSessions(sessions []session.Session) error {
 		out = append(out, storedSession{
 			ID: x.ID, Kind: string(x.Kind), Tenant: string(x.Tenant), Key: x.Key, Tokens: x.Tokens, ParentID: x.ParentID,
 			Name: x.Name, CreatedBy: x.CreatedBy, CreatedAt: x.CreatedAt, ExpiresAt: x.ExpiresAt,
-			TTL: int64(x.TTL / time.Second), Masks: x.Masks, Metadata: x.Metadata,
+			TTL: int64(x.TTL / time.Second), Masks: x.Masks, Metadata: x.Metadata, NoGlobal: x.NoGlobal,
 		})
 	}
 	data, err := json.MarshalIndent(out, "", "  ")
@@ -106,7 +107,7 @@ func (s *SessionStore) LoadSessions(ctx context.Context) ([]session.Session, err
 		sess := session.Session{
 			ID: x.ID, Kind: session.Kind(x.Kind), Tenant: tenant.ID(x.Tenant), Key: x.Key, Tokens: x.Tokens, ParentID: x.ParentID,
 			Name: x.Name, CreatedBy: x.CreatedBy, CreatedAt: x.CreatedAt, ExpiresAt: x.ExpiresAt,
-			TTL: time.Duration(x.TTL) * time.Second, Masks: x.Masks, Metadata: x.Metadata,
+			TTL: time.Duration(x.TTL) * time.Second, Masks: x.Masks, Metadata: x.Metadata, NoGlobal: x.NoGlobal,
 		}
 		if err := s.loadMappings(ctx, sess.Scope()); err != nil {
 			return nil, err

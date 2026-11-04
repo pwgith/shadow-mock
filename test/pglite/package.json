@@ -1,0 +1,10 @@
+{
+  "name": "shadowmock-pglite",
+  "private": true,
+  "type": "module",
+  "description": "An in-memory Postgres (PGlite) that the database tests use when no SHADOWMOCK_TEST_POSTGRES_DSN is set.",
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.14",
+    "@electric-sql/pglite-socket": "0.2.17"
+  }
+}

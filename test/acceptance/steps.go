@@ -35,6 +35,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 		w.initTracing(sc)
 		w.initRecordingAsserts(sc)
 		w.initManaged(sc)
+		w.initConsole(sc)
 		return ctx, nil
 	})
 	sc.After(func(ctx context.Context, s *godog.Scenario, _ error) (context.Context, error) {

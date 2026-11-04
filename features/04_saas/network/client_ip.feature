@@ -1,4 +1,4 @@
-@saas @P5 @FR-9.6b @security
+@managed @P5 @FR-9.6b @security
 Feature: Determining the true client IP behind the platform proxy
   The client IP comes only from the X-Forwarded-For hop added by the trusted
   proxy, so a client cannot spoof it.

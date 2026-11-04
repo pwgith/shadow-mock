@@ -70,6 +70,7 @@ func (w *world) initEnv(sc *godog.ScenarioContext) {
 	})
 
 	w.initConfigSteps(sc)
+	w.initManagedConfig(sc)
 }
 
 func (w *world) advanceClock(spec string) error {

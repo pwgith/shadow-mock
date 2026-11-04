@@ -24,6 +24,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/auth"
 	"github.com/pwgith/shadow-mock/internal/browserproxy"
 	"github.com/pwgith/shadow-mock/internal/clock"
+	"github.com/pwgith/shadow-mock/internal/console"
 	"github.com/pwgith/shadow-mock/internal/mock"
 	"github.com/pwgith/shadow-mock/internal/ratelimit"
 	"github.com/pwgith/shadow-mock/internal/stats"
@@ -74,6 +75,8 @@ type Router struct {
 	ExemptAdminTokens bool
 	// OrgLimits holds each org's rate limiter; nil means no per-org limit.
 	OrgLimits *OrgLimiters
+	// Console serves the embedded console under /__console, or is nil when it is off (FR-11.17).
+	Console http.Handler
 	// Checks reports the shared stores for /__ready, each as "up" or "down". Nil reports none.
 	Checks func(context.Context) map[string]string
 }
@@ -148,6 +151,10 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // serveProbe answers the health, readiness and metrics paths, which belong to no org. It reports whether it did.
 func (rt *Router) serveProbe(w http.ResponseWriter, r *http.Request, path string) bool {
+	if rt.Console != nil && rt.ServeAdmin && (path == console.Prefix || strings.HasPrefix(path, console.Prefix+"/")) {
+		rt.Console.ServeHTTP(w, r)
+		return true
+	}
 	switch path {
 	case "/__health":
 		rt.health(w, nil)
@@ -429,7 +436,7 @@ func (rt *Router) rejectIP(w http.ResponseWriter, org *tenant.Org, ip netip.Addr
 		rt.Usage.IPRejected(org.ID)
 	}
 	e := apierr.New(http.StatusForbidden, apierr.IPNotAllowed, "Requests from %s are not allowed for this org.", ip)
-	e.Details = map[string]any{"ip": ip.String()}
+	e.Fields = map[string]any{"ip": ip.String()}
 	e.Write(w)
 }
 
@@ -459,10 +466,11 @@ const ReasonHeader = apierr.ReasonHeader
 // LimitHeader names the header that says which limit applied to a rate-limited request.
 const LimitHeader = "X-Shadow-Mock-Limit"
 
-// orgLimiter is an org's rate limiter and the limits it was made with, so a plan change makes a new one.
+// orgLimiter is an org's rate limiter and the rate it was made with, so a plan change makes a new one.
 type orgLimiter struct {
-	limits tenant.Limits
-	l      *ratelimit.Limiter
+	rate  float64
+	burst int
+	l     *ratelimit.Limiter
 }
 
 // admitMock lets a mock request in, or answers it: the client's own rate, the org's rate, and the org's
@@ -492,8 +500,8 @@ func (rt *Router) withinOrgRate(w http.ResponseWriter, org *tenant.Org) bool {
 	}
 	cur, _ := rt.OrgLimits.m.Load(org.ID)
 	ol, found := cur.(*orgLimiter)
-	if !found || ol.limits != lim {
-		ol = &orgLimiter{limits: lim, l: ratelimit.New(rt.Clock, lim.RequestsPerSecond, lim.Burst)}
+	if !found || ol.rate != lim.RequestsPerSecond || ol.burst != lim.Burst {
+		ol = &orgLimiter{rate: lim.RequestsPerSecond, burst: lim.Burst, l: ratelimit.New(rt.Clock, lim.RequestsPerSecond, lim.Burst)}
 		rt.OrgLimits.m.Store(org.ID, ol)
 	}
 	ok, wait := ol.l.Allow(string(org.ID))
