@@ -62,6 +62,26 @@ jobs:
       - name: Unit and acceptance tests with race detector and coverage targets
         run: make cover-check
 
+  # The embedded console in a real browser: Cucumber features driven by Playwright against a built binary.
+  console-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the test dependencies and Chromium
+        working-directory: test/console-e2e
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Console features
+        working-directory: test/console-e2e
+        run: npm test
+
   # The S3 driver's fault tests use Shadow Mock as a failing object store. They run against the engine built from this
   # tree in the test job; this job runs them again against the latest published edge build, a separate binary.
   s3-against-edge:
