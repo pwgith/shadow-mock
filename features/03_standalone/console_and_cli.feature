@@ -174,6 +174,7 @@ Feature: The embedded console and the command line
     Examples:
       | command                                        | call                                         |
       | session create --kind key-based --ttl 10m      | POST /__admin/sessions/key-based             |
+      | session create --kind url-based --no-global    | POST /__admin/sessions/url-based             |
       | session list --state active                    | GET /__admin/sessions?state=active           |
       | session delete ${S1.id}                        | DELETE /__admin/sessions/${S1.id}            |
       | journal tail --unmatched                       | GET /__admin/requests?limit=20&unmatched=true |

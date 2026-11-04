@@ -151,7 +151,7 @@
     if (!list.some(function (s) { return s.id === editing; })) { closeEdit(); }
     list.forEach(function (s) {
       const tr = el("tr");
-      [s.name || s.id, s.kind, s.createdBy, s.expiresAt, String(s.requestCount)].forEach(function (v) { tr.appendChild(el("td", v)); });
+      [s.name || s.id, s.kind + (s.inheritGlobal === false ? " (no global fallback)" : ""), s.createdBy, s.expiresAt, String(s.requestCount)].forEach(function (v) { tr.appendChild(el("td", v)); });
       const td = el("td");
       const edit = el("button", "Edit");
       edit.type = "button";
