@@ -64,6 +64,9 @@ func (s *Service) forgetRuntime(ctx context.Context, scopes []store.Scope) error
 	for _, sc := range scopes {
 		s.Journal.Remove(sc, nil)
 		errs = append(errs, s.Counters.ForgetScope(ctx, sc))
+		if s.Recorder != nil {
+			s.Recorder.Forget(sc)
+		}
 		if !sc.IsGlobal() {
 			errs = append(errs, s.Mappings.DeleteAll(ctx, sc), s.Files.DeleteAll(ctx, sc))
 		}

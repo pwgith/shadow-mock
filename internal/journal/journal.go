@@ -39,6 +39,9 @@ type Entry struct {
 	// Sessions lists every session in the request's stack, most specific first. A session's
 	// journal holds the requests whose stack includes it (FR-7.11).
 	Sessions []string
+	// GlobalSkipped is true when a session in the stack was created with inheritGlobal=false, so the request could not
+	// fall through to the global layer (FR-7.13).
+	GlobalSkipped bool
 	// Layer is the kind of layer that served the request: key-based, url-based or global;
 	// "" when nothing matched.
 	Layer       string
@@ -57,7 +60,14 @@ type Entry struct {
 	// ProcessTime and AddedDelay are in milliseconds.
 	ProcessTime int64
 	AddedDelay  int64
+	// BodiesOmitted says why the entry holds no bodies: BodiesOffByOrg when the org's journal settings keep them out.
+	BodiesOmitted string
+	// BodyTruncatedAt is the size a body was cut to when the journal kept the entry; 0 when none was.
+	BodyTruncatedAt int
 }
+
+// BodiesOffByOrg is the reason of an entry whose bodies the org's journal settings keep out (FR-11.11d).
+const BodiesOffByOrg = "org_settings"
 
 // Matched reports whether a stub served the request, or the browser proxy passed it on.
 func (e *Entry) Matched() bool { return e.Stub != nil || e.PassThrough }
@@ -176,6 +186,7 @@ func (j *Memory) trimmed(e *Entry) *Entry {
 		return e
 	}
 	cp := *e
+	cp.BodyTruncatedAt = j.maxBody
 	if reqBig {
 		cp.Request = e.Request.WithBody(slices.Clone(e.Request.Body[:j.maxBody]))
 	}

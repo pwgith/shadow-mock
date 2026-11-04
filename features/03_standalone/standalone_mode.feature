@@ -55,3 +55,7 @@ Feature: Standalone mode
   Scenario: A WireMock-style health endpoint is also served
     When I send a "GET" request to "/__admin/health"
     Then the response status is 200
+
+  Scenario: Standalone has no usage
+    When I call admin "GET" "/usage"
+    Then the response status is 404

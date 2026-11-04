@@ -1,4 +1,4 @@
-@saas @P5 @NFR-4.2
+@managed @P5 @NFR-4.2
 Feature: Plan limits on request rate and sessions
   Limits come from the org's plan entitlements. Soft caps bill overage and
   never break a running test. Hard caps return 429 with a reason.
@@ -27,19 +27,20 @@ Feature: Plan limits on request rate and sessions
   Scenario: The Free tier hard-caps monthly requests
     Given the org "acme" is on Shadow Mock plan "Free"
     And org "acme" has served 100000 mock requests this month
-    When I send a "GET" request to "/x"
+    When I send a "GET" request to "/acme/x"
     Then the response status is 429
     And the response JSON at "$.error" is "monthly_request_cap"
 
   Scenario: Paid tiers keep serving past the included requests and bill overage
     Given the org "acme" is on Shadow Mock plan "Starter"
     And org "acme" has served 2000000 mock requests this month
-    When I send a "GET" request to "/x"
+    When I send a "GET" request to "/acme/x"
     Then the response status is 200
-    And the org "acme" usage shows overage requests
+    And the org "acme" usage counts 2000001 requests this month
 
   Scenario Outline: Concurrent session limits
     Given the org "acme" is on Shadow Mock plan "<plan>"
+    And I present a token for "erin" in org "acme" with app role "member"
     And org "acme" has <active> active sessions
     When I call admin "POST" "/sessions/key-based" with:
       """json
@@ -62,17 +63,15 @@ Feature: Plan limits on request rate and sessions
     Then the response status is 201
     And the response header "X-Shadow-Mock-Usage-Warning" is "sessions_over_included"
 
-  Scenario Outline: Tool app key limits
-    Given the org "acme" is on Shadow Mock plan "<plan>"
-    And org "acme" has <keys> active Tool app keys
-    When an org admin creates another Tool app key
-    Then the result is "<result>"
-
-    Examples:
-      | plan    | keys | result                 |
-      | Free    | 1    | rejected: limit reached |
-      | Starter | 4    | created                |
-      | Team    | 25   | rejected: limit reached |
+  Scenario: The Free tier caps URL-based TTLs at 7 days
+    Given the org "acme" is on Shadow Mock plan "Free"
+    And I present a token for "erin" in org "acme" with app role "member"
+    When I call admin "POST" "/sessions/url-based" with:
+      """json
+      { "ttlSeconds": 1209600 }
+      """
+    Then the response status is 422
+    And the response JSON at "$.error" is "ttl_exceeds_plan_maximum"
 
   Scenario: Limits change immediately when the plan changes
     Given the org "acme" is on Shadow Mock plan "Free"

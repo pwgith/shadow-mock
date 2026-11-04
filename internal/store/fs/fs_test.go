@@ -389,7 +389,7 @@ func TestSessionStoreRoundTrip(t *testing.T) {
 	sess := session.Session{
 		ID: "ses_AAAAAAAAAAAAAAAAAAAAAAAAAA", Kind: session.KeyBased, Tenant: tenant.Local, Key: "smk_KEY", Tokens: []string{"CUST-1"},
 		Name: "n", CreatedBy: "local", CreatedAt: created, ExpiresAt: created.Add(time.Hour), TTL: time.Hour,
-		Masks: []model.Mask{{ID: "m1"}}, Metadata: map[string]any{"a": "b"},
+		Masks: []model.Mask{{ID: "m1"}}, Metadata: map[string]any{"a": "b"}, NoGlobal: true,
 	}
 	first := open()
 	if got, err := first.LoadSessions(ctx); err != nil || got != nil {

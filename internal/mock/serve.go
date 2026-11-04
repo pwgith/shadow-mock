@@ -167,7 +167,8 @@ func (s *Service) trafficStack(_ context.Context, tr Traffic, req *match.Request
 	if len(sessions) > 0 {
 		sv.entry.SessionID = sessions[0]
 	}
-	return s.Layers.Stack(tr.Tenant, sessions...), nil
+	sv.entry.GlobalSkipped = s.skipsGlobal(tr.Tenant, sessions)
+	return s.stackOf(tr.Tenant, sessions), nil
 }
 
 func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Request, req *match.Request, stack engine.Stack, res engine.Result, sv *served) {
@@ -199,6 +200,7 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return
 	}
 	markMatched(out.Header, stub)
+	out.GzipDisabled = out.GzipDisabled || s.orgSettings(sv.entry.Tenant).NoCompression
 	if s.Config.MatchedHeader {
 		out.Header.Set("X-Shadow-Mock-Matched", layerLabel(res.Layer.Scope)+";layer="+string(res.Layer.Kind))
 	}
@@ -214,7 +216,7 @@ func (s *Service) respond(ctx context.Context, w http.ResponseWriter, r *http.Re
 
 // unmatched sends WireMock's 404 diagnostic with the closest stubs (FR-3.6).
 func (s *Service) unmatched(w http.ResponseWriter, req *match.Request, stack engine.Stack, sv *served) {
-	near := engine.NearMisses(req, stack, 3)
+	near := s.nearMisses(req, stack, 3)
 	var b strings.Builder
 	b.WriteString("Request was not matched\n=======================\n\n")
 	fmt.Fprintf(&b, "Request: %s %s\n", req.Method, req.URL())
@@ -227,7 +229,11 @@ func (s *Service) unmatched(w http.ResponseWriter, req *match.Request, stack eng
 			if name == "" {
 				name = nm.Stub.ID()
 			}
-			fmt.Fprintf(&b, "  %s (%s layer, distance %.2f)\n", name, nm.Layer.Kind, nm.Distance)
+			skipped := ""
+			if nm.Skipped {
+				skipped = ", not inherited by this shadow mock"
+			}
+			fmt.Fprintf(&b, "  %s (%s layer%s, distance %.2f)\n", name, nm.Layer.Kind, skipped, nm.Distance)
 			for _, why := range nm.Stub.Matcher.Mismatches(req) {
 				fmt.Fprintf(&b, "    %s does not match\n", why)
 			}
@@ -265,6 +271,28 @@ func (s *Service) fail(w http.ResponseWriter, sv *served, req *match.Request, er
 	ae.Write(w)
 }
 
+// forJournal applies the org's journal settings to an entry about to be kept (FR-11.11d). It returns nil for an entry
+// the settings keep out, and else the entry, or a copy of it with the bodies left out.
+func (s *Service) forJournal(e *journal.Entry) *journal.Entry {
+	set := s.orgSettings(e.Tenant)
+	switch set.JournalCapture {
+	case tenant.CaptureOff:
+		return nil
+	case tenant.CaptureSessionsUnmatched:
+		if len(e.Sessions) == 0 && e.Matched() {
+			return nil
+		}
+	}
+	if !set.NoJournalBodies {
+		return e
+	}
+	cp := *e
+	cp.Request = e.Request.WithBody(nil)
+	cp.Response.Body = nil
+	cp.BodiesOmitted = journal.BodiesOffByOrg
+	return &cp
+}
+
 func (s *Service) finish(sv *served) {
 	if sv.done {
 		return
@@ -273,7 +301,9 @@ func (s *Service) finish(sv *served) {
 	e := sv.entry
 	e.ProcessTime = s.Clock.Now().Sub(sv.start).Milliseconds()
 	if e.Request != nil {
-		s.Journal.Append(e)
+		if kept := s.forJournal(e); kept != nil {
+			s.Journal.Append(kept)
+		}
 	}
 	path := ""
 	if e.Request != nil {

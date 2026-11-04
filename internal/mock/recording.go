@@ -95,6 +95,7 @@ func (s *Service) forwardTo(ctx context.Context, w http.ResponseWriter, r *http.
 		}
 	}
 	out := s.Renderer.FromUpstream(def, res.Status, res.Header, res.Body)
+	out.GzipDisabled = out.GzipDisabled || s.orgSettings(sv.entry.Tenant).NoCompression
 	markMatched(out.Header, sv.entry.Stub)
 	sv.entry.Response = journal.Response{Status: out.Status, Header: out.Header.Clone(), Body: out.Body}
 	sv.entry.AddedDelay = out.Delay.Milliseconds()

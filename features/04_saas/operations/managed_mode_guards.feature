@@ -1,8 +1,9 @@
-@saas @P5 @FR-11.1 @FR-11.9 @FR-11.16 @security @TA-4 @TA-11
+@P5 @FR-11.1 @FR-11.9 @FR-11.16 @security @TA-4 @TA-11
 Feature: Managed mode refuses settings that are unsafe on a shared host
   Managed mode is a multi-tenant service. It refuses to start with a setting that would let one org reach another,
   or the host's network, and it serves no pages of its own.
 
+  @managed
   Scenario Outline: Settings managed mode will not start with
     Given the configuration file contains:
       """yaml
@@ -26,18 +27,22 @@ Feature: Managed mode refuses settings that are unsafe on a shared host
       | storage: { global: { driver: fs } }            | storage.global              |
       | storage: { blobs: { driver: fs } }             | storage.blobs               |
 
+  @managed
   Scenario: Egress blocking cannot be turned off by an environment variable or a flag
     Given Shadow Mock is configured for managed mode
     And the environment variable "SHADOWMOCK_EGRESS_BLOCKPRIVATE" is "false"
     When Shadow Mock starts
     Then start-up fails with an error mentioning "egress.blockPrivate"
 
+  @managed
   Scenario: The JWT helper's keys must be given, because instances differ
     Given Shadow Mock is configured for managed mode
     And templating.extensions is "jwt" with the RS256 and HS256 keys set
     When Shadow Mock starts
     Then start-up succeeds
 
+  # Needs a way to mount a mapping with a given response in a shadow mock, and a resolver that can be told what a name resolves to.
+  @saas
   Scenario Outline: A proxy or webhook target inside the platform is refused
     Given Shadow Mock is running in managed mode with the trusted issuer "management-app"
     And the org "acme" with handle "acme" on plan "Team"
@@ -56,17 +61,20 @@ Feature: Managed mode refuses settings that are unsafe on a shared host
       | { "proxyBaseUrl": "file:///etc/passwd" }                          |
       | { "proxyBaseUrl": "gopher://example.com" }                        |
 
+  @saas
   Scenario: A recording cannot be aimed at the platform's network
     Given Shadow Mock is running in managed mode with the trusted issuer "management-app"
     When I start a recording from "http://127.0.0.1:5432"
     Then the response status is 502
     And the response JSON at "$.error" is "egress_blocked"
 
+  @saas
   Scenario: The address that was checked is the address that is used
     Given a name that resolves to a public address when checked and to 10.0.0.9 when connected to
     When the engine proxies to it
     Then the request is refused
 
+  @saas
   Scenario: A body file is only ever the org's own
     Given the org "acme" with handle "acme" on plan "Team"
     And the org "globex" has a file "secret.json"
@@ -75,6 +83,7 @@ Feature: Managed mode refuses settings that are unsafe on a shared host
     Then the response status is 500
     And the response does not contain "globex"
 
+  @saas
   Scenario Outline: Managed mode serves no pages of its own
     Given Shadow Mock is running in managed mode with the trusted issuer "management-app"
     When I request "<path>" with a valid token
@@ -88,12 +97,14 @@ Feature: Managed mode refuses settings that are unsafe on a shared host
       | /acme/__console/           |
       | /__console/                |
 
+  @saas
   Scenario: The admin API, mock traffic, health and metrics still answer
     Given Shadow Mock is running in managed mode with the trusted issuer "management-app"
     Then "/__health" and "/__ready" answer 200 without an org
     And "/acme/__admin/sessions" answers 200 with a valid token
     And "/acme/hello" is mock traffic
 
+  @saas
   Scenario: Shutdown and save are disabled
     Given Shadow Mock is running in managed mode with the trusted issuer "management-app"
     When I call admin "POST" "/shutdown" with a token for "alice" in org "acme"

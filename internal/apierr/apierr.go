@@ -27,6 +27,7 @@ const (
 	ValidationFailed             Code = "validation_failed"
 	TTLMustBePositive            Code = "ttl_must_be_positive"
 	TTLExceedsMaximum            Code = "ttl_exceeds_maximum"
+	TTLExceedsPlanMaximum        Code = "ttl_exceeds_plan_maximum"
 	TokenTooShort                Code = "token_too_short"
 	TokenInUse                   Code = "token_in_use"
 	RecordingInProgress          Code = "recording_in_progress"
@@ -57,6 +58,8 @@ type Error struct {
 	Code    Code
 	Message string
 	Details map[string]any
+	// Fields are extra members of the body itself, for the errors whose description names one (such as `ip`).
+	Fields map[string]any
 }
 
 // New returns an API error.
@@ -75,7 +78,18 @@ type body struct {
 
 // Write renders the error as JSON.
 func (e *Error) Write(w http.ResponseWriter) {
-	WriteJSON(w, e.Status, body{Error: e.Code, Message: e.Message, Details: e.Details})
+	if len(e.Fields) == 0 {
+		WriteJSON(w, e.Status, body{Error: e.Code, Message: e.Message, Details: e.Details})
+		return
+	}
+	doc := map[string]any{"error": e.Code, "message": e.Message}
+	if len(e.Details) > 0 {
+		doc["details"] = e.Details
+	}
+	for k, v := range e.Fields {
+		doc[k] = v
+	}
+	WriteJSON(w, e.Status, doc)
 }
 
 // WireMockError is one entry of WireMock's validation error body.

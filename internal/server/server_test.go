@@ -105,6 +105,11 @@ func TestClientIP(t *testing.T) {
 			request(t, "10.0.0.9:1", "X-Forwarded-For", "garbage, 10.0.0.1"), "10.0.0.9",
 		},
 		{
+			"a header from a peer that is no trusted proxy is ignored",
+			server.ClientIP{Header: "X-Forwarded-For", TrustedProxies: prefixes("10.0.0.0/8")},
+			request(t, "198.51.100.9:1", "X-Forwarded-For", "203.0.113.4"), "198.51.100.9",
+		},
+		{
 			"a single-value platform header",
 			server.ClientIP{Header: "Fly-Client-IP", TrustedHops: 1},
 			request(t, "10.0.0.9:1", "Fly-Client-IP", "198.51.100.4"), "198.51.100.4",
@@ -152,9 +157,16 @@ func TestParsePrefixes(t *testing.T) {
 // newRouter returns a router built the way cmd/shadowmock builds one, for tests to adjust.
 func newRouter(t *testing.T) (*server.Router, *app.App) {
 	t.Helper()
+	return newRouterWith(t, func(*config.Config) {})
+}
+
+// newRouterWith is newRouter with the configuration adjusted first.
+func newRouterWith(t *testing.T, adjust func(*config.Config)) (*server.Router, *app.App) {
+	t.Helper()
 	cfg := config.Default()
 	cfg.Root = t.TempDir()
 	cfg.Storage.Global.Driver = "memory"
+	adjust(&cfg)
 	a, err := app.New(cfg, app.Options{Logger: slog.New(slog.DiscardHandler), Clock: clock.NewFake(time.Unix(1_800_000_000, 0)), Version: "test"})
 	if err != nil {
 		t.Fatal(err)
@@ -296,8 +308,7 @@ func TestIPAllowlist(t *testing.T) {
 		rt, a := build(t, false)
 		rec := serve(t, rt, "/anything", "192.0.2.1:4000")
 		v := jsonBody(t, rec)
-		details, _ := v["details"].(map[string]any)
-		if rec.Code != 403 || v["error"] != "ip_not_allowed" || details["ip"] != "192.0.2.1" {
+		if rec.Code != 403 || v["error"] != "ip_not_allowed" || v["ip"] != "192.0.2.1" {
 			t.Errorf("%d %s", rec.Code, rec.Body)
 		}
 		if serve(t, rt, "/anything", "10.1.1.1:4000").Code != 404 { // allowed: reaches the unmatched 404
@@ -352,6 +363,53 @@ func TestListenerSplit(t *testing.T) {
 	if strings.Contains(serve(t, adminOnly, "/anything", "").Body.String(), "Request was not matched") {
 		t.Error("the admin listener must not run mock matching")
 	}
+}
+
+func TestConsole(t *testing.T) {
+	t.Parallel()
+	enabled := func(c *config.Config) { c.Console.Enabled = true }
+	t.Run("it is off unless asked for", func(t *testing.T) {
+		t.Parallel()
+		rt, _ := newRouter(t)
+		rec := serve(t, rt, "/__console/", "")
+		if rec.Code != 404 || !strings.Contains(rec.Body.String(), "Request was not matched") {
+			t.Errorf("GET /__console/ = %d %s, want mock traffic with no match", rec.Code, rec.Body)
+		}
+	})
+	t.Run("it is served when console.enabled is set", func(t *testing.T) {
+		t.Parallel()
+		rt, _ := newRouterWith(t, enabled)
+		rec := serve(t, rt, "/__console/", "")
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), `content="/__admin"`) {
+			t.Errorf("GET /__console/ = %d %s", rec.Code, rec.Body)
+		}
+		if rec := serve(t, rt, "/__console/app.js", ""); rec.Code != 200 {
+			t.Errorf("GET /__console/app.js = %d", rec.Code)
+		}
+		if rec := serve(t, rt, "/__consoles/", ""); !strings.Contains(rec.Body.String(), "Request was not matched") {
+			t.Errorf("a path that merely starts with the prefix is not the console: %d %s", rec.Code, rec.Body)
+		}
+	})
+	t.Run("it is told the configured admin prefix", func(t *testing.T) {
+		t.Parallel()
+		rt, _ := newRouterWith(t, func(c *config.Config) { enabled(c); c.AdminPrefix = "/__control" })
+		if body := serve(t, rt, "/__console/", "").Body.String(); !strings.Contains(body, `content="/__control"`) {
+			t.Errorf("the page does not carry the admin prefix: %s", body)
+		}
+	})
+	t.Run("only a listener that serves the admin API serves it", func(t *testing.T) {
+		t.Parallel()
+		mockOnly, _ := newRouterWith(t, enabled)
+		mockOnly.ServeAdmin = false
+		if rec := serve(t, mockOnly, "/__console/", ""); !strings.Contains(rec.Body.String(), "Request was not matched") {
+			t.Errorf("the mock listener served the console: %d %s", rec.Code, rec.Body)
+		}
+		adminOnly, _ := newRouterWith(t, enabled)
+		adminOnly.ServeMock = false
+		if rec := serve(t, adminOnly, "/__console/", ""); rec.Code != 200 {
+			t.Errorf("the admin listener did not serve the console: %d", rec.Code)
+		}
+	})
 }
 
 func TestAdminPrefix(t *testing.T) {

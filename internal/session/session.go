@@ -43,6 +43,9 @@ type Session struct {
 	TTL      time.Duration
 	Masks    []model.Mask
 	Metadata map[string]any
+	// NoGlobal is true when the session was created with inheritGlobal=false: its requests are matched against the
+	// session's own mappings (and its URL-based parent's) and never fall through to the global layer (FR-7.13).
+	NoGlobal bool
 }
 
 // Scope returns the session's storage scope.

@@ -108,7 +108,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.svc.Usage.IPRejected(t)
 		}
 		e := apierr.New(http.StatusForbidden, apierr.IPNotAllowed, "Requests from %s are not allowed for this org.", ip)
-		e.Details = map[string]any{"ip": ip.String()}
+		e.Fields = map[string]any{"ip": ip.String()}
 		e.Write(w)
 		return
 	}

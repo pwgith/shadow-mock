@@ -100,6 +100,47 @@ Create bodies and patch fields are in [Shadow mocks](06-shadow-mocks.md).
 Outside the admin prefix, `GET /__health` (liveness) and `GET /__ready` (readiness) are always
 available.
 
+## Console and command line
+
+Both are clients of the admin API. They hold no behaviour of their own, so what they show is what the
+API answers.
+
+**The console** is a small web page served by the binary. It is off unless `console.enabled: true`, and
+it is for standalone and central-server use: a managed-mode server refuses to start with it on.
+
+```bash
+./shadowmock --config shadowmock.yaml     # with console: { enabled: true }
+# then open http://localhost:8080/__console/
+```
+
+It shows the journal (with an "unmatched only" filter, and for an unmatched request the closest mappings and
+what each missed), the shadow mocks, the call counters, recordings, and a dry run. A shadow mock can be edited
+in place: renamed, given a new lifetime, kept alive, and have its match tokens and masks added or removed.
+Counters are listed for the global session or a shadow mock, and each can be set or reset. A recording can be
+started and stopped for the global session or a shadow mock, and the mappings it captured are listed when it
+stops. On a central server with admin tokens, the
+page itself is served to anyone, but every call it makes needs the token, which you type into its header
+field. The token is kept for the browser tab only.
+
+**The command line** has sub-commands that each make one admin call and print the answer:
+
+| Command | Calls |
+|---|---|
+| `shadowmock session create [--kind key-based\|url-based] [--name N] [--ttl 10m] [--token T]...` | `POST /sessions/{kind}`. `--kind` defaults to `key-based` |
+| `shadowmock session list [--kind K] [--state active\|expired] [--name N] [--created-by W]` | `GET /sessions` |
+| `shadowmock session delete ID` | `DELETE /sessions/{id}` |
+| `shadowmock journal tail [--unmatched] [--limit N]` | `GET /requests`, newest first |
+| `shadowmock recording start --target URL` | `POST /recordings/start` |
+| `shadowmock recording stop`, `shadowmock recording status` | `POST /recordings/stop`, `GET /recordings/status` |
+
+Every sub-command takes `--url` (the server's base URL, default `http://localhost:8080`, or `SHADOWMOCK_URL`;
+on a shared host include the org, such as `https://mocks.example.com/acme`) and `--admin-prefix` (default
+`/__admin`). A key or token is read from the environment, never from a flag, so that it does not show in a
+process list: `SHADOWMOCK_KEY` (a Tool app key) or else `SHADOWMOCK_TOKEN`, sent as a bearer token.
+
+The answer is printed as the API sent it, whatever its status. An answer of 400 or above also makes the
+command exit 1.
+
 ## Journal answers
 
 Every journal answer says whether the journal is switched off (`requestJournalDisabled`), and

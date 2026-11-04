@@ -61,3 +61,43 @@ func TestStaticDirectory(t *testing.T) {
 		t.Error("Lookup of an unknown handle should fail")
 	}
 }
+
+func TestPlanFeatures(t *testing.T) {
+	t.Parallel()
+	got, unknown := tenant.ParseFeatures([]string{"ip_allowlist"})
+	if got != tenant.FeatureIPAllowlist || unknown != "" {
+		t.Errorf("ParseFeatures(ip_allowlist) = %v, %q", got, unknown)
+	}
+	got, unknown = tenant.ParseFeatures([]string{"ip_allowlist", "teleport"})
+	if got != tenant.FeatureIPAllowlist || unknown != "teleport" {
+		t.Errorf("ParseFeatures with an unknown name = %v, %q: the known ones must still count", got, unknown)
+	}
+	var l tenant.Limits
+	if !l.Includes(tenant.FeatureIPAllowlist) {
+		t.Error("a plan includes every feature unless it says it does not")
+	}
+	l.Without = tenant.FeatureIPAllowlist
+	if l.Includes(tenant.FeatureIPAllowlist) {
+		t.Error("a plan without the feature must not include it")
+	}
+}
+
+func TestAllowlistIsIgnoredWhenThePlanLacksIt(t *testing.T) {
+	t.Parallel()
+	org := &tenant.Org{ID: "acme", Handle: "acme", Allowlist: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}}
+	outside := netip.MustParseAddr("203.0.113.4")
+	if org.Allows(outside) {
+		t.Fatal("the allowlist must apply while the plan has it")
+	}
+	org.Limits.Without = tenant.FeatureIPAllowlist
+	if !org.Allows(outside) {
+		t.Error("the allowlist must not apply when the plan lacks it")
+	}
+	if len(org.Allowlist) != 1 {
+		t.Error("the entries must stay stored")
+	}
+	org.Limits.Without = 0
+	if org.Allows(outside) {
+		t.Error("the allowlist must apply again when the plan has it again")
+	}
+}

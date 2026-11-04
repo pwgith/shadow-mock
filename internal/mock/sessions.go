@@ -35,6 +35,9 @@ type CreateSessionRequest struct {
 	ParentID   string            `json:"parentId"`
 	SeedFrom   *SeedFrom         `json:"seedFrom"`
 	Metadata   map[string]any    `json:"metadata"`
+	// InheritGlobal says whether requests that the session's own mappings do not cover fall through to the global layer.
+	// Left out, it is true (FR-7.13).
+	InheritGlobal *bool `json:"inheritGlobal"`
 	// CreatedByKey is the label of the Tool app key making the request. The admin handler sets it; a client cannot.
 	CreatedByKey string `json:"-"`
 }
@@ -53,7 +56,7 @@ func (s *Service) CreateSession(ctx context.Context, t tenant.ID, kind session.K
 	if err != nil {
 		return session.Session{}, err
 	}
-	if limit := s.Config.Limits.MaxMappingsPerSession; limit > 0 && len(mappings) > limit {
+	if limit := s.mappingsPerSessionLimit(t); limit > 0 && len(mappings) > limit {
 		return session.Session{}, apierr.New(http.StatusTooManyRequests, apierr.MappingLimitReached,
 			"A shadow mock may hold at most %d mappings, and this one starts with %d.", limit, len(mappings))
 	}
@@ -62,7 +65,8 @@ func (s *Service) CreateSession(ctx context.Context, t tenant.ID, kind session.K
 	}
 	sess, err := s.Sessions.Create(ctx, t, session.CreateRequest{
 		Kind: kind, Name: req.Name, TTLSeconds: req.TTLSeconds, Tokens: req.Tokens, ParentID: req.ParentID,
-		Masks: req.Masks, Metadata: req.Metadata, CreatedBy: createdBy, CreatedByKey: req.CreatedByKey,
+		Masks: req.Masks, Metadata: req.Metadata, NoGlobal: req.InheritGlobal != nil && !*req.InheritGlobal, CreatedBy: createdBy, CreatedByKey: req.CreatedByKey,
+		PlanMaxTTL: s.planMaxTTL(t, kind),
 	})
 	if err != nil {
 		return session.Session{}, err
@@ -144,8 +148,14 @@ func (s *Service) validateMasks(masks []model.Mask) error {
 
 // UpdateSession applies a patch, then refreshes the layer (masks) and detector (tokens).
 func (s *Service) UpdateSession(ctx context.Context, t tenant.ID, id string, p session.Patch) (session.Session, error) {
+	if p.InheritGlobal != nil {
+		return session.Session{}, apierr.Invalid("/inheritGlobal", "inheritGlobal is set when the shadow mock is created and cannot be changed")
+	}
 	if err := s.validateMasks(p.AddMasks); err != nil {
 		return session.Session{}, err
+	}
+	if cur, ok := s.Sessions.Get(t, id); ok {
+		p.PlanMaxTTL = s.planMaxTTL(t, cur.Kind)
 	}
 	sess, err := s.Sessions.Update(ctx, t, id, p)
 	if err != nil {
@@ -189,6 +199,10 @@ func (s *Service) forget(ctx context.Context, scopes []store.Scope) error {
 		// A session's journal is discarded with it (FR-7.2).
 		s.Journal.Remove(sc, nil)
 		s.Layers.Drop(sc)
+		// Nothing is left to record into, so a recording running in it ends with it.
+		if s.Recorder != nil {
+			s.Recorder.Forget(sc)
+		}
 	}
 	s.Detector.Invalidate()
 	s.persist(ctx)
@@ -209,6 +223,12 @@ func (s *Service) ReapOnce(ctx context.Context) {
 	scopes := s.Sessions.RemoveExpired(ctx)
 	if len(scopes) == 0 {
 		return
+	}
+	if s.Stats != nil {
+		now := s.Clock.Now()
+		for _, sc := range scopes {
+			s.Stats.RecordExpiry(sc.Tenant, now)
+		}
 	}
 	if err := s.forget(ctx, scopes); err != nil {
 		s.Logger.ErrorContext(ctx, "reap expired sessions", "error", err.Error())

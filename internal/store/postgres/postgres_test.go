@@ -340,6 +340,9 @@ func TestFilesThroughObjectStorage(t *testing.T) {
 func TestChangesAreNotified(t *testing.T) {
 	t.Parallel()
 	db := pgtest.Connect(t)
+	if !db.SupportsNotify() {
+		t.Skip("PGlite does not deliver LISTEN/NOTIFY; CI runs this against Postgres")
+	}
 	org, _ := newOrg(t, db, "active")
 	ch, err := db.Watch(t.Context())
 	if err != nil {
@@ -361,5 +364,46 @@ func TestChangesAreNotified(t *testing.T) {
 		case <-deadline:
 			t.Fatal("no notice arrived for the mapping")
 		}
+	}
+}
+
+func TestAnOrgsPlanAndSettingsAreRead(t *testing.T) {
+	t.Parallel()
+	db := pgtest.Connect(t)
+	plain, plainHandle := newOrg(t, db, "active")
+	set, setHandle := newOrg(t, db, "active")
+	raw(t, db, `UPDATE engine.orgs SET max_sessions = 30, included_sessions = 10, max_mappings = 500, max_mappings_per_session = 40,
+max_url_ttl_seconds = 604800, excluded_features = '{ip_allowlist}', journal_capture = 'sessions-and-unmatched',
+journal_bodies = false, compression = false WHERE id = $1`, string(set))
+	orgs := db.Orgs(nil)
+	if err := orgs.Refresh(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	p, ok := orgs.Lookup(plainHandle)
+	if !ok || p.ID != plain || p.Settings != (tenant.Settings{JournalCapture: tenant.CaptureAll}) || p.Limits.MaxSessions != 0 || p.Limits.Without != 0 {
+		t.Errorf("an org with the defaults = %+v, %v: the engine's own settings must apply", p, ok)
+	}
+	s, ok := orgs.Lookup(setHandle)
+	if !ok {
+		t.Fatal("the org is missing")
+	}
+	wantLimits := tenant.Limits{
+		MaxSessions: 30, IncludedSessions: 10, MaxMappings: 500, MaxMappingsPerSession: 40,
+		MaxURLTTL: 7 * 24 * time.Hour, Without: tenant.FeatureIPAllowlist,
+	}
+	if s.Limits != wantLimits {
+		t.Errorf("limits = %+v, want %+v", s.Limits, wantLimits)
+	}
+	if want := (tenant.Settings{JournalCapture: tenant.CaptureSessionsUnmatched, NoJournalBodies: true, NoCompression: true}); s.Settings != want {
+		t.Errorf("settings = %+v, want %+v", s.Settings, want)
+	}
+}
+
+func TestAJournalCaptureTheEngineDoesNotKnowIsRefused(t *testing.T) {
+	t.Parallel()
+	db := pgtest.Connect(t)
+	id, _ := newOrg(t, db, "active")
+	if err := db.Exec(t.Context(), "UPDATE engine.orgs SET journal_capture = 'sometimes' WHERE id = $1", string(id)); err == nil {
+		t.Error("the database accepted a journal capture that is none of all, sessions-and-unmatched and off")
 	}
 }

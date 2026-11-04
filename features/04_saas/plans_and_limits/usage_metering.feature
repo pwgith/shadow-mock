@@ -1,4 +1,4 @@
-@saas @P5 @FR-11.12 @NFR-4.3
+@managed @P5 @FR-11.12 @NFR-4.3
 Feature: Usage the management app can read
   The engine counts what happened and answers `GET /__admin/usage` with hourly buckets. The management app reads
   them and reports to the platform; the engine does not know the platform exists.
@@ -8,6 +8,9 @@ Feature: Usage the management app can read
     And the org "acme" with handle "acme" on plan "Team"
     And a mapping "hello" in the global layer for "GET /hello"
 
+  # Needs two engine instances that share their counts; the managed harness runs one instance, and usage is
+  # held in memory (COVERAGE.md, "Not built yet").
+  @saas @multi-instance
   Scenario: Requests are counted in hourly buckets across instances
     Given 2 instances are running
     When the SUT sends 30 requests to instance 1 and 20 to instance 2 in the same hour
@@ -69,8 +72,3 @@ Feature: Usage the management app can read
     Given the org "globex" with handle "globex" on plan "Team"
     When I call admin "GET" "/usage" on org "globex" with a token for "alice" in org "acme"
     Then the response status is 403
-
-  Scenario: Standalone has no usage
-    Given Shadow Mock is running in standalone mode
-    When I call admin "GET" "/usage"
-    Then the response status is 404

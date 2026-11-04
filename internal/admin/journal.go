@@ -262,7 +262,7 @@ func journalWindow(q url.Values) (since time.Time, limit int, err error) {
 }
 
 // cutPage drops the entries before the cursor and keeps up to limit; next is the cursor for the page after.
-func cutPage(q url.Values, shown []*journal.Entry, limit int) (page []*journal.Entry, next string, err error) {
+func cutPage[T any](q url.Values, shown []T, limit int) (page []T, next string, err error) {
 	cursor := 0
 	if v := q.Get("cursor"); v != "" {
 		if cursor, err = strconv.Atoi(v); err != nil || cursor < 0 {

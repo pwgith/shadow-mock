@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"sync/atomic"
+	"time"
 
 	"github.com/pwgith/shadow-mock/internal/tenant"
 )
@@ -40,7 +41,9 @@ func (o *Orgs) ByID(id tenant.ID) (*tenant.Org, bool) { return o.snap.Load().ByI
 // Refresh reads all orgs and aliases and swaps in a new snapshot. If the read fails the old snapshot stays.
 func (o *Orgs) Refresh(ctx context.Context) error {
 	rows, err := o.db.pool.Query(ctx, `SELECT id, handle, status, allowlist, allowlist_admin,
-		requests_per_second, burst, monthly_request_cap, grace FROM engine.orgs ORDER BY id`)
+		requests_per_second, burst, monthly_request_cap, grace,
+		max_sessions, included_sessions, max_mappings, max_mappings_per_session, max_url_ttl_seconds,
+		excluded_features, journal_capture, journal_bodies, compression FROM engine.orgs ORDER BY id`)
 	if err != nil {
 		return fmt.Errorf("postgres orgs: %w", err)
 	}
@@ -54,12 +57,16 @@ func (o *Orgs) Refresh(ctx context.Context) error {
 			status string
 			allow  []netip.Prefix
 			burst  int32
+			plan   planColumns
 		)
 		if err = rows.Scan(&id, &org.Handle, &status, &allow, &org.AllowlistAdmin,
-			&org.Limits.RequestsPerSecond, &burst, &org.Limits.MonthlyRequestCap, &org.Limits.Grace); err != nil {
+			&org.Limits.RequestsPerSecond, &burst, &org.Limits.MonthlyRequestCap, &org.Limits.Grace,
+			&plan.maxSessions, &plan.includedSessions, &plan.maxMappings, &plan.maxMappingsPerSession, &plan.maxURLTTL,
+			&plan.excluded, &org.Settings.JournalCapture, &plan.journalBodies, &plan.compression); err != nil {
 			return fmt.Errorf("postgres orgs: %w", err)
 		}
 		org.ID, org.Allowlist, org.Limits.Burst, org.Status = tenant.ID(id), allow, int(burst), tenant.Status(status)
+		o.applyPlan(&org, plan)
 		if org.Status == tenant.StatusDeleted {
 			// Aliases cannot be added to a deleted org, so it is put as active and marked deleted afterwards.
 			deleted = append(deleted, org.ID)
@@ -83,6 +90,27 @@ func (o *Orgs) Refresh(ctx context.Context) error {
 	}
 	o.snap.Store(next)
 	return nil
+}
+
+// planColumns are the plan and settings columns of an org, as they are stored.
+type planColumns struct {
+	maxSessions, includedSessions, maxMappings, maxMappingsPerSession, maxURLTTL int32
+	excluded                                                                     []string
+	journalBodies, compression                                                   bool
+}
+
+// applyPlan puts the plan columns into the org. A feature name the engine does not know is reported and ignored,
+// so a newer management app cannot stop an older engine from loading its orgs.
+func (o *Orgs) applyPlan(org *tenant.Org, p planColumns) {
+	l := &org.Limits
+	l.MaxSessions, l.IncludedSessions = int(p.maxSessions), int(p.includedSessions)
+	l.MaxMappings, l.MaxMappingsPerSession = int(p.maxMappings), int(p.maxMappingsPerSession)
+	l.MaxURLTTL = time.Duration(p.maxURLTTL) * time.Second
+	var unknown string
+	if l.Without, unknown = tenant.ParseFeatures(p.excluded); unknown != "" {
+		o.report(org.Handle, fmt.Errorf("unknown plan feature %q", unknown))
+	}
+	org.Settings.NoJournalBodies, org.Settings.NoCompression = !p.journalBodies, !p.compression
 }
 
 func (o *Orgs) addAliases(ctx context.Context, next *tenant.Memory) error {

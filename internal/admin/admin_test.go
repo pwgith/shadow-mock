@@ -297,6 +297,9 @@ func TestNearMissEndpoints(t *testing.T) {
 	if len(list) != 1 || stub["id"] != idA || first["layer"] != "global" {
 		t.Errorf("near misses for a request = %v", nm)
 	}
+	if missed, _ := first["missed"].([]any); len(missed) != 1 || missed[0] != "Header [Accept]" {
+		t.Errorf("missed = %v, want [Header [Accept]]", first["missed"])
+	}
 	a.wantError(422, "validation_failed", "POST", "/near-misses/request", `{"method":"GET"}`)
 	a.wantError(422, "validation_failed", "POST", "/near-misses/request", `nope`)
 
@@ -585,6 +588,34 @@ func TestGlobalWritesReservedForTheManagementApp(t *testing.T) {
 	a.want(201, "POST", "/sessions/"+id+"/mappings", mapping(idA, "/a", "x"))
 	a.want(200, "POST", "/sessions/"+id+"/recordings/start", `{"targetBaseUrl":"http://localhost:8089"}`)
 	a.want(200, "DELETE", "/requests", "")
+}
+
+func TestTheSessionListIsPagedWithACursor(t *testing.T) {
+	t.Parallel()
+	a := newAPI(t)
+	for range 3 {
+		a.want(201, "POST", "/sessions/key-based", `{}`)
+	}
+	first := a.want(200, "GET", "/sessions?limit=2", "")
+	if got, _ := first["sessions"].([]any); len(got) != 2 {
+		t.Fatalf("the first page has %d sessions, want 2", len(got))
+	}
+	meta, _ := first["meta"].(map[string]any)
+	cursor, _ := meta["nextCursor"].(string)
+	if cursor != "2" {
+		t.Fatalf("the first page's cursor is %q, want 2", cursor)
+	}
+	next := a.want(200, "GET", "/sessions?limit=2&cursor="+cursor, "")
+	if got, _ := next["sessions"].([]any); len(got) != 1 {
+		t.Errorf("the second page has %d sessions, want 1", len(got))
+	}
+	if meta, _ = next["meta"].(map[string]any); meta["nextCursor"] != nil {
+		t.Errorf("the last page has a cursor: %v", meta["nextCursor"])
+	}
+	// The older offset still says where a page starts.
+	if got, _ := a.want(200, "GET", "/sessions?offset=1", "")["sessions"].([]any); len(got) != 2 {
+		t.Errorf("offset=1 lists %d sessions, want 2", len(got))
+	}
 }
 
 func TestShutdown(t *testing.T) {

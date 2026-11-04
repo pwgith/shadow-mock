@@ -1,4 +1,4 @@
-@saas @P5 @FR-11.15 @FR-11.5 @security
+@managed @P5 @FR-11.15 @FR-11.5 @security
 Feature: The audit trail, purging an org and anonymising a person
   Deleting an org or a person is a job the platform sends to the management app, which calls these operations. They
   must be repeatable, because the platform retries.
@@ -62,5 +62,6 @@ Feature: The audit trail, purging an org and anonymising a person
     And entries for "erin" are unchanged
 
   Scenario: Journal entries are removed with the org, not traced to a person
+    Given a request was sent to "https://shadowmock.test/acme/hello"
     When the management app purges the org
     Then no journal entry for org "acme" is readable
