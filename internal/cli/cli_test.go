@@ -77,6 +77,7 @@ func TestSubCommandsMakeTheDocumentedCall(t *testing.T) {
 		{"session create", "POST", "/__admin/sessions/key-based", "", `{}`},
 		{"session create --kind key-based --ttl 10m", "POST", "/__admin/sessions/key-based", "", `{"ttlSeconds":600}`},
 		{"session create --kind url-based --name demo", "POST", "/__admin/sessions/url-based", "", `{"name":"demo"}`},
+		{"session create --kind url-based --no-global", "POST", "/__admin/sessions/url-based", "", `{"inheritGlobal":false}`},
 		{"session create --kind key-based --token ABC-123 --token DEF-456", "POST", "/__admin/sessions/key-based", "", `{"tokens":["ABC-123","DEF-456"]}`},
 		{"session list --state active", "GET", "/__admin/sessions", "state=active", ""},
 		{"session list --kind key-based --name x --created-by me", "GET", "/__admin/sessions", "createdBy=me&kind=key-based&name=x", ""},

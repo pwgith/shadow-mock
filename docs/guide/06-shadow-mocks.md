@@ -37,6 +37,20 @@ once**, so keep it. Keys start with `smk_` and are unguessable.
 You can also supply `tokens`, `mappings`, `masks`, `seedFrom`, `parentId` and `metadata` at
 creation. See the sections below.
 
+### Fail instead of falling back to the global session
+
+By default a request your session's mappings do not cover is served by the global session, if a global
+mapping matches. To make it fail with the normal 404 instead, create the session with `inheritGlobal: false`
+(`--no-global` on the command line):
+
+```bash
+curl -X POST localhost:8080/__admin/sessions/key-based -d '{ "inheritGlobal": false }'
+```
+
+The 404 and the near-miss endpoints still list the closest global mappings, marked as not inherited, so you can see
+what would have matched. The setting is fixed at creation; create another session to change it. It works the same for
+URL-based sessions, and a key-based session nested in a URL-based one skips the global layer if either asked to.
+
 ### Add mappings to it
 
 Use the same mapping calls as the global API, under the session:

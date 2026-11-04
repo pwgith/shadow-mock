@@ -151,6 +151,7 @@ func sessionCreate(fs *flag.FlagSet) func([]string) (call, error) {
 	kind := fs.String("kind", "key-based", "key-based or url-based")
 	sname := fs.String("name", "", "a name for the shadow mock")
 	ttl := fs.Duration("ttl", 0, "how long it lasts, such as 10m")
+	noGlobal := fs.Bool("no-global", false, "answer only from the shadow mock's own mappings, never from the global session")
 	var tokens stringList
 	fs.Var(&tokens, "token", "a match token (key-based only; repeat for more)")
 	return func(pos []string) (call, error) {
@@ -175,6 +176,9 @@ func sessionCreate(fs *flag.FlagSet) func([]string) (call, error) {
 		}
 		if len(tokens) > 0 {
 			body["tokens"] = []string(tokens)
+		}
+		if *noGlobal {
+			body["inheritGlobal"] = false
 		}
 		return jsonCall(http.MethodPost, "/sessions/"+*kind, nil, body)
 	}

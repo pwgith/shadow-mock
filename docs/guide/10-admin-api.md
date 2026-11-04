@@ -126,7 +126,7 @@ field. The token is kept for the browser tab only.
 
 | Command | Calls |
 |---|---|
-| `shadowmock session create [--kind key-based\|url-based] [--name N] [--ttl 10m] [--token T]...` | `POST /sessions/{kind}`. `--kind` defaults to `key-based` |
+| `shadowmock session create [--kind key-based\|url-based] [--name N] [--ttl 10m] [--token T]... [--no-global]` | `POST /sessions/{kind}`. `--kind` defaults to `key-based`; `--no-global` sets `inheritGlobal: false` (FR-7.13) |
 | `shadowmock session list [--kind K] [--state active\|expired] [--name N] [--created-by W]` | `GET /sessions` |
 | `shadowmock session delete ID` | `DELETE /sessions/{id}` |
 | `shadowmock journal tail [--unmatched] [--limit N]` | `GET /requests`, newest first |
