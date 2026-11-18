@@ -108,6 +108,13 @@ curl -X POST localhost:8080/__admin/sessions/url-based -d '{ "name": "orders-api
 The response gives a base URL such as `http://localhost:8080/d/<id>`. Point the API under test at
 it for its outbound calls.
 
+### Console and command line
+
+Set `console: { enabled: true }` and open `http://localhost:8080/__console/` to browse the journal,
+shadow mocks and recordings. The same binary manages them from a terminal, for example
+`shadowmock session create ...` and `shadowmock journal ...`. See the
+[admin API guide](docs/guide/10-admin-api.md#console-and-command-line).
+
 ### Configuration
 
 Configuration comes from a YAML file (`--config`), `SHADOWMOCK_*` environment variables and
@@ -142,8 +149,9 @@ Run the checks with `make lint` and `make test`, and the acceptance specs with `
 
 ## Status
 
-The engine, shadow mocks and WireMock parity are built. The central server (metrics, tracing,
-hardening) is in progress, and a hosted multi-tenant service is planned.
+The engine, shadow mocks, WireMock parity, the shared central server, the web console and the
+`shadowmock` command line are built and tested, including against real WireMock in CI. Sessions
+shared across several server instances and a hosted multi-tenant service are planned.
 
 ## Licence
 
