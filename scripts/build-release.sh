@@ -44,6 +44,8 @@ for target in "${TARGETS[@]}"; do
   echo "building $name"
   CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" GOARM="${goarm:-}" \
     go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$stage/$bin" ./cmd/shadowmock
+  # The AGPL needs the licence to travel with the binary.
+  cp LICENSE NOTICE README.md "$stage/"
 
   if [[ "$goos" == "windows" ]]; then
     if command -v zip >/dev/null; then
