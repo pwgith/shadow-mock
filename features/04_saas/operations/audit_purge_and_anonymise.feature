@@ -61,6 +61,19 @@ Feature: The audit trail, purging an org and anonymising a person
     Then the response status is 200
     And entries for "erin" are unchanged
 
+  Scenario Outline: A person is anonymised in an org that is not served
+    Given "dana" created 2 shadow mocks and made 5 audited calls
+    And the status of org "acme" is "<status>"
+    When the management app calls admin "POST" "/people/dana/anonymise"
+    Then the response status is 200
+    And no entry names "dana"
+
+    Examples:
+      | status    |
+      | suspended |
+      | cancelled |
+      | deleted   |
+
   Scenario: Journal entries are removed with the org, not traced to a person
     Given a request was sent to "https://shadowmock.test/acme/hello"
     When the management app purges the org
