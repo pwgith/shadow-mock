@@ -75,9 +75,10 @@ func New(cfg Config, clk clock.Clock) (*Client, error) {
 // target builds the URL of a key, or of the bucket when key is "".
 func (c *Client) target(key string, query url.Values) *url.URL {
 	u := *c.base
-	host, path := c.base.Host, ""
+	// The endpoint's own path comes first: Supabase Storage serves S3 under /storage/v1/s3.
+	host, path := c.base.Host, strings.TrimSuffix(c.base.EscapedPath(), "/")
 	if c.cfg.PathStyle {
-		path = "/" + c.cfg.Bucket
+		path += "/" + c.cfg.Bucket
 	} else {
 		host = c.cfg.Bucket + "." + host
 	}
