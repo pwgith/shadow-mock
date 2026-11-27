@@ -441,16 +441,16 @@ func (rt *Router) rejectIP(w http.ResponseWriter, org *tenant.Org, ip netip.Addr
 }
 
 // refuseOrgState answers for an org that is not served (FR-11.5): suspended and cancelled orgs get 403
-// and say why; a deleted one gets 410 for everything but the management app's purge. It reports whether
-// it answered.
+// and say why; a deleted one gets 410. The management app's purge and anonymise still pass, whatever the
+// org's state, because erasing a person or an org must not wait for the org to be served again (FR-11.15).
+// It reports whether it answered.
 func (rt *Router) refuseOrgState(w http.ResponseWriter, org *tenant.Org, isAdmin bool, method, adminPath string) bool {
 	switch {
 	case org.Status.Serves():
 		return false
+	case isAdmin && method == http.MethodPost && erasure(adminPath):
+		return false
 	case org.Status == tenant.StatusDeleted:
-		if isAdmin && method == http.MethodPost && adminPath == "/__admin/org/purge" {
-			return false
-		}
 		w.Header().Set(ReasonHeader, string(apierr.OrgDeleted))
 		apierr.New(http.StatusGone, apierr.OrgDeleted, "This org has been deleted.").Write(w)
 	default:
@@ -458,6 +458,20 @@ func (rt *Router) refuseOrgState(w http.ResponseWriter, org *tenant.Org, isAdmin
 		apierr.New(http.StatusForbidden, apierr.OrgSuspended, "This org is suspended.").Write(w)
 	}
 	return true
+}
+
+// erasure reports whether an admin path is the management app's purge or anonymise, which an org that is not
+// served still answers (its token still needs the system scope, FR-11.15).
+func erasure(adminPath string) bool {
+	if adminPath == "/__admin/org/purge" {
+		return true
+	}
+	person, ok := strings.CutPrefix(adminPath, "/__admin/people/")
+	if !ok {
+		return false
+	}
+	id, ok := strings.CutSuffix(person, "/anonymise")
+	return ok && id != "" && !strings.Contains(id, "/")
 }
 
 // ReasonHeader names the header that says why the engine refused a request.
