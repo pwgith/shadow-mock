@@ -4,6 +4,7 @@
 package usage
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"time"
@@ -40,17 +41,23 @@ type bucket struct {
 	dirty bool
 }
 
-// Meter holds the buckets in memory.
+// Meter holds the buckets in memory, and with a Store also writes them beyond the instance (store.go).
 type Meter struct {
-	clk clock.Clock
+	clk   clock.Clock
+	store Store
 
 	mu   sync.Mutex
 	orgs map[tenant.ID]map[time.Time]*bucket
+	// pending is what this instance counted since it last wrote to the store, by org and hour.
+	pending map[tenant.ID]map[time.Time]*Bucket
+	// base is each org's stored requests in baseMonth, as read at the last write.
+	base      map[tenant.ID]int64
+	baseMonth time.Time
 }
 
 // New returns an empty meter.
 func New(clk clock.Clock) *Meter {
-	return &Meter{clk: clk, orgs: map[tenant.ID]map[time.Time]*bucket{}}
+	return &Meter{clk: clk, orgs: map[tenant.ID]map[time.Time]*bucket{}, pending: map[tenant.ID]map[time.Time]*Bucket{}}
 }
 
 func hourOf(t time.Time) time.Time { return t.UTC().Truncate(time.Hour) }
@@ -72,49 +79,47 @@ func (m *Meter) at(org tenant.ID, t time.Time) *bucket {
 	return b
 }
 
-// Request counts a served mock request.
-func (m *Meter) Request(org tenant.ID) {
+// count applies fn to the org's bucket for this hour, and to what is waiting to be written when there is a store.
+func (m *Meter) count(org tenant.ID, fn func(*Bucket)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.at(org, m.clk.Now()).Requests++
+	now := m.clk.Now()
+	fn(&m.at(org, now).Bucket)
+	if m.store != nil {
+		fn(m.pendingAt(org, hourOf(now)))
+	}
 }
+
+// Request counts a served mock request.
+func (m *Meter) Request(org tenant.ID) { m.count(org, func(b *Bucket) { b.Requests++ }) }
 
 // RateLimited counts a request refused by the rate limit.
-func (m *Meter) RateLimited(org tenant.ID) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.at(org, m.clk.Now()).RateLimited++
-}
+func (m *Meter) RateLimited(org tenant.ID) { m.count(org, func(b *Bucket) { b.RateLimited++ }) }
 
 // IPRejected counts a request refused by the allowlist.
-func (m *Meter) IPRejected(org tenant.ID) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.at(org, m.clk.Now()).IPRejected++
-}
+func (m *Meter) IPRejected(org tenant.ID) { m.count(org, func(b *Bucket) { b.IPRejected++ }) }
 
 // Sessions notes how many shadow mocks are active now.
 func (m *Meter) Sessions(org tenant.ID, active int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if b := m.at(org, m.clk.Now()); active > b.ConcurrentSessionsMax {
-		b.ConcurrentSessionsMax = active
-	}
+	m.count(org, func(b *Bucket) { b.ConcurrentSessionsMax = max(b.ConcurrentSessionsMax, active) })
 }
 
 // StoredFiles notes how many files and bytes the org stores now.
 func (m *Meter) StoredFiles(org tenant.ID, f Files) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	b := m.at(org, m.clk.Now())
-	b.StoredFiles.Count = max(b.StoredFiles.Count, f.Count)
-	b.StoredFiles.Bytes = max(b.StoredFiles.Bytes, f.Bytes)
+	m.count(org, func(b *Bucket) {
+		b.StoredFiles.Count = max(b.StoredFiles.Count, f.Count)
+		b.StoredFiles.Bytes = max(b.StoredFiles.Bytes, f.Bytes)
+	})
 }
 
-// Month is how many requests the org has had served in the calendar month of t.
+// Month is how many requests the org has had served in the calendar month of t. With a store it is what every
+// instance has written, as read at this instance's last write, plus what this one has not written yet.
 func (m *Meter) Month(org tenant.ID, t time.Time) int64 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.store != nil {
+		return m.storedMonth(org, t)
+	}
 	t = t.UTC()
 	var n int64
 	for h, b := range m.orgs[org] {
@@ -128,12 +133,22 @@ func (m *Meter) Month(org tenant.ID, t time.Time) int64 {
 // Buckets returns the org's hourly buckets that start in [from, to), oldest first. A zero `to` means now. When both
 // ends are given, every hour of the range has a bucket, and an hour with nothing counted is an empty one.
 func (m *Meter) Buckets(org tenant.ID, from, to time.Time) []Bucket {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	return m.BucketsContext(context.Background(), org, from, to)
+}
+
+// BucketsContext is Buckets for a caller with a context, which bounds the read of the store.
+func (m *Meter) BucketsContext(ctx context.Context, org tenant.ID, from, to time.Time) []Bucket {
 	fill := !from.IsZero() && !to.IsZero()
 	if to.IsZero() {
 		to = m.clk.Now().Add(time.Hour)
 	}
+	if m.store != nil {
+		if stored, ok := m.storedBuckets(ctx, org, from, to); ok {
+			return withEveryHour(stored, from, to, fill)
+		}
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	out := []Bucket{}
 	for h, b := range m.orgs[org] {
 		if h.Before(hourOf(from)) || !h.Before(to) {
@@ -147,6 +162,12 @@ func (m *Meter) Buckets(org tenant.ID, from, to time.Time) []Bucket {
 		b.read, b.dirty = true, false
 		out = append(out, b.Bucket)
 	}
+	return withEveryHour(out, from, to, fill)
+}
+
+// withEveryHour adds an empty bucket for each hour of [from, to) that has none when fill is set, and sorts the
+// buckets oldest first.
+func withEveryHour(out []Bucket, from, to time.Time, fill bool) []Bucket {
 	if fill {
 		have := make(map[time.Time]bool, len(out))
 		for _, b := range out {
@@ -167,4 +188,6 @@ func (m *Meter) Forget(org tenant.ID) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.orgs, org)
+	delete(m.pending, org)
+	delete(m.base, org)
 }

@@ -40,7 +40,7 @@ func newOrg(t *testing.T, db *pgtest.DB, status string) (id tenant.ID, handle st
 	raw(t, db, "INSERT INTO engine.orgs (id, handle, status) VALUES ($1, $2, $3)", string(id), handle, status)
 	t.Cleanup(func() {
 		ctx := context.WithoutCancel(t.Context())
-		for _, table := range []string{"files", "mappings", "api_keys", "org_aliases", "audit_log"} {
+		for _, table := range []string{"files", "mappings", "api_keys", "org_aliases", "audit_log", "usage"} {
 			_ = db.Exec(ctx, "DELETE FROM engine."+table+" WHERE org_id = $1", string(id))
 		}
 		_ = db.Exec(ctx, "DELETE FROM engine.orgs WHERE id = $1", string(id))

@@ -210,7 +210,7 @@ func (h *Handler) usage(w http.ResponseWriter, r *http.Request, sc store.Scope) 
 		return err
 	}
 	h.noteFiles(r.Context(), sc)
-	return writeJSON(w, http.StatusOK, usageView{Buckets: h.svc.Usage.Buckets(sc.Tenant, from, to)})
+	return writeJSON(w, http.StatusOK, usageView{Buckets: h.svc.Usage.BucketsContext(r.Context(), sc.Tenant, from, to)})
 }
 
 // noteFiles records what the org stores now, so the bucket carries its peak.
