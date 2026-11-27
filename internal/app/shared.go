@@ -18,6 +18,7 @@ import (
 	"github.com/pwgith/shadow-mock/internal/store/postgres"
 	redisstore "github.com/pwgith/shadow-mock/internal/store/redis"
 	"github.com/pwgith/shadow-mock/internal/tenant"
+	"github.com/pwgith/shadow-mock/internal/usage"
 )
 
 // startupTimeout bounds opening the shared stores, so a database that is not there stops the engine from starting
@@ -163,11 +164,56 @@ func upOrDown(err error) string {
 	return "up"
 }
 
+// usageMeter counts usage in memory, and with the database also in engine.usage, so that it outlives the instance
+// (FR-11.12). The database's meter is written every minute and on shutdown, before the connection closes.
+func (a *App) usageMeter(o Options) *usage.Meter {
+	if a.sh.pg == nil {
+		return usage.New(o.Clock)
+	}
+	m := usage.NewStored(o.Clock, a.sh.pg.Usage())
+	flushOnClose := func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), usageFlushTimeout)
+		defer cancel()
+		if err := m.Flush(ctx); err != nil {
+			return fmt.Errorf("write usage: %w", err)
+		}
+		return nil
+	}
+	a.closers = append([]func() error{flushOnClose}, a.closers...)
+	return m
+}
+
+// usageFlushTimeout bounds one write of the usage counts.
+const usageFlushTimeout = 10 * time.Second
+
+// usageFlushEvery is how often the usage counts are written; a crash loses at most this much.
+const usageFlushEvery = time.Minute
+
+// startUsage reads the stored month before serving, so the monthly cap holds after a restart, then writes the
+// counts every minute.
+func (a *App) startUsage(ctx context.Context) error {
+	if a.meter == nil || a.sh.pg == nil {
+		return nil
+	}
+	if err := a.meter.Flush(ctx); err != nil {
+		return fmt.Errorf("read usage: %w", err)
+	}
+	go clock.Every(ctx, usageFlushEvery, func() {
+		if err := a.meter.Flush(ctx); err != nil {
+			a.log.WarnContext(ctx, "write usage", "error", err.Error())
+		}
+	})
+	return nil
+}
+
 // startShared loads the orgs from the database and starts the relay that keeps them, and the global layer, up to
 // date. It returns the orgs to load and the stream of changes for the service.
 func (a *App) startShared(ctx context.Context) ([]tenant.ID, <-chan store.ChangeEvent, error) {
 	if err := a.sh.orgs.Refresh(ctx); err != nil {
 		return nil, nil, fmt.Errorf("load orgs: %w", err)
+	}
+	if err := a.startUsage(ctx); err != nil {
+		return nil, nil, err
 	}
 	out := make(chan store.ChangeEvent, 64)
 	go a.relay(ctx, out)

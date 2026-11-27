@@ -665,7 +665,7 @@ func (a *App) Usage() *usage.Meter { return a.meter }
 // managedState makes the usage meter and the audit trail that managed mode keeps (FR-11.12, FR-11.15).
 func (a *App) managedState(cfg config.Config, o Options) {
 	if cfg.Mode == modeManaged {
-		a.meter, a.audit = usage.New(o.Clock), a.managedAudit(o)
+		a.meter, a.audit = a.usageMeter(o), a.managedAudit(o)
 	}
 }
 
